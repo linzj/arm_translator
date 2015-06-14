@@ -1,0 +1,14 @@
+rax = Memory(8, 0x1000)
+rbx = Memory(8, 0x2000)
+rcx = 1
+rdx = 0
+novex
+%%
+a0 = GET(rax)
+a1 = GET(rcx)
+a2 = GET(rdx)
+a3 = LOADG(a2, a0, CONST(0x3000))
+a4 = GET(rbx)
+STOREG(a1, a3, a4)
+%%
+CheckMemory rbx 0x3000

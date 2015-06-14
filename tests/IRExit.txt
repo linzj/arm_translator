@@ -1,0 +1,9 @@
+rbx = 0xaaaa
+rcx= 0xaaaa
+%%
+EXIT 0xa0b0c0d0
+%%
+CheckEqual rip 0xa0b0c0d0
+CheckEqual rbx 0xaaaa
+CheckEqual rbx rcx
+CheckState 51

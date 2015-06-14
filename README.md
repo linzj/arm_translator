@@ -1,1 +1,1 @@
-# arm_translator
+# llvm-toy

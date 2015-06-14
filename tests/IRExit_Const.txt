@@ -1,0 +1,11 @@
+rbx = 0xaaaa
+rcx= 0xaaaa
+%%
+wocao=CONST(0x1000)
+PUT(8 * 8, RDTMP(wocao))
+EXIT 0xa0b0c0d0
+%%
+CheckEqual rip 0xa0b0c0d0
+CheckEqual rbx 0xaaaa
+CheckEqual rbx rcx
+CheckEqual rsi 0x1000
