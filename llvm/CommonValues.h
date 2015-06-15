@@ -41,6 +41,8 @@ public:
     const LValue int8Zero;
     const LValue int32Zero;
     const LValue int32One;
+    const LValue int32NegativeOne;
+    const LValue int32ThirtyTwo;
     const LValue int64Zero;
     const LValue intPtrZero;
     const LValue intPtrOne;

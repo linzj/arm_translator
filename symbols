@@ -493,10 +493,6 @@ syn_cp15_rt_trap
 syn_fp_access_trap
 syn_swstep
 syn_uncategorized
-tcg_const_i32
-tcg_const_i64
-tcg_const_ptr
-tcg_gen_add2_i32
 tcg_gen_add_i32
 tcg_gen_add_i64
 tcg_gen_addi_i32
@@ -564,7 +560,6 @@ tcg_gen_xor_i32
 tcg_gen_xor_i64
 tcg_gen_xori_i32
 tcg_global_mem_new_i32
-tcg_global_mem_new_i64
 tcg_global_reg_new_ptr
 tcg_temp_free
 tcg_temp_free_i32

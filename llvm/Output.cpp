@@ -256,6 +256,11 @@ LValue Output::buildAtomicCmpXchg(LValue addr, LValue cmp, LValue val)
     return llvmAPI->BuildExtractValue(m_builder, pair, 0, "");
 }
 
+LValue Output::buildAlloca(LType type)
+{
+    return llvmAPI->BuildAlloca(m_builder, type, "");
+}
+
 LType Output::typeOf(LValue val)
 {
     return llvmAPI->TypeOf(val);
