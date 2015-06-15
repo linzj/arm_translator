@@ -493,16 +493,6 @@ syn_cp15_rt_trap
 syn_fp_access_trap
 syn_swstep
 syn_uncategorized
-tcg_gen_add_i32
-tcg_gen_add_i64
-tcg_gen_addi_i32
-tcg_gen_addi_i64
-tcg_gen_addi_ptr
-tcg_gen_andc_i32
-tcg_gen_and_i32
-tcg_gen_and_i64
-tcg_gen_andi_i32
-tcg_gen_andi_i64
 tcg_gen_brcondi_i32
 tcg_gen_bswap16_i32
 tcg_gen_bswap32_i32

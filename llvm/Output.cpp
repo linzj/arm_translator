@@ -137,6 +137,11 @@ LValue Output::buildAnd(LValue lhs, LValue rhs)
     return jit::buildAnd(m_builder, lhs, rhs);
 }
 
+LValue Output::buildNot(LValue value)
+{
+    return llvmAPI->BuildNot(m_builder, value, "");
+}
+
 LValue Output::buildBr(LBasicBlock bb)
 {
     return jit::buildBr(m_builder, bb);

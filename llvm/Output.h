@@ -25,6 +25,7 @@ public:
     LValue buildStore(LValue val, LValue pointer);
     LValue buildAdd(LValue lhs, LValue rhs);
     LValue buildAnd(LValue lhs, LValue rhs);
+    LValue buildNot(LValue value);
     LValue buildOr(LValue left, LValue right);
     LValue buildShl(LValue lhs, LValue rhs);
     LValue buildLShr(LValue lhs, LValue rhs);

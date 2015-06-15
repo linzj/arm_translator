@@ -135,3 +135,62 @@ void tcg_gen_add_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
     LValue v = g_output->buildAdd(unwrapValue(arg1), unwrapValue(arg2));
     g_output->buildStore(v, unwrapPointer(ret));
 }
+
+void tcg_gen_add_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+{
+    LValue v = g_output->buildAdd(unwrapValue(arg1), unwrapValue(arg2));
+    g_output->buildStore(v, unwrapPointer(ret));
+}
+
+void tcg_gen_addi_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+{
+    LValue v;
+    if (arg2 != 0) {
+        v = g_output->buildAdd(unwrapValue(arg1), g_output->constInt32(arg2));
+    } else {
+        v = unwrapValue(arg1);
+    }
+    g_output->buildStore(v, unwrapPointer(ret));
+}
+
+void tcg_gen_addi_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
+{
+    LValue v;
+    if (arg2 != 0) {
+        v = g_output->buildAdd(unwrapValue(arg1), g_output->constInt64(arg2));
+    } else {
+        v = unwrapValue(arg1);
+    }
+    g_output->buildStore(v, unwrapPointer(ret));
+}
+
+void tcg_gen_andc_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    LValue t0 = g_output->buildNot(unwrapValue(arg2));
+    LValue v = g_output->buildAnd(unwrapValue(arg1), t0);
+    g_output->buildStore(v, unwrapPointer(ret));
+}
+
+void tcg_gen_and_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    LValue v = g_output->buildAnd(unwrapValue(arg1), unwrapValue(arg2));
+    g_output->buildStore(v, unwrapPointer(ret));
+}
+
+void tcg_gen_and_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+{
+    LValue v = g_output->buildAnd(unwrapValue(arg1), unwrapValue(arg2));
+    g_output->buildStore(v, unwrapPointer(ret));
+}
+
+void tcg_gen_andi_i32(TCGv_i32 ret, TCGv_i32 arg1, uint32_t arg2)
+{
+    LValue v = g_output->buildAnd(unwrapValue(arg1), g_output->constInt32(arg2));
+    g_output->buildStore(v, unwrapPointer(ret));
+}
+
+void tcg_gen_andi_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
+{
+    LValue v = g_output->buildAnd(unwrapValue(arg1), g_output->constInt64(arg2));
+    g_output->buildStore(v, unwrapPointer(ret));
+}
