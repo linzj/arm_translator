@@ -5,6 +5,7 @@
 #include "IntrinsicRepository.h"
 #include "Output.h"
 #include "cpu.h"
+#include "log.h"
 
 namespace jit {
 
@@ -15,6 +16,9 @@ uint8_t* g_currentBufferEnd;
 static LBasicBlock g_currentBB;
 static CompilerState* g_state;
 static Output* g_output;
+
+typedef std::unordered_map<int, LBasicBlock> LabelMap;
+LabelMap g_labelMap;
 
 static PlatformDesc g_desc = {
     sizeof(CPUARMState),
@@ -50,20 +54,21 @@ void llvm_tcg_deinit(void)
     g_output = nullptr;
     delete g_state;
     g_state = nullptr;
+    g_labelMap.clear();
 }
 }
 
 using namespace jit;
 
 template <typename TCGType>
-TCGType wrapPointer(LValue v)
+static TCGType wrapPointer(LValue v)
 {
     TCGType ret = reinterpret_cast<TCGType>(v);
     return ret;
 }
 
 template <typename TCGType>
-TCGType wrapValue(LValue v)
+static TCGType wrapValue(LValue v)
 {
     LValue alloca = g_output->buildAlloca(jit::typeOf(v));
     g_output->buildStore(v, alloca);
@@ -72,18 +77,24 @@ TCGType wrapValue(LValue v)
 }
 
 template <typename TCGType>
-LValue unwrapPointer(TCGType v)
+static LValue unwrapPointer(TCGType v)
 {
     return reinterpret_cast<LValue>(v);
 }
 
 template <typename TCGType>
-LValue unwrapValue(TCGType v)
+static LValue unwrapValue(TCGType v)
 {
     return g_output->buildLoad(reinterpret_cast<LValue>(v));
 }
 
-void extract_64_32(LValue my64, LValue rl, LValue rh)
+template <typename TCGType>
+void storeToTCG(LValue v, TCGType ret)
+{
+    g_output->buildStore(v, unwrapPointer(ret));
+}
+
+static void extract_64_32(LValue my64, LValue rl, LValue rh)
 {
     LValue thirtytwo = g_output->repo().int32ThirtyTwo;
     LValue negativeOne = g_output->repo().int32NegativeOne;
@@ -91,6 +102,36 @@ void extract_64_32(LValue my64, LValue rl, LValue rh)
     LValue rlUnwrap = g_output->buildCast(LLVMTrunc, my64, g_output->repo().int32);
     g_output->buildStore(rhUnwrap, rh);
     g_output->buildStore(rlUnwrap, rl);
+}
+
+static LLVMIntPredicate tcgCondToLLVM(TCGCond cond)
+{
+    switch (cond) {
+    case TCG_COND_EQ:
+        return LLVMIntEQ;
+    case TCG_COND_NE:
+        return LLVMIntNE;
+    /* signed */
+    case TCG_COND_LT:
+        return LLVMIntSLT;
+    case TCG_COND_GE:
+        return LLVMIntSGE;
+    case TCG_COND_LE:
+        return LLVMIntSLE;
+    case TCG_COND_GT:
+        return LLVMIntSGT;
+    /* unsigned */
+    case TCG_COND_LTU:
+        return LLVMIntULT;
+    case TCG_COND_GEU:
+        return LLVMIntUGE;
+    case TCG_COND_LEU:
+        return LLVMIntULE;
+    case TCG_COND_GTU:
+        return LLVMIntUGT;
+    default:
+        EMASSERT("unsupported compare" && false);
+    }
 }
 
 TCGv_i64 tcg_global_mem_new_i64(int reg, intptr_t offset, const char* name)
@@ -110,6 +151,29 @@ TCGv_i32 tcg_const_i32(int32_t val)
 TCGv_i64 tcg_const_i64(int64_t val)
 {
     return wrapValue<TCGv_i64>(g_output->constInt64(val));
+}
+
+static LBasicBlock labelToBB(int n)
+{
+    auto found = g_labelMap.find(n);
+    EMASSERT(found != g_labelMap.end());
+    LBasicBlock bb = found->second;
+    return bb;
+}
+
+int gen_new_label(void)
+{
+    static int count = 0;
+    LBasicBlock bb = g_output->appendBasicBlock("");
+    g_labelMap.insert(std::make_pair(count, bb));
+    return count++;
+}
+
+void gen_set_label(int n)
+{
+    LBasicBlock bb = labelToBB(n);
+    g_output->buildBr(bb);
+    g_output->positionToBBEnd(bb);
 }
 
 void tcg_gen_add2_i32(TCGv_i32 rl, TCGv_i32 rh, TCGv_i32 al,
@@ -133,13 +197,13 @@ void tcg_gen_add2_i32(TCGv_i32 rl, TCGv_i32 rh, TCGv_i32 al,
 void tcg_gen_add_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
     LValue v = g_output->buildAdd(unwrapValue(arg1), unwrapValue(arg2));
-    g_output->buildStore(v, unwrapPointer(ret));
+    storeToTCG(v, ret);
 }
 
 void tcg_gen_add_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
 {
     LValue v = g_output->buildAdd(unwrapValue(arg1), unwrapValue(arg2));
-    g_output->buildStore(v, unwrapPointer(ret));
+    storeToTCG(v, ret);
 }
 
 void tcg_gen_addi_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
@@ -147,10 +211,11 @@ void tcg_gen_addi_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
     LValue v;
     if (arg2 != 0) {
         v = g_output->buildAdd(unwrapValue(arg1), g_output->constInt32(arg2));
-    } else {
+    }
+    else {
         v = unwrapValue(arg1);
     }
-    g_output->buildStore(v, unwrapPointer(ret));
+    storeToTCG(v, ret);
 }
 
 void tcg_gen_addi_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
@@ -158,39 +223,99 @@ void tcg_gen_addi_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
     LValue v;
     if (arg2 != 0) {
         v = g_output->buildAdd(unwrapValue(arg1), g_output->constInt64(arg2));
-    } else {
+    }
+    else {
         v = unwrapValue(arg1);
     }
-    g_output->buildStore(v, unwrapPointer(ret));
+    storeToTCG(v, ret);
 }
 
 void tcg_gen_andc_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
     LValue t0 = g_output->buildNot(unwrapValue(arg2));
     LValue v = g_output->buildAnd(unwrapValue(arg1), t0);
-    g_output->buildStore(v, unwrapPointer(ret));
+    storeToTCG(v, ret);
 }
 
 void tcg_gen_and_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
     LValue v = g_output->buildAnd(unwrapValue(arg1), unwrapValue(arg2));
-    g_output->buildStore(v, unwrapPointer(ret));
+    storeToTCG(v, ret);
 }
 
 void tcg_gen_and_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
 {
     LValue v = g_output->buildAnd(unwrapValue(arg1), unwrapValue(arg2));
-    g_output->buildStore(v, unwrapPointer(ret));
+    storeToTCG(v, ret);
 }
 
 void tcg_gen_andi_i32(TCGv_i32 ret, TCGv_i32 arg1, uint32_t arg2)
 {
     LValue v = g_output->buildAnd(unwrapValue(arg1), g_output->constInt32(arg2));
-    g_output->buildStore(v, unwrapPointer(ret));
+    storeToTCG(v, ret);
 }
 
 void tcg_gen_andi_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
 {
     LValue v = g_output->buildAnd(unwrapValue(arg1), g_output->constInt64(arg2));
-    g_output->buildStore(v, unwrapPointer(ret));
+    storeToTCG(v, ret);
+}
+
+void tcg_gen_brcondi_i32(TCGCond cond, TCGv_i32 arg1,
+    int32_t arg2, int label_index)
+{
+    LBasicBlock taken = labelToBB(label_index);
+    LBasicBlock nottaken = g_output->appendBasicBlock("notTaken");
+    LValue v1 = unwrapValue(arg1);
+    LValue v2 = g_output->constInt32(arg2);
+    LValue condVal = g_output->buildICmp(tcgCondToLLVM(cond), v1, v2);
+    g_output->buildCondBr(condVal, taken, nottaken);
+    g_output->positionToBBEnd(nottaken);
+}
+
+void tcg_gen_bswap16_i32(TCGv_i32 ret, TCGv_i32 arg)
+{
+    LValue v = unwrapValue(arg);
+    LValue lower = g_output->buildAnd(v, g_output->repo().int32TwoFiveFive);
+    LValue higher = g_output->buildShl(v, g_output->repo().int32Eight);
+    LValue valret = g_output->buildOr(higher, lower);
+    storeToTCG(valret, ret);
+}
+
+void tcg_gen_bswap32_i32(TCGv_i32 ret, TCGv_i32 arg)
+{
+    LValue v = unwrapValue(arg);
+    LValue twentyFour = g_output->constInt32(24);
+    LValue hi24 = g_output->buildShl(v, twentyFour);
+    LValue hi16 = g_output->buildAnd(v, g_output->constInt32(0xff00));
+    hi16 = g_output->buildShl(hi16, g_output->repo().int32Eight);
+    LValue lo8 = g_output->buildAnd(v, g_output->constInt32(0xff0000));
+    lo8 = g_output->buildLShr(lo8, g_output->repo().int32Eight);
+    LValue lo0 = g_output->buildAnd(v, g_output->constInt32(0xff000000));
+    lo0 = g_output->buildLShr(lo0, twentyFour);
+    LValue ret1 = g_output->buildOr(hi24, hi16);
+    LValue ret2 = g_output->buildOr(lo0, lo8);
+    LValue retVal = g_output->buildOr(ret1, ret2);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_concat_i32_i64(TCGv_i64 dest, TCGv_i32 low,
+    TCGv_i32 high)
+{
+    LValue lo = unwrapValue(low);
+    LValue hi = unwrapValue(high);
+    LValue low64 = g_output->buildCast(LLVMZExt, lo, g_output->repo().int64);
+    LValue hi64 = g_output->buildCast(LLVMZExt, hi64, g_output->repo().int64);
+    hi64 = g_output->buildShl(hi64, g_output->repo().int32ThirtyTwo);
+    LValue ret = g_output->buildOr(hi64, low64);
+    storeToTCG(ret, dest);
+}
+
+void tcg_gen_deposit_i32(TCGv_i32 ret, TCGv_i32 arg1,
+    TCGv_i32 arg2, unsigned int ofs,
+    unsigned int len)
+{
+    EMASSERT(ofs < 32);
+    EMASSERT(len <= 32);
+    EMASSERT(ofs + len <= 32);
 }

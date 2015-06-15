@@ -5,12 +5,14 @@
 extern "C" {
 #endif
 
+int gen_new_label(void);
+void gen_set_label(int n);
 TCGv_i64 tcg_global_mem_new_i64(int reg, intptr_t offset, const char* name);
 TCGv_i32 tcg_const_i32(int32_t val);
 TCGv_i64 tcg_const_i64(int64_t val);
 #define TCGV_NAT_TO_PTR(a) ((TCGv_ptr)a)
 #define tcg_const_ptr(V) TCGV_NAT_TO_PTR(tcg_const_i32((intptr_t)(V)))
-# define tcg_gen_addi_ptr(R, A, B) \
+#define tcg_gen_addi_ptr(R, A, B) \
     tcg_gen_addi_i32(TCGV_PTR_TO_NAT(R), TCGV_PTR_TO_NAT(A), (B))
 
 void tcg_gen_add2_i32(TCGv_i32 rl, TCGv_i32 rh, TCGv_i32 al,
@@ -25,7 +27,16 @@ void tcg_gen_and_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
 void tcg_gen_and_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2);
 void tcg_gen_andi_i32(TCGv_i32 ret, TCGv_i32 arg1, uint32_t arg2);
 void tcg_gen_andi_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2);
+void tcg_gen_brcondi_i32(TCGCond cond, TCGv_i32 arg1,
+    int32_t arg2, int label_index);
+void tcg_gen_bswap16_i32(TCGv_i32 ret, TCGv_i32 arg);
+void tcg_gen_bswap32_i32(TCGv_i32 ret, TCGv_i32 arg);
+void tcg_gen_concat_i32_i64(TCGv_i64 dest, TCGv_i32 low,
+    TCGv_i32 high);
 
+void tcg_gen_deposit_i32(TCGv_i32 ret, TCGv_i32 arg1,
+    TCGv_i32 arg2, unsigned int ofs,
+    unsigned int len);
 #ifdef __cplusplus
 }
 #endif

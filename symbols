@@ -479,8 +479,6 @@ gen_helper_vfp_uitod
 gen_helper_vfp_uitos
 gen_helper_vfp_ultod
 gen_helper_vfp_ultos
-gen_new_label
-gen_set_label
 get_arm_cp_reginfo
 get_mem_index
 is_a64
@@ -493,10 +491,6 @@ syn_cp15_rt_trap
 syn_fp_access_trap
 syn_swstep
 syn_uncategorized
-tcg_gen_brcondi_i32
-tcg_gen_bswap16_i32
-tcg_gen_bswap32_i32
-tcg_gen_concat_i32_i64
 tcg_gen_deposit_i32
 tcg_gen_exit_tb
 tcg_gen_ext16s_i32
