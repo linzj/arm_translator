@@ -3,7 +3,7 @@
 #include "types.h"
 
 typedef struct TCGv_i32__* TCGv_i32;
-typedef struct TCGv_i54__* TCGv_i64;
+typedef struct TCGv_i64__* TCGv_i64;
 typedef struct TCGv_ptr__* TCGv_ptr;
 typedef struct TCGv__* TCGv;
 #define TARGET_FMT_lx "%08x"

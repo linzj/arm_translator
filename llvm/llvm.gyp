@@ -9,6 +9,7 @@
             'sources': [ '<@(sources)',],
             'include_dirs': [
                 '.',
+                '<(DEPTH)/qemu',
             ],
             'defines': [
                 'LLVMLOG_LEVEL=<(llvmlog_level)',
@@ -16,6 +17,7 @@
             'direct_dependent_settings': {
                 'include_dirs': [
                     '.',
+                    '<(DEPTH)/qemu',
                 ],
                 'libraries': [
                     '<!(llvm-config --libs)',

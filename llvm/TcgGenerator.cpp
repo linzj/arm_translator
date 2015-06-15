@@ -1,84 +1,104 @@
 #include <unordered_map>
+#include <vector>
 #include "TcgGenerator.h"
 #include "CompilerState.h"
 #include "IntrinsicRepository.h"
 #include "Output.h"
 #include "cpu.h"
 
+struct TCGCommonStruct {
+    jit::LValue m_value;
+};
+
+struct TCGv_i32__ : public TCGCommonStruct {
+};
+struct TCGv_i64__ : public TCGCommonStruct {
+};
+struct TCGv_ptr__ : public TCGCommonStruct {
+};
+struct TCGv__ : public TCGCommonStruct {
+};
+
 namespace jit {
 
-static inline CompilerState& state()
+const static size_t allocate_unit = 4096 * 16;
+typedef std::vector<void*> TcgBufferList;
+static TcgBufferList g_bufferList;
+uint8_t* g_currentBufferPointer;
+uint8_t* g_currentBufferEnd;
+
+static LBasicBlock g_currentBB;
+static CompilerState* g_state;
+static Output* g_output;
+
+static PlatformDesc g_desc = {
+    sizeof(CPUARMState),
+    static_cast<size_t>(offsetof(CPUARMState, regs[15])), /* offset of pc */
+    11, /* prologue size */
+    17, /* direct size */
+    17, /* indirect size */
+    17, /* assist size */
+};
+
+template <typename Type>
+Type allocateTcg()
 {
-    PlatformDesc desc = {
-        sizeof(CPUARMState),
-        static_cast<size_t>(offsetof(CPUARMState, regs[15])), /* offset of pc */
-        11, /* prologue size */
-        17, /* direct size */
-        17, /* indirect size */
-        17, /* assist size */
-    };
-    static CompilerState mystate("qemu", desc);
-    return mystate;
+    if (g_currentBufferPointer >= g_currentBufferEnd) {
+        g_currentBufferPointer = static_cast<uint8_t*>(malloc(allocate_unit));
+        g_currentBufferEnd = g_currentBufferPointer + allocate_unit;
+        g_bufferList.push_back(g_currentBufferPointer);
+    }
+    Type r = reinterpret_cast<Type>(g_currentBufferPointer);
+    g_currentBufferPointer += sizeof(*r);
+    return r;
 }
 
-static inline IntrinsicRepository& repo()
+void clearTcgBuffer()
 {
-    CompilerState& mystate = state();
-    static IntrinsicRepository myrepo(mystate.m_context, mystate.m_module);
-    return myrepo;
-}
-
-static inline LBuilder builder()
-{
-    static LBuilder mybuilder = llvmAPI->CreateBuilderInContext(state().m_context);
-    return mybuilder;
+    for (void* b : g_bufferList) {
+        free(b);
+    }
+    g_bufferList.clear();
+    g_currentBufferPointer = nullptr;
+    g_currentBufferEnd = nullptr;
 }
 
 static LType argType()
 {
-    static LType myargType = pointerType(arrayType(repo().int8, state().m_platformDesc.m_contextSize));
+    LType globalInt8Type = llvmAPI->Int8Type();
+    static LType myargType = pointerType(arrayType(globalInt8Type, g_desc.m_contextSize));
     return myargType;
 }
 
-static LValue g_function;
-static LBasicBlock g_currentBB;
-static LValue g_arg;
-
 static inline LBasicBlock appendBasicBlock(const char* name)
 {
-    return jit::appendBasicBlock(state().m_context, state().m_function, name);
-}
-
-static inline void Output::positionToBBEnd(LBasicBlock bb)
-{
-    g_currentBB = bb;
-    PositionBuilderAtEnd(builder(), bb);
+    return jit::appendBasicBlock(g_state->m_context, g_state->m_function, name);
 }
 
 void llvm_tcg_init(void)
 {
-    CompilerState& mystate = state();
-    m_function = addFunction(
-        state.m_module, "main", functionType(repo().int64, argType()));
-
-    m_prologue = appendBasicBlock("");
-    positionToBBEnd(m_prologue);
-    g_arg = llvmAPI->GetParam(g_function, 0);
+    g_state = new CompilerState("qemu", g_desc);
+    g_output = new Output(*g_state);
 }
 
 void llvm_tcg_deinit(void)
 {
-    llvmAPI->DeleteFunction(g_function);
-    g_function = nullptr;
-    g_currentBB = nullptr;
-    g_arg = nullptr;
+    llvmAPI->DeleteFunction(g_state->m_function);
+    delete g_output;
+    g_output = nullptr;
+    delete g_state;
+    g_state = nullptr;
+    clearTcgBuffer();
 }
 }
 
 using namespace jit;
+
 TCGv_i64 tcg_global_mem_new_i64(int reg, intptr_t offset, const char* name)
 {
-    LValue v = jit::buildAdd(g_arg, offset);
-    LValue v2 = jit::buildPointerCast(v, repo().ref64);
-    return reinterpret_cast<TCGv_i64>(v2);
+    LValue v = g_output->buildAdd(g_output->arg(), g_output->constInt32(offset));
+    LValue v2 = g_output->buildPointerCast(v, g_output->repo().ref64);
+    TCGv_i64 ret = allocateTcg<TCGv_i64>();
+    ret->m_value = v2;
+    return ret;
 }

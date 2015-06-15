@@ -14,6 +14,7 @@
             'Compile.cpp',
             'StackMaps.cpp',
             'Link.cpp',
+            'TcgGenerator.cpp',
         ],
         'llvmlog_level': 0,
     },
