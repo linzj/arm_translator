@@ -9,11 +9,9 @@
 #include "PlatformDesc.h"
 namespace jit {
 enum class PatchType {
-    Direct,
-    DirectSlow,
-    Indirect,
     Assist,
-    Tcg,
+    TcgDirect,
+    TcgIndirect,
 };
 
 struct PatchDesc {

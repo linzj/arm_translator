@@ -38,7 +38,31 @@ void tcg_gen_deposit_i32(TCGv_i32 ret, TCGv_i32 arg1,
     TCGv_i32 arg2, unsigned int ofs,
     unsigned int len);
 void tcg_gen_mov_i32(TCGv_i32 ret, TCGv_i32 arg);
-void tcg_gen_exit_tb(uintptr_t val);
+void tcg_gen_exit_tb(int direct);
+void tcg_gen_ext16s_i32(TCGv_i32 ret, TCGv_i32 arg);
+void tcg_gen_ext16u_i32(TCGv_i32 ret, TCGv_i32 arg);
+void tcg_gen_ext32u_i64(TCGv_i64 ret, TCGv_i64 arg);
+void tcg_gen_ext8s_i32(TCGv_i32 ret, TCGv_i32 arg);
+void tcg_gen_ext8u_i32(TCGv_i32 ret, TCGv_i32 arg);
+void tcg_gen_ext_i32_i64(TCGv_i64 ret, TCGv_i32 arg);
+void tcg_gen_extu_i32_i64(TCGv_i64 ret, TCGv_i32 arg);
+void tcg_gen_ld_i32(TCGv_i32 ret, TCGv_ptr arg2, tcg_target_long offset);
+void tcg_gen_ld_i64(TCGv_i64 ret, TCGv_ptr arg2,
+    tcg_target_long offset);
+void tcg_gen_movcond_i32(TCGCond cond, TCGv_i32 ret,
+    TCGv_i32 c1, TCGv_i32 c2,
+    TCGv_i32 v1, TCGv_i32 v2);
+void tcg_gen_movcond_i64(TCGCond cond, TCGv_i64 ret,
+    TCGv_i64 c1, TCGv_i64 c2,
+    TCGv_i64 v1, TCGv_i64 v2);
+void tcg_gen_mov_i64(TCGv_i64 ret, TCGv_i64 arg);
+void tcg_gen_movi_i32(TCGv_i32 ret, int32_t arg);
+void tcg_gen_movi_i64(TCGv_i64 ret, int64_t arg);
+void tcg_gen_mul_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
+void tcg_gen_muls2_i32(TCGv_i32 rl, TCGv_i32 rh,
+    TCGv_i32 arg1, TCGv_i32 arg2);
+void tcg_gen_mulu2_i32(TCGv_i32 rl, TCGv_i32 rh,
+    TCGv_i32 arg1, TCGv_i32 arg2);
 #ifdef __cplusplus
 }
 #endif

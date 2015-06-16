@@ -3,16 +3,13 @@
 namespace jit {
 struct LinkDesc {
     void* m_opaque;
-    void* m_dispDirect;
-    void* m_dispDirectSlow;
-    void* m_dispIndirect;
     void* m_dispAssist;
-    void* m_dispTcg;
+    void* m_dispTcgDirect;
+    void* m_dispTcgIndirect;
     void (*m_patchPrologue)(void* opaque, uint8_t* start);
-    void (*m_patchDirect)(void* opaque, uint8_t* toFill, void*);
-    void (*m_patchIndirect)(void* opaque, uint8_t* toFill, void*);
     void (*m_patchAssist)(void* opaque, uint8_t* toFill, void*);
-    void (*m_patchTcg)(void* opaque, uint8_t* toFill, void*, int reg);
+    void (*m_patchTcgDirect)(void* opaque, uint8_t* toFill, void*);
+    void (*m_patchTcgIndirect)(void* opaque, uint8_t* toFill, void*);
 };
 
 void link(CompilerState& state, const LinkDesc& desc);

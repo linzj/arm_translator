@@ -132,14 +132,29 @@ LValue Output::buildLShr(LValue lhs, LValue rhs)
     return llvmAPI->BuildLShr(m_builder, lhs, rhs, "");
 }
 
+LValue Output::buildAShr(LValue lhs, LValue rhs)
+{
+    return llvmAPI->BuildAShr(m_builder, lhs, rhs, "");
+}
+
 LValue Output::buildAnd(LValue lhs, LValue rhs)
 {
     return jit::buildAnd(m_builder, lhs, rhs);
 }
 
+LValue Output::buildMul(LValue lhs, LValue rhs)
+{
+    return jit::buildMul(m_builder, lhs, rhs);
+}
+
 LValue Output::buildNot(LValue value)
 {
     return llvmAPI->BuildNot(m_builder, value, "");
+}
+
+LValue Output::buildNeg(LValue value)
+{
+    return llvmAPI->BuildNeg(m_builder, value, "");
 }
 
 LValue Output::buildBr(LBasicBlock bb)
@@ -179,36 +194,6 @@ void Output::buildGetArg()
     m_arg = llvmAPI->GetParam(m_state.m_function, 0);
 }
 
-void Output::buildDirectPatch(uintptr_t where)
-{
-    PatchDesc desc = { PatchType::Direct };
-    buildPatchCommon(constInt64(where), desc, m_state.m_platformDesc.m_directSize);
-}
-
-void Output::buildDirectPatch(LValue where)
-{
-    PatchDesc desc = { PatchType::Direct };
-    buildPatchCommon(where, desc, m_state.m_platformDesc.m_directSize);
-}
-
-void Output::buildDirectSlowPatch(uintptr_t where)
-{
-    PatchDesc desc = { PatchType::DirectSlow };
-    buildPatchCommon(constInt64(where), desc, m_state.m_platformDesc.m_directSize);
-}
-
-void Output::buildDirectSlowPatch(LValue where)
-{
-    PatchDesc desc = { PatchType::DirectSlow };
-    buildPatchCommon(where, desc, m_state.m_platformDesc.m_directSize);
-}
-
-void Output::buildIndirectPatch(LValue where)
-{
-    PatchDesc desc = { PatchType::Indirect };
-    buildPatchCommon(where, desc, m_state.m_platformDesc.m_indirectSize);
-}
-
 void Output::buildAssistPatch(LValue where)
 {
     PatchDesc desc = { PatchType::Assist };
@@ -226,10 +211,20 @@ void Output::buildPatchCommon(LValue where, const PatchDesc& desc, size_t patchS
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
 }
 
-void Output::buildTcgPatch(LValue val)
+void Output::buildTcgDirectPatch(void)
 {
-    PatchDesc desc = { PatchType::Tcg };
-    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt32(m_stackMapsId), constInt32(m_state.m_platformDesc.m_tcgSize), constNull(repo().ref8), constInt32(1), val);
+    PatchDesc desc = { PatchType::TcgDirect };
+    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt32(m_stackMapsId), constInt32(m_state.m_platformDesc.m_tcgSize), constNull(repo().ref8), constInt32(0));
+    llvmAPI->SetInstructionCallConv(call, LLVMAnyRegCallConv);
+    buildUnreachable(m_builder);
+    // record the stack map info
+    m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+}
+
+void Output::buildTcgIndirectPatch(void)
+{
+    PatchDesc desc = { PatchType::TcgIndirect };
+    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt32(m_stackMapsId), constInt32(m_state.m_platformDesc.m_tcgSize), constNull(repo().ref8), constInt32(0));
     llvmAPI->SetInstructionCallConv(call, LLVMAnyRegCallConv);
     buildUnreachable(m_builder);
     // record the stack map info

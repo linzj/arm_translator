@@ -25,10 +25,13 @@ public:
     LValue buildStore(LValue val, LValue pointer);
     LValue buildAdd(LValue lhs, LValue rhs);
     LValue buildAnd(LValue lhs, LValue rhs);
+    LValue buildMul(LValue lhs, LValue rhs);
     LValue buildNot(LValue value);
+    LValue buildNeg(LValue value);
     LValue buildOr(LValue left, LValue right);
     LValue buildShl(LValue lhs, LValue rhs);
     LValue buildLShr(LValue lhs, LValue rhs);
+    LValue buildAShr(LValue lhs, LValue rhs);
     LValue buildBr(LBasicBlock bb);
     LValue buildCondBr(LValue condition, LBasicBlock taken, LBasicBlock notTaken);
     LValue buildRet(LValue ret);
@@ -70,13 +73,9 @@ public:
     LValue buildPointerCast(LLVMValueRef Val, LLVMTypeRef DestTy);
     LValue buildPhi(LType type);
 
-    void buildDirectPatch(uintptr_t where);
-    void buildDirectPatch(LValue where);
-    void buildDirectSlowPatch(uintptr_t where);
-    void buildDirectSlowPatch(LValue where);
-    void buildIndirectPatch(LValue where);
     void buildAssistPatch(LValue where);
-    void buildTcgPatch(LValue val);
+    void buildTcgDirectPatch(void);
+    void buildTcgIndirectPatch(void);
 
     inline IntrinsicRepository& repo() { return m_repo; }
     inline LType argType() const { return m_argType; }

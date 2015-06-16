@@ -79,4 +79,6 @@ typedef enum TCGMemOp {
     MO_SSIZE = MO_SIZE | MO_SIGN,
 } TCGMemOp;
 
+typedef target_ulong tcg_target_long;
+
 #endif /* TGTYPE_H */

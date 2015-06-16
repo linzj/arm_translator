@@ -22,23 +22,16 @@ void link(CompilerState& state, const LinkDesc& desc)
         EMASSERT(found != state.m_patchMap.end());
         PatchDesc& patchDesc = found->second;
         switch (patchDesc.m_type) {
-        case PatchType::Direct: {
-            desc.m_patchDirect(desc.m_opaque, body + record.second[0].instructionOffset, desc.m_dispDirect);
-        } break;
-        case PatchType::DirectSlow: {
-            desc.m_patchDirect(desc.m_opaque, body + record.second[0].instructionOffset, desc.m_dispDirectSlow);
-        } break;
-        case PatchType::Indirect: {
-            desc.m_patchIndirect(desc.m_opaque, body + record.second[0].instructionOffset, desc.m_dispIndirect);
-        } break;
         case PatchType::Assist: {
             desc.m_patchAssist(desc.m_opaque, body + record.second[0].instructionOffset, desc.m_dispAssist);
         } break;
-        case PatchType::Tcg: {
+        case PatchType::TcgDirect: {
             auto& recordUnit = record.second[0];
-            auto& location = recordUnit.locations[1];
-            EMASSERT(location.kind == StackMaps::Location::Register);
-            desc.m_patchTcg(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcg, location.dwarfReg.reg().val());
+            desc.m_patchTcgDirect(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcgDirect);
+        } break;
+        case PatchType::TcgIndirect: {
+            auto& recordUnit = record.second[0];
+            desc.m_patchTcgIndirect(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcgIndirect);
         } break;
         default:
             __builtin_unreachable();

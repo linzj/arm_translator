@@ -34,7 +34,7 @@ static void buildIR(State& state)
     LBasicBlock patch = output.appendBasicBlock("Patch");
     output.buildBr(patch);
     output.positionToBBEnd(patch);
-    output.buildDirectPatch(reinterpret_cast<uintptr_t>(myexit));
+    output.buildTcgDirectPatch();
 }
 
 static void mydispIndirect(void)

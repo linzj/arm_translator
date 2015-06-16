@@ -342,7 +342,166 @@ void tcg_gen_mov_i32(TCGv_i32 ret, TCGv_i32 arg)
     storeToTCG(v, ret);
 }
 
-void tcg_gen_exit_tb(uintptr_t val)
+void tcg_gen_exit_tb(int direct)
 {
-    g_output->buildTcgPatch(g_output->constInt32(val));
+    if (direct)
+        g_output->buildTcgDirectPatch();
+    else
+        g_output->buildTcgIndirectPatch();
+}
+
+void tcg_gen_ext16s_i32(TCGv_i32 ret, TCGv_i32 arg)
+{
+    LValue retVal = g_output->buildShl(unwrapValue(arg), g_output->repo().int32Sixteen);
+    retVal = g_output->buildAShr(retVal, g_output->repo().int32Sixteen);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_ext16u_i32(TCGv_i32 ret, TCGv_i32 arg)
+{
+    LValue retVal = g_output->buildAnd(unwrapValue(arg), g_output->constInt32(0xffff));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_ext32u_i64(TCGv_i64 ret, TCGv_i64 arg)
+{
+    LValue retVal = g_output->buildAnd(unwrapValue(arg), g_output->constInt64(0xffffffffu));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_ext8s_i32(TCGv_i32 ret, TCGv_i32 arg)
+{
+    LValue constant = g_output->constInt32(24);
+    LValue retVal = g_output->buildShl(unwrapValue(arg), constant);
+    retVal = g_output->buildAShr(retVal, constant);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_ext8u_i32(TCGv_i32 ret, TCGv_i32 arg)
+{
+    LValue retVal = g_output->buildAnd(unwrapValue(arg), g_output->constInt32(0xff));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_ext_i32_i64(TCGv_i64 ret, TCGv_i32 arg)
+{
+    LValue retVal = g_output->buildCast(LLVMSExt, unwrapValue(arg), g_output->repo().int64);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_extu_i32_i64(TCGv_i64 ret, TCGv_i32 arg)
+{
+    LValue retVal = g_output->buildCast(LLVMZExt, unwrapValue(arg), g_output->repo().int64);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_ld_i32(TCGv_i32 ret, TCGv_ptr arg2, tcg_target_long offset)
+{
+    LValue pointer = unwrapValue(arg2);
+    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref8);
+    pointer = g_output->buildAdd(pointer, g_output->constInt32(offset));
+    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref32);
+    LValue retVal = g_output->buildLoad(pointer);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_ld_i64(TCGv_i64 ret, TCGv_ptr arg2,
+    tcg_target_long offset)
+{
+    LValue pointer = unwrapValue(arg2);
+    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref8);
+    pointer = g_output->buildAdd(pointer, g_output->constInt32(offset));
+    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref64);
+    LValue retVal = g_output->buildLoad(pointer);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_movcond_i32(TCGCond cond, TCGv_i32 ret,
+    TCGv_i32 c1, TCGv_i32 c2,
+    TCGv_i32 v1, TCGv_i32 v2)
+{
+    LValue t0;
+    switch (cond) {
+    case TCG_COND_ALWAYS:
+        t0 = g_output->repo().int32One;
+        break;
+    case TCG_COND_NEVER:
+        t0 = g_output->repo().int32Zero;
+        break;
+    default:
+        t0 = g_output->buildICmp(tcgCondToLLVM(cond), unwrapValue(c1), unwrapValue(c2));
+    }
+
+    LValue retVal = g_output->buildSelect(t0, unwrapValue(v1), unwrapValue(v2));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_movcond_i64(TCGCond cond, TCGv_i64 ret,
+    TCGv_i64 c1, TCGv_i64 c2,
+    TCGv_i64 v1, TCGv_i64 v2)
+{
+    LValue t0;
+    switch (cond) {
+    case TCG_COND_ALWAYS:
+        t0 = g_output->repo().int32One;
+        break;
+    case TCG_COND_NEVER:
+        t0 = g_output->repo().int32Zero;
+        break;
+    default:
+        t0 = g_output->buildICmp(tcgCondToLLVM(cond), unwrapValue(c1), unwrapValue(c2));
+    }
+
+    LValue retVal = g_output->buildSelect(t0, unwrapValue(v1), unwrapValue(v2));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_mov_i64(TCGv_i64 ret, TCGv_i64 arg)
+{
+    LValue retVal = unwrapValue(arg);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_movi_i32(TCGv_i32 ret, int32_t arg)
+{
+    LValue retVal = g_output->constInt32(arg);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_movi_i64(TCGv_i64 ret, int64_t arg)
+{
+    LValue retVal = g_output->constInt64(arg);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_mul_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    LValue retVal = g_output->buildMul(unwrapValue(arg1), unwrapValue(arg2));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_muls2_i32(TCGv_i32 rl, TCGv_i32 rh,
+    TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    LValue t0 = g_output->buildCast(LLVMSExt, unwrapValue(arg1), g_output->repo().int64);
+    LValue t1 = g_output->buildCast(LLVMSExt, unwrapValue(arg2), g_output->repo().int64);
+    LValue t3 = g_output->buildMul(t0, t1);
+    LValue low = g_output->buildCast(LLVMTrunc, t3, g_output->repo().int32);
+    LValue high = g_output->buildAShr(t3, g_output->repo().int32ThirtyTwo);
+    high = g_output->buildCast(LLVMTrunc, high, g_output->repo().int32);
+    storeToTCG(low, rl);
+    storeToTCG(high, rh);
+}
+
+void tcg_gen_mulu2_i32(TCGv_i32 rl, TCGv_i32 rh,
+    TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    LValue t0 = g_output->buildCast(LLVMZExt, unwrapValue(arg1), g_output->repo().int64);
+    LValue t1 = g_output->buildCast(LLVMZExt, unwrapValue(arg2), g_output->repo().int64);
+    LValue t3 = g_output->buildMul(t0, t1);
+    LValue low = g_output->buildCast(LLVMTrunc, t3, g_output->repo().int32);
+    LValue high = g_output->buildLShr(t3, g_output->repo().int32ThirtyTwo);
+    high = g_output->buildCast(LLVMTrunc, high, g_output->repo().int32);
+    storeToTCG(low, rl);
+    storeToTCG(high, rh);
 }
