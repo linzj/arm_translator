@@ -27,6 +27,7 @@ static PlatformDesc g_desc = {
     17, /* direct size */
     17, /* indirect size */
     17, /* assist size */
+    17, /* tcg size */
 };
 
 static LType argType()
@@ -315,7 +316,33 @@ void tcg_gen_deposit_i32(TCGv_i32 ret, TCGv_i32 arg1,
     TCGv_i32 arg2, unsigned int ofs,
     unsigned int len)
 {
-    EMASSERT(ofs < 32);
-    EMASSERT(len <= 32);
-    EMASSERT(ofs + len <= 32);
+    if (ofs == 0 && len == 32) {
+        tcg_gen_mov_i32(ret, arg2);
+        return;
+    }
+    LValue v;
+    unsigned mask = (1u << len) - 1;
+    if (ofs + len < 32) {
+        v = g_output->buildAnd(unwrapValue(arg2), g_output->constInt32(mask));
+        v = g_output->buildShl(v, g_output->constInt32(ofs));
+    }
+    else {
+        v = g_output->buildShl(unwrapValue(arg2), g_output->constInt32(ofs));
+    }
+    LValue retVal = g_output->buildAnd(unwrapValue(arg1), g_output->constInt32(~(mask << ofs)));
+    retVal = g_output->buildOr(retVal, v);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_mov_i32(TCGv_i32 ret, TCGv_i32 arg)
+{
+    if (arg == ret)
+        return;
+    LValue v = unwrapValue(arg);
+    storeToTCG(v, ret);
+}
+
+void tcg_gen_exit_tb(uintptr_t val)
+{
+    g_output->buildTcgPatch(g_output->constInt32(val));
 }

@@ -76,6 +76,7 @@ public:
     void buildDirectSlowPatch(LValue where);
     void buildIndirectPatch(LValue where);
     void buildAssistPatch(LValue where);
+    void buildTcgPatch(LValue val);
 
     inline IntrinsicRepository& repo() { return m_repo; }
     inline LType argType() const { return m_argType; }

@@ -37,6 +37,8 @@ void tcg_gen_concat_i32_i64(TCGv_i64 dest, TCGv_i32 low,
 void tcg_gen_deposit_i32(TCGv_i32 ret, TCGv_i32 arg1,
     TCGv_i32 arg2, unsigned int ofs,
     unsigned int len);
+void tcg_gen_mov_i32(TCGv_i32 ret, TCGv_i32 arg);
+void tcg_gen_exit_tb(uintptr_t val);
 #ifdef __cplusplus
 }
 #endif

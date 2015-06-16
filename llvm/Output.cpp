@@ -226,6 +226,16 @@ void Output::buildPatchCommon(LValue where, const PatchDesc& desc, size_t patchS
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
 }
 
+void Output::buildTcgPatch(LValue val)
+{
+    PatchDesc desc = { PatchType::Tcg };
+    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt32(m_stackMapsId), constInt32(m_state.m_platformDesc.m_tcgSize), constNull(repo().ref8), constInt32(1), val);
+    llvmAPI->SetInstructionCallConv(call, LLVMAnyRegCallConv);
+    buildUnreachable(m_builder);
+    // record the stack map info
+    m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+}
+
 LValue Output::buildLoadArgIndex(int index)
 {
     LValue constIndex[] = { constInt32(0), constInt32(index) };

@@ -13,6 +13,7 @@ enum class PatchType {
     DirectSlow,
     Indirect,
     Assist,
+    Tcg,
 };
 
 struct PatchDesc {

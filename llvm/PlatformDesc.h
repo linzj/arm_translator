@@ -8,6 +8,7 @@ struct PlatformDesc {
     size_t m_directSize;
     size_t m_indirectSize;
     size_t m_assistSize;
+    size_t m_tcgSize;
 };
 
 #endif /* PLATFORMDESC_H */

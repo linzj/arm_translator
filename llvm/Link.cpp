@@ -34,6 +34,12 @@ void link(CompilerState& state, const LinkDesc& desc)
         case PatchType::Assist: {
             desc.m_patchAssist(desc.m_opaque, body + record.second[0].instructionOffset, desc.m_dispAssist);
         } break;
+        case PatchType::Tcg: {
+            auto& recordUnit = record.second[0];
+            auto& location = recordUnit.locations[1];
+            EMASSERT(location.kind == StackMaps::Location::Register);
+            desc.m_patchTcg(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcg, location.dwarfReg.reg().val());
+        } break;
         default:
             __builtin_unreachable();
         }
