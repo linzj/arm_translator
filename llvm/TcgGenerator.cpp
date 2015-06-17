@@ -898,3 +898,17 @@ void tcg_gen_callN(void*, void* func, TCGArg ret,
         storeToTCG(retVal, reinterpret_cast<TCGv_ptr>(ret));
     }
 }
+
+TCGv_ptr TCGV_NAT_TO_PTR(TCGv_i32 a)
+{
+    LValue val = unwrapValue(a);
+    val = g_output->buildCast(LLVMBitCast, val, g_output->repo().ref8);
+    return wrapValue<TCGv_ptr>(val);
+}
+
+TCGv_i32 TCGV_PTR_TO_NAT(TCGv_ptr n)
+{
+    LValue val = unwrapValue(n);
+    val = g_output->buildCast(LLVMBitCast, val, g_output->repo().int32);
+    return wrapValue<TCGv_i32>(val);
+}

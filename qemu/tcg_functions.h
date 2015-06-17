@@ -5,9 +5,6 @@
 extern "C" {
 #endif
 
-#define TCGV_NAT_TO_PTR(a) ((TCGv_ptr)a)
-#define TCGV_PTR_TO_NAT(n) ((TCGv_i32)(n))
-
 #define tcg_const_ptr(V) TCGV_NAT_TO_PTR(tcg_const_i32((intptr_t)(V)))
 #define tcg_gen_addi_ptr(R, A, B) \
     tcg_gen_addi_i32(TCGV_PTR_TO_NAT(R), TCGV_PTR_TO_NAT(A), (B))
@@ -117,6 +114,9 @@ TCGv_i32 tcg_temp_new_i32(void);
 TCGv_i64 tcg_temp_new_i64(void);
 void tcg_gen_callN(void* s, void* func, TCGArg ret,
     int nargs, TCGArg* args);
+TCGv_ptr TCGV_NAT_TO_PTR(TCGv_i32 a);
+TCGv_i32 TCGV_PTR_TO_NAT(TCGv_ptr n);
+
 
 static inline TCGv_i32 MAKE_TCGV_I32(intptr_t i)
 {
