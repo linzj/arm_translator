@@ -7,8 +7,8 @@ typedef int32_t target_long;
 
 #ifndef __cplusplus
 typedef uint8_t bool;
-#define true(bool)1
-#define false(bool)0
+#define true (bool)1
+#define false (bool)0
 #endif
 
 typedef int (*fprintf_function)(FILE* f, const char* fmt, ...)
