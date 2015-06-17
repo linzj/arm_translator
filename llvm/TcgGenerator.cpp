@@ -888,3 +888,9 @@ TCGv_i64 tcg_temp_new_i64(void)
 {
     return wrapPointer<TCGv_i64>(g_output->buildAlloca(g_output->repo().int64));
 }
+
+TCGv tcg_gen_helper_3(void* func, void* p1, void* p2)
+{
+    LValue p1U = unwrapValue(p1);
+    LValue p2U = unwrapValue(p2);
+}

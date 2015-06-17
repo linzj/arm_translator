@@ -115,6 +115,7 @@ void tcg_gen_xori_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2);
 TCGv_i32 tcg_temp_local_new_i32(void);
 TCGv_i32 tcg_temp_new_i32(void);
 TCGv_i64 tcg_temp_new_i64(void);
+TCGv tcg_gen_helper_3(void* func, void* p1, void* p2);
 #ifdef __cplusplus
 }
 #endif

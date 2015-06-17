@@ -252,6 +252,18 @@ void Output::buildTcgIndirectPatch(void)
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
 }
 
+LValue Output::buildTcgHelperCall3(void* func, LValue p2, LValue p3)
+{
+    PatchDesc desc = { PatchType::TcgHelper };
+    LValue funcVal = constIntPtr(reinterpret_cast<uintptr_t>(func));
+    funcVal = buildCast(LLVMBitCast, funcVal, repo().ref8);
+    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt32(m_stackMapsId), constInt32(0), funcVal, constInt32(3), m_arg, p2, p3);
+    llvmAPI->SetInstructionCallConv(call, LLVMFastCallConv);
+    // record the stack map info
+    m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+    return call;
+}
+
 LValue Output::buildLoadArgIndex(int index)
 {
     LValue constIndex[] = { constInt32(0), constInt32(index) };

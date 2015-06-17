@@ -1,5 +1,6 @@
 #ifndef CPU_H
 #define CPU_H
+#include <setjmp.h>
 #include "tgtypes.h"
 #include "ghash.h"
 
@@ -93,7 +94,7 @@ typedef struct CPUARMState {
         uint64_t esr_el[4];
         uint32_t c6_region[8]; /* MPU base/size registers.  */
         uint64_t far_el[4]; /* Fault address registers.  */
-        uint64_t par_el1;  /* Translation result. */
+        uint64_t par_el1; /* Translation result. */
         uint32_t c9_insn; /* Cache lockdown registers.  */
         uint32_t c9_data;
         uint64_t c9_pmcr; /* performance monitor control register */
@@ -223,44 +224,43 @@ typedef struct CPUARMState {
     /* For usermode syscall translation.  */
     int eabi;
 
-    struct CPUBreakpoint *cpu_breakpoint[16];
-    struct CPUWatchpoint *cpu_watchpoint[16];
-
+    struct CPUBreakpoint* cpu_breakpoint[16];
+    struct CPUWatchpoint* cpu_watchpoint[16];
 
     /* These fields after the common ones so they are preserved on reset.  */
 
     /* Internal CPU feature flags.  */
     uint64_t features;
 
-    void *nvic;
+    void* nvic;
 } CPUARMState;
 
-#define EXCP_UDEF            1   /* undefined instruction */
-#define EXCP_SWI             2   /* software interrupt */
-#define EXCP_PREFETCH_ABORT  3
-#define EXCP_DATA_ABORT      4
-#define EXCP_IRQ             5
-#define EXCP_FIQ             6
-#define EXCP_BKPT            7
-#define EXCP_EXCEPTION_EXIT  8   /* Return from v7M exception.  */
-#define EXCP_KERNEL_TRAP     9   /* Jumped to kernel code page.  */
-#define EXCP_STREX          10
-#define EXCP_HVC            11   /* HyperVisor Call */
-#define EXCP_HYP_TRAP       12
-#define EXCP_SMC            13   /* Secure Monitor Call */
-#define EXCP_VIRQ           14
-#define EXCP_VFIQ           15
+#define EXCP_UDEF 1 /* undefined instruction */
+#define EXCP_SWI 2 /* software interrupt */
+#define EXCP_PREFETCH_ABORT 3
+#define EXCP_DATA_ABORT 4
+#define EXCP_IRQ 5
+#define EXCP_FIQ 6
+#define EXCP_BKPT 7
+#define EXCP_EXCEPTION_EXIT 8 /* Return from v7M exception.  */
+#define EXCP_KERNEL_TRAP 9 /* Jumped to kernel code page.  */
+#define EXCP_STREX 10
+#define EXCP_HVC 11 /* HyperVisor Call */
+#define EXCP_HYP_TRAP 12
+#define EXCP_SMC 13 /* Secure Monitor Call */
+#define EXCP_VIRQ 14
+#define EXCP_VFIQ 15
 
 enum arm_features {
     ARM_FEATURE_VFP,
-    ARM_FEATURE_AUXCR,  /* ARM1026 Auxiliary control register.  */
+    ARM_FEATURE_AUXCR, /* ARM1026 Auxiliary control register.  */
     ARM_FEATURE_XSCALE, /* Intel XScale extensions.  */
     ARM_FEATURE_IWMMXT, /* Intel iwMMXt extension.  */
     ARM_FEATURE_V6,
     ARM_FEATURE_V6K,
     ARM_FEATURE_V7,
     ARM_FEATURE_THUMB2,
-    ARM_FEATURE_MPU,    /* Only has Memory Protection Unit, not full MMU.  */
+    ARM_FEATURE_MPU, /* Only has Memory Protection Unit, not full MMU.  */
     ARM_FEATURE_VFP3,
     ARM_FEATURE_VFP_FP16,
     ARM_FEATURE_NEON,
@@ -268,7 +268,7 @@ enum arm_features {
     ARM_FEATURE_M, /* Microcontroller profile.  */
     ARM_FEATURE_OMAPCP, /* OMAP specific CP15 ops handling.  */
     ARM_FEATURE_THUMB2EE,
-    ARM_FEATURE_V7MP,    /* v7 Multiprocessing Extensions */
+    ARM_FEATURE_V7MP, /* v7 Multiprocessing Extensions */
     ARM_FEATURE_V4T,
     ARM_FEATURE_V5,
     ARM_FEATURE_STRONGARM,
@@ -306,22 +306,22 @@ typedef union {
     uint64_t ll;
 } CPU_DoubleU;
 
-#define ARM_IWMMXT_wCID		0
-#define ARM_IWMMXT_wCon		1
-#define ARM_IWMMXT_wCSSF	2
-#define ARM_IWMMXT_wCASF	3
-#define ARM_IWMMXT_wCGR0	8
-#define ARM_IWMMXT_wCGR1	9
-#define ARM_IWMMXT_wCGR2	10
-#define ARM_IWMMXT_wCGR3	11
+#define ARM_IWMMXT_wCID 0
+#define ARM_IWMMXT_wCon 1
+#define ARM_IWMMXT_wCSSF 2
+#define ARM_IWMMXT_wCASF 3
+#define ARM_IWMMXT_wCGR0 8
+#define ARM_IWMMXT_wCGR1 9
+#define ARM_IWMMXT_wCGR2 10
+#define ARM_IWMMXT_wCGR3 11
 
-#define ARM_VFP_FPSID   0
-#define ARM_VFP_FPSCR   1
-#define ARM_VFP_MVFR2   5
-#define ARM_VFP_MVFR1   6
-#define ARM_VFP_MVFR0   7
-#define ARM_VFP_FPEXC   8
-#define ARM_VFP_FPINST  9
+#define ARM_VFP_FPSID 0
+#define ARM_VFP_FPSCR 1
+#define ARM_VFP_MVFR2 5
+#define ARM_VFP_MVFR1 6
+#define ARM_VFP_MVFR0 7
+#define ARM_VFP_FPEXC 8
+#define ARM_VFP_FPINST 9
 #define ARM_VFP_FPINST2 10
 
 enum arm_fprounding {
@@ -335,10 +335,10 @@ enum arm_fprounding {
 
 enum {
     float_round_nearest_even = 0,
-    float_round_down         = 1,
-    float_round_up           = 2,
-    float_round_to_zero      = 3,
-    float_round_ties_away    = 4,
+    float_round_down = 1,
+    float_round_up = 2,
+    float_round_to_zero = 3,
+    float_round_ties_away = 4,
 };
 
 #define TARGET_PAGE_BITS 12
@@ -391,17 +391,17 @@ typedef enum CPAccessResult {
 
 typedef struct ARMCPRegInfo ARMCPRegInfo;
 
-typedef uint64_t CPReadFn(CPUARMState *env, const ARMCPRegInfo *opaque);
-typedef void CPWriteFn(CPUARMState *env, const ARMCPRegInfo *opaque,
-                       uint64_t value);
+typedef uint64_t CPReadFn(CPUARMState* env, const ARMCPRegInfo* opaque);
+typedef void CPWriteFn(CPUARMState* env, const ARMCPRegInfo* opaque,
+    uint64_t value);
 /* Access permission check functions for coprocessor registers. */
-typedef CPAccessResult CPAccessFn(CPUARMState *env, const ARMCPRegInfo *opaque);
+typedef CPAccessResult CPAccessFn(CPUARMState* env, const ARMCPRegInfo* opaque);
 /* Hook function for register reset */
-typedef void CPResetFn(CPUARMState *env, const ARMCPRegInfo *opaque);
+typedef void CPResetFn(CPUARMState* env, const ARMCPRegInfo* opaque);
 
 struct ARMCPRegInfo {
     /* Name of register (useful mainly for debugging, need not be unique) */
-    const char *name;
+    const char* name;
     /* Location of register: coprocessor number and (crn,crm,opc1,opc2)
      * tuple. Any of crm, opc1 and opc2 may be CP_ANY to indicate a
      * 'wildcard' field -- any value of that field in the MRC/MCR insn
@@ -435,7 +435,7 @@ struct ARMCPRegInfo {
      * this register was defined: can be used to hand data through to the
      * register read/write functions, since they are passed the ARMCPRegInfo*.
      */
-    void *opaque;
+    void* opaque;
     /* Value of this register, if it is ARM_CP_CONST. Otherwise, if
      * fieldoffset is non-zero, the reset value of the register.
      */
@@ -451,35 +451,35 @@ struct ARMCPRegInfo {
      * checks required. The access check is performed at runtime, not at
      * translate time.
      */
-    CPAccessFn *accessfn;
+    CPAccessFn* accessfn;
     /* Function for handling reads of this register. If NULL, then reads
      * will be done by loading from the offset into CPUARMState specified
      * by fieldoffset.
      */
-    CPReadFn *readfn;
+    CPReadFn* readfn;
     /* Function for handling writes of this register. If NULL, then writes
      * will be done by writing to the offset into CPUARMState specified
      * by fieldoffset.
      */
-    CPWriteFn *writefn;
+    CPWriteFn* writefn;
     /* Function for doing a "raw" read; used when we need to copy
      * coprocessor state to the kernel for KVM or out for
      * migration. This only needs to be provided if there is also a
      * readfn and it has side effects (for instance clear-on-read bits).
      */
-    CPReadFn *raw_readfn;
+    CPReadFn* raw_readfn;
     /* Function for doing a "raw" write; used when we need to copy KVM
      * kernel coprocessor state into userspace, or for inbound
      * migration. This only needs to be provided if there is also a
      * writefn and it masks out "unwritable" bits or has write-one-to-clear
      * or similar behaviour.
      */
-    CPWriteFn *raw_writefn;
+    CPWriteFn* raw_writefn;
     /* Function for resetting the register. If NULL, then reset will be done
      * by writing resetvalue to the field specified in fieldoffset. If
      * fieldoffset is 0 then no reset will be done.
      */
-    CPResetFn *resetfn;
+    CPResetFn* resetfn;
 };
 /* ARMCPRegInfo type field bits. If the SPECIAL bit is set this is a
  * special-behaviour cp reg and bits [15..8] indicate what behaviour
@@ -516,22 +516,29 @@ struct ARMCPRegInfo {
 #define MMU_USER_IDX 0
 
 typedef struct
-{
+    {
     GHashTable* cp_regs;
+    jmp_buf exit_buf;
+    int exception_index;
     CPUARMState env;
 } CPU;
-#define EXCP_INTERRUPT 	0x10000 /* async interruption */
-#define EXCP_HLT        0x10001 /* hlt instruction reached */
-#define EXCP_DEBUG      0x10002 /* cpu stopped after a breakpoint or singlestep */
-#define EXCP_HALTED     0x10003 /* cpu is halted (waiting for external event) */
-#define EXCP_YIELD      0x10004 /* cpu wants to yield timeslice to another */
+#ifndef container_of
+#define container_of(ptr, type, member) ({			\
+	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+	(type *)( (char *)__mptr - offsetof(type,member) ); })
+#endif
+#define arm_env_get_cpu(env) container_of(env, CPU, env)
+#define EXCP_INTERRUPT 0x10000 /* async interruption */
+#define EXCP_HLT 0x10001 /* hlt instruction reached */
+#define EXCP_DEBUG 0x10002 /* cpu stopped after a breakpoint or singlestep */
+#define EXCP_HALTED 0x10003 /* cpu is halted (waiting for external event) */
+#define EXCP_YIELD 0x10004 /* cpu wants to yield timeslice to another */
 enum CPUDumpFlags {
     CPU_DUMP_CODE = 0x00010000,
-    CPU_DUMP_FPU  = 0x00020000,
+    CPU_DUMP_FPU = 0x00020000,
     CPU_DUMP_CCOP = 0x00040000,
 };
 
-#define ENCODE_CP_REG(cp, is64, crn, crm, opc1, opc2)   \
-    (((cp) << 16) | ((is64) << 15) | ((crn) << 11) |    \
-     ((crm) << 7) | ((opc1) << 3) | (opc2))
+#define ENCODE_CP_REG(cp, is64, crn, crm, opc1, opc2) \
+    (((cp) << 16) | ((is64) << 15) | ((crn) << 11) | ((crm) << 7) | ((opc1) << 3) | (opc2))
 #endif /* CPU_H */

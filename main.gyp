@@ -9,6 +9,7 @@
             'sources': [
                 'main.cpp',
                 'qemu/translate.c',
+                'qemu/helper.c',
              ],
             'dependencies': [
                 '<(DEPTH)/llvm/llvm.gyp:libllvm',

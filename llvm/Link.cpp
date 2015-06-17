@@ -33,6 +33,8 @@ void link(CompilerState& state, const LinkDesc& desc)
             auto& recordUnit = record.second[0];
             desc.m_patchTcgIndirect(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcgIndirect);
         } break;
+        case PatchType::TcgHelper: {
+        } break;
         default:
             __builtin_unreachable();
         }

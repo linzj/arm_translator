@@ -80,6 +80,7 @@ public:
     void buildAssistPatch(LValue where);
     void buildTcgDirectPatch(void);
     void buildTcgIndirectPatch(void);
+    LValue buildTcgHelperCall3(void* func, LValue p2, LValue p3);
 
     inline IntrinsicRepository& repo() { return m_repo; }
     inline LType argType() const { return m_argType; }
