@@ -5,15 +5,31 @@
 extern "C" {
 #endif
 
-int gen_new_label(void);
-void gen_set_label(int n);
-TCGv_i64 tcg_global_mem_new_i64(int reg, intptr_t offset, const char* name);
-TCGv_i32 tcg_const_i32(int32_t val);
-TCGv_i64 tcg_const_i64(int64_t val);
 #define TCGV_NAT_TO_PTR(a) ((TCGv_ptr)a)
+#define TCGV_PTR_TO_NAT(n) ((TCGv_i32)(n))
+
 #define tcg_const_ptr(V) TCGV_NAT_TO_PTR(tcg_const_i32((intptr_t)(V)))
 #define tcg_gen_addi_ptr(R, A, B) \
     tcg_gen_addi_i32(TCGV_PTR_TO_NAT(R), TCGV_PTR_TO_NAT(A), (B))
+#define tcg_global_reg_new_ptr(R, N) \
+    TCGV_NAT_TO_PTR(tcg_global_reg_new_i32((R), (N)))
+#define tcg_temp_free tcg_temp_free_i32
+#define tcg_temp_free_i32(a)
+#define tcg_temp_free_i64(a)
+#define tcg_temp_free_ptr(T) tcg_temp_free_i32(TCGV_PTR_TO_NAT(T))
+#define tcg_temp_new() (TCGv) tcg_temp_new_i32();
+#define tcg_temp_new_ptr() TCGV_NAT_TO_PTR(tcg_temp_new_i32())
+#define TCGV_UNUSED_I32(a) ((void)a)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
+int gen_new_label(void);
+void gen_set_label(int n);
+TCGv_i64 tcg_global_mem_new_i64(int reg, intptr_t offset, const char* name);
+TCGv_i32 tcg_global_mem_new_i32(int reg, intptr_t offset, const char* name);
+TCGv_i32 tcg_global_reg_new_i32(int reg, const char* name);
+
+TCGv_i32 tcg_const_i32(int32_t val);
+TCGv_i64 tcg_const_i64(int64_t val);
 
 void tcg_gen_add2_i32(TCGv_i32 rl, TCGv_i32 rh, TCGv_i32 al,
     TCGv_i32 ah, TCGv_i32 bl, TCGv_i32 bh);
@@ -89,6 +105,16 @@ void tcg_gen_shri_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2);
 void tcg_gen_st_i32(TCGv_i32 arg1, TCGv_ptr arg2, tcg_target_long offset);
 void tcg_gen_st_i64(TCGv_i64 arg1, TCGv_ptr arg2,
     tcg_target_long offset);
+void tcg_gen_sub_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
+void tcg_gen_sub_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2);
+void tcg_gen_subi_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2);
+void tcg_gen_trunc_i64_i32(TCGv_i32 ret, TCGv_i64 arg);
+void tcg_gen_xor_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
+void tcg_gen_xor_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2);
+void tcg_gen_xori_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2);
+TCGv_i32 tcg_temp_local_new_i32(void);
+TCGv_i32 tcg_temp_new_i32(void);
+TCGv_i64 tcg_temp_new_i64(void);
 #ifdef __cplusplus
 }
 #endif

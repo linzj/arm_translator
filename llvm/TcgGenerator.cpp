@@ -150,7 +150,7 @@ static LValue tcgPointerToLLVM(TCGMemOp op, TCGv pointer)
     case MO_64:
         return g_output->buildPointerCast(pointerBeforeCast, g_output->repo().ref64);
     default:
-        EMASSERT("unknow pointer type." && false);
+        EMASSERT("unknown pointer type." && false);
     }
 }
 
@@ -170,16 +170,31 @@ static LValue tcgMemCastTo32(TCGMemOp op, LValue val)
     case MO_64:
         return g_output->buildCast(LLVMTrunc, val, g_output->repo().int32);
     default:
-        EMASSERT("unknow pointer type." && false);
+        EMASSERT("unknown pointer type." && false);
     }
 }
 
-TCGv_i64 tcg_global_mem_new_i64(int reg, intptr_t offset, const char* name)
+TCGv_i64 tcg_global_mem_new_i64(int, intptr_t offset, const char* name)
 {
-    LValue v = g_output->buildAdd(g_output->arg(), g_output->constInt32(offset / sizeof(target_ulong)));
+    LValue v = g_output->buildGEP(g_output->arg(), offset / sizeof(target_ulong));
     LValue v2 = g_output->buildPointerCast(v, g_output->repo().ref64);
 
     return wrapPointer<TCGv_i64>(v2);
+}
+
+TCGv_i32 tcg_global_mem_new_i32(int, intptr_t offset, const char* name)
+{
+    LValue v = g_output->buildGEP(g_output->arg(), offset / sizeof(target_ulong));
+    LValue v2 = g_output->buildPointerCast(v, g_output->repo().ref32);
+
+    return wrapPointer<TCGv_i32>(v2);
+}
+
+TCGv_i32 tcg_global_reg_new_i32(int, const char* name)
+{
+    LValue retVal = g_output->arg();
+    retVal = g_output->buildPointerCast(retVal, g_output->repo().ref32);
+    return wrapValue<TCGv_i32>(retVal);
 }
 
 TCGv_i32 tcg_const_i32(int32_t val)
@@ -614,7 +629,7 @@ void tcg_gen_qemu_ld_i32(TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
     case (MO_Q | MO_SIGN):
         retVal = g_output->buildCast(LLVMTrunc, retVal, g_output->repo().int32);
     default:
-        EMASSERT("unknow pointer type." && false);
+        EMASSERT("unknown pointer type." && false);
     }
     storeToTCG(retVal, val);
 }
@@ -647,7 +662,7 @@ void tcg_gen_qemu_ld_i64(TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
     case (MO_Q | MO_SIGN):
         break;
     default:
-        EMASSERT("unknow pointer type." && false);
+        EMASSERT("unknown pointer type." && false);
     }
     storeToTCG(retVal, val);
 }
@@ -676,7 +691,7 @@ void tcg_gen_qemu_st_i32(TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
         valToStore = g_output->buildCast(LLVMSExt, valToStore, g_output->repo().int32);
         break;
     default:
-        EMASSERT("unknow memop" && false);
+        EMASSERT("unknown memop" && false);
     }
     g_output->buildStore(valToStore, pointer);
 }
@@ -703,7 +718,7 @@ void tcg_gen_qemu_st_i64(TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
     case (MO_Q | MO_SIGN):
         break;
     default:
-        EMASSERT("unknow memop" && false);
+        EMASSERT("unknown memop" && false);
     }
     g_output->buildStore(valToStore, pointer);
 }
@@ -815,4 +830,61 @@ void tcg_gen_st_i64(TCGv_i64 arg1, TCGv_ptr arg2,
     pointer = g_output->buildGEP(pointer, offset);
     pointer = g_output->buildPointerCast(pointer, g_output->repo().int64);
     g_output->buildStore(unwrapValue(arg1), pointer);
+}
+
+void tcg_gen_sub_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    LValue retVal = g_output->buildSub(unwrapValue(arg1), unwrapValue(arg2));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_sub_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+{
+    LValue retVal = g_output->buildSub(unwrapValue(arg1), unwrapValue(arg2));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_subi_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+{
+    LValue retVal = g_output->buildSub(unwrapValue(arg1), g_output->constInt32(arg2));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_trunc_i64_i32(TCGv_i32 ret, TCGv_i64 arg)
+{
+    LValue retVal = g_output->buildCast(LLVMTrunc, unwrapValue(arg), g_output->repo().int32);
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_xor_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    LValue retVal = g_output->buildXor(unwrapValue(arg1), unwrapValue(arg2));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_xor_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+{
+    LValue retVal = g_output->buildXor(unwrapValue(arg1), unwrapValue(arg2));
+    storeToTCG(retVal, ret);
+}
+
+void tcg_gen_xori_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+{
+    LValue retVal = g_output->buildXor(unwrapValue(arg1), g_output->constInt32(arg2));
+    storeToTCG(retVal, ret);
+}
+
+TCGv_i32 tcg_temp_local_new_i32(void)
+{
+    return wrapPointer<TCGv_i32>(g_output->buildAlloca(g_output->repo().int32));
+}
+
+TCGv_i32 tcg_temp_new_i32(void)
+{
+    return tcg_temp_local_new_i32();
+}
+
+TCGv_i64 tcg_temp_new_i64(void)
+{
+    return wrapPointer<TCGv_i64>(g_output->buildAlloca(g_output->repo().int64));
 }

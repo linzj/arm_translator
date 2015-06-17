@@ -28,6 +28,7 @@ public:
     LValue buildAdd(LValue lhs, LValue rhs);
     LValue buildSub(LValue lhs, LValue rhs);
     LValue buildAnd(LValue lhs, LValue rhs);
+    LValue buildXor(LValue lhs, LValue rhs);
     LValue buildMul(LValue lhs, LValue rhs);
     LValue buildNot(LValue value);
     LValue buildNeg(LValue value);

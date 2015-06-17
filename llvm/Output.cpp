@@ -158,6 +158,11 @@ LValue Output::buildAnd(LValue lhs, LValue rhs)
     return jit::buildAnd(m_builder, lhs, rhs);
 }
 
+LValue Output::buildXor(LValue lhs, LValue rhs)
+{
+    return jit::buildXor(m_builder, lhs, rhs);
+}
+
 LValue Output::buildMul(LValue lhs, LValue rhs)
 {
     return jit::buildMul(m_builder, lhs, rhs);

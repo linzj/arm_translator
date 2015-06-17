@@ -5,9 +5,10 @@
 typedef struct TCGv_i32__* TCGv_i32;
 typedef struct TCGv_i64__* TCGv_i64;
 typedef struct TCGv_ptr__* TCGv_ptr;
-typedef struct TCGv__* TCGv;
+#define TCGv TCGv_i32
 #define TARGET_FMT_lx "%08x"
 #define TCG_TARGET_REG_BITS 32
+#define TARGET_LONG_BITS 32
 typedef enum {
     /* non-signed */
     TCG_COND_NEVER = 0 | 0 | 0 | 0,
