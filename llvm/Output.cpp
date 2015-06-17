@@ -102,6 +102,17 @@ LValue Output::buildStructGEP(LValue structVal, unsigned field)
     return jit::buildStructGEP(m_builder, structVal, field);
 }
 
+LValue Output::buildGEP(LValue pointer, int idx)
+{
+    LValue idxVal = constInt32(idx);
+    return llvmAPI->BuildGEP(m_builder, pointer, &idxVal, 1, "");
+}
+
+LValue Output::buildGEP(LValue pointer, LValue* Indices, unsigned NumIndices)
+{
+    return llvmAPI->BuildGEP(m_builder, pointer, Indices, NumIndices, "");
+}
+
 LValue Output::buildLoad(LValue toLoad)
 {
     return jit::buildLoad(m_builder, toLoad);
@@ -115,6 +126,11 @@ LValue Output::buildStore(LValue val, LValue pointer)
 LValue Output::buildAdd(LValue lhs, LValue rhs)
 {
     return jit::buildAdd(m_builder, lhs, rhs);
+}
+
+LValue Output::buildSub(LValue lhs, LValue rhs)
+{
+    return jit::buildSub(m_builder, lhs, rhs);
 }
 
 LValue Output::buildOr(LValue left, LValue right)

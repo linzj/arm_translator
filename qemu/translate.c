@@ -1198,6 +1198,7 @@ VFP_GEN_FIX(slto, )
 VFP_GEN_FIX(uhto, )
 VFP_GEN_FIX(ulto, )
 #undef VFP_GEN_FIX
+#define get_mem_index(a) 0
 
 static inline void gen_vfp_ld(DisasContext *s, int dp, TCGv_i32 addr)
 {

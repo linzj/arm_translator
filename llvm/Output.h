@@ -21,9 +21,12 @@ public:
     LValue constV128(unsigned short);
     LValue constV256(unsigned);
     LValue buildStructGEP(LValue structVal, unsigned field);
+    LValue buildGEP(LValue Pointer, LValue* Indices, unsigned NumIndices);
+    LValue buildGEP(LValue Pointer, int idx);
     LValue buildLoad(LValue toLoad);
     LValue buildStore(LValue val, LValue pointer);
     LValue buildAdd(LValue lhs, LValue rhs);
+    LValue buildSub(LValue lhs, LValue rhs);
     LValue buildAnd(LValue lhs, LValue rhs);
     LValue buildMul(LValue lhs, LValue rhs);
     LValue buildNot(LValue value);
