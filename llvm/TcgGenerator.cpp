@@ -142,13 +142,13 @@ static LValue tcgPointerToLLVM(TCGMemOp op, TCGv pointer)
     LValue pointerBeforeCast = unwrapValue(pointer);
     switch (op) {
     case MO_8:
-        return g_output->buildPointerCast(pointerBeforeCast, g_output->repo().ref8);
+        return g_output->buildCast(LLVMBitCast, pointerBeforeCast, g_output->repo().ref8);
     case MO_16:
-        return g_output->buildPointerCast(pointerBeforeCast, g_output->repo().ref16);
+        return g_output->buildCast(LLVMBitCast, pointerBeforeCast, g_output->repo().ref16);
     case MO_32:
-        return g_output->buildPointerCast(pointerBeforeCast, g_output->repo().ref32);
+        return g_output->buildCast(LLVMBitCast, pointerBeforeCast, g_output->repo().ref32);
     case MO_64:
-        return g_output->buildPointerCast(pointerBeforeCast, g_output->repo().ref64);
+        return g_output->buildCast(LLVMBitCast, pointerBeforeCast, g_output->repo().ref64);
     default:
         EMASSERT("unknown pointer type." && false);
     }
