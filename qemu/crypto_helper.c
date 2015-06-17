@@ -14,6 +14,7 @@
 #include "cpu.h"
 #include "helper-proto.h"
 #include "aes.h"
+#include "bitops.h"
 
 union CRYPTO_STATE {
     uint8_t    bytes[16];

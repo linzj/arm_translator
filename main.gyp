@@ -14,6 +14,8 @@
                 'qemu/iwmmxt_helper.c',
                 'qemu/aes.c',
                 'qemu/crypto_helper.c',
+                'qemu/softfloat.c',
+                'qemu/crc32c.c',
              ],
             'dependencies': [
                 '<(DEPTH)/llvm/llvm.gyp:libllvm',

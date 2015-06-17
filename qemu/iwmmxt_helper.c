@@ -24,6 +24,7 @@
 
 #include "cpu.h"
 #include "helper-proto.h"
+#include "bitops.h"
 
 /* iwMMXt macros extracted from GNU gdb.  */
 

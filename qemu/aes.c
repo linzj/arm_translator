@@ -29,6 +29,7 @@
  */
 #include <string.h>
 #include "aes.h"
+#include "log.h"
 
 typedef uint32_t u32;
 typedef uint8_t u8;
@@ -1229,7 +1230,7 @@ void AES_encrypt(const unsigned char *in, unsigned char *out,
 	int r;
 #endif /* ?FULL_UNROLL */
 
-	assert(in && out && key);
+	EMASSERT(in && out && key);
 	rk = key->rd_key;
 
 	/*
@@ -1420,7 +1421,7 @@ void AES_decrypt(const unsigned char *in, unsigned char *out,
 	int r;
 #endif /* ?FULL_UNROLL */
 
-	assert(in && out && key);
+	EMASSERT(in && out && key);
 	rk = key->rd_key;
 
 	/*
@@ -1609,7 +1610,7 @@ void AES_cbc_encrypt(const unsigned char *in, unsigned char *out,
 	unsigned long len = length;
 	unsigned char tmp[AES_BLOCK_SIZE];
 
-	assert(in && out && key && ivec);
+	EMASSERT(in && out && key && ivec);
 
 	if (enc) {
 		while (len >= AES_BLOCK_SIZE) {
