@@ -3,18 +3,7 @@
 #include <setjmp.h>
 #include "tgtypes.h"
 #include "ghash.h"
-
-typedef struct float_status {
-    signed char float_detect_tininess;
-    signed char float_rounding_mode;
-    signed char float_exception_flags;
-    signed char floatx80_rounding_precision;
-    /* should denormalised results go to zero and set the inexact flag? */
-    flag flush_to_zero;
-    /* should denormalised inputs go to zero and set the input_denormal flag? */
-    flag flush_inputs_to_zero;
-    flag default_nan_mode;
-} float_status;
+#include "softfloat.h"
 
 typedef struct CPUARMState {
     /* Regs for current mode.  */
@@ -335,13 +324,6 @@ enum arm_fprounding {
     FPROUNDING_ODD
 };
 
-enum {
-    float_round_nearest_even = 0,
-    float_round_down = 1,
-    float_round_up = 2,
-    float_round_to_zero = 3,
-    float_round_ties_away = 4,
-};
 
 #define TARGET_PAGE_BITS 12
 #define TARGET_PAGE_SIZE (1 << TARGET_PAGE_BITS)
@@ -517,19 +499,27 @@ struct ARMCPRegInfo {
 #define ARM_CP_FLAG_MASK 0x7f
 #define MMU_USER_IDX 0
 
-typedef struct
-    {
+typedef struct {
     GHashTable* cp_regs;
     jmp_buf exit_buf;
     int exception_index;
+    int halted;
+} CPUState;
+
+typedef struct {
     CPUARMState env;
-} CPU;
+    CPUState state;
+    uint32_t dbgdidr;
+    uint32_t dcz_blocksize;
+} ARMCPU;
 #ifndef container_of
 #define container_of(ptr, type, member) ({			\
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) ); })
 #endif
-#define arm_env_get_cpu(env) container_of(env, CPU, env)
+#define arm_env_get_cpu(env) container_of(env, ARMCPU, env)
+#define CPU(cpu) (&cpu->state)
+#define ARM_CPU(cs) container_of(cs, ARMCPU, state)
 #define EXCP_INTERRUPT 0x10000 /* async interruption */
 #define EXCP_HLT 0x10001 /* hlt instruction reached */
 #define EXCP_DEBUG 0x10002 /* cpu stopped after a breakpoint or singlestep */
@@ -541,6 +531,153 @@ enum CPUDumpFlags {
     CPU_DUMP_CCOP = 0x00040000,
 };
 
+enum arm_cpu_mode {
+  ARM_CPU_MODE_USR = 0x10,
+  ARM_CPU_MODE_FIQ = 0x11,
+  ARM_CPU_MODE_IRQ = 0x12,
+  ARM_CPU_MODE_SVC = 0x13,
+  ARM_CPU_MODE_MON = 0x16,
+  ARM_CPU_MODE_ABT = 0x17,
+  ARM_CPU_MODE_HYP = 0x1a,
+  ARM_CPU_MODE_UND = 0x1b,
+  ARM_CPU_MODE_SYS = 0x1f
+};
+
+/* SCTLR bit meanings. Several bits have been reused in newer
+ * versions of the architecture; in that case we define constants
+ * for both old and new bit meanings. Code which tests against those
+ * bits should probably check or otherwise arrange that the CPU
+ * is the architectural version it expects.
+ */
+#define SCTLR_M       (1U << 0)
+#define SCTLR_A       (1U << 1)
+#define SCTLR_C       (1U << 2)
+#define SCTLR_W       (1U << 3) /* up to v6; RAO in v7 */
+#define SCTLR_SA      (1U << 3)
+#define SCTLR_P       (1U << 4) /* up to v5; RAO in v6 and v7 */
+#define SCTLR_SA0     (1U << 4) /* v8 onward, AArch64 only */
+#define SCTLR_D       (1U << 5) /* up to v5; RAO in v6 */
+#define SCTLR_CP15BEN (1U << 5) /* v7 onward */
+#define SCTLR_L       (1U << 6) /* up to v5; RAO in v6 and v7; RAZ in v8 */
+#define SCTLR_B       (1U << 7) /* up to v6; RAZ in v7 */
+#define SCTLR_ITD     (1U << 7) /* v8 onward */
+#define SCTLR_S       (1U << 8) /* up to v6; RAZ in v7 */
+#define SCTLR_SED     (1U << 8) /* v8 onward */
+#define SCTLR_R       (1U << 9) /* up to v6; RAZ in v7 */
+#define SCTLR_UMA     (1U << 9) /* v8 onward, AArch64 only */
+#define SCTLR_F       (1U << 10) /* up to v6 */
+#define SCTLR_SW      (1U << 10) /* v7 onward */
+#define SCTLR_Z       (1U << 11)
+#define SCTLR_I       (1U << 12)
+#define SCTLR_V       (1U << 13)
+#define SCTLR_RR      (1U << 14) /* up to v7 */
+#define SCTLR_DZE     (1U << 14) /* v8 onward, AArch64 only */
+#define SCTLR_L4      (1U << 15) /* up to v6; RAZ in v7 */
+#define SCTLR_UCT     (1U << 15) /* v8 onward, AArch64 only */
+#define SCTLR_DT      (1U << 16) /* up to ??, RAO in v6 and v7 */
+#define SCTLR_nTWI    (1U << 16) /* v8 onward */
+#define SCTLR_HA      (1U << 17)
+#define SCTLR_IT      (1U << 18) /* up to ??, RAO in v6 and v7 */
+#define SCTLR_nTWE    (1U << 18) /* v8 onward */
+#define SCTLR_WXN     (1U << 19)
+#define SCTLR_ST      (1U << 20) /* up to ??, RAZ in v6 */
+#define SCTLR_UWXN    (1U << 20) /* v7 onward */
+#define SCTLR_FI      (1U << 21)
+#define SCTLR_U       (1U << 22)
+#define SCTLR_XP      (1U << 23) /* up to v6; v7 onward RAO */
+#define SCTLR_VE      (1U << 24) /* up to v7 */
+#define SCTLR_E0E     (1U << 24) /* v8 onward, AArch64 only */
+#define SCTLR_EE      (1U << 25)
+#define SCTLR_L2      (1U << 26) /* up to v6, RAZ in v7 */
+#define SCTLR_UCI     (1U << 26) /* v8 onward, AArch64 only */
+#define SCTLR_NMFI    (1U << 27)
+#define SCTLR_TRE     (1U << 28)
+#define SCTLR_AFE     (1U << 29)
+#define SCTLR_TE      (1U << 30)
+
+/* Bit definitions for ARMv8 SPSR (PSTATE) format.
+ * Only these are valid when in AArch64 mode; in
+ * AArch32 mode SPSRs are basically CPSR-format.
+ */
+#define PSTATE_SP (1U)
+#define PSTATE_M (0xFU)
+#define PSTATE_nRW (1U << 4)
+#define PSTATE_F (1U << 6)
+#define PSTATE_I (1U << 7)
+#define PSTATE_A (1U << 8)
+#define PSTATE_D (1U << 9)
+#define PSTATE_IL (1U << 20)
+#define PSTATE_SS (1U << 21)
+#define PSTATE_V (1U << 28)
+#define PSTATE_C (1U << 29)
+#define PSTATE_Z (1U << 30)
+#define PSTATE_N (1U << 31)
+#define PSTATE_NZCV (PSTATE_N | PSTATE_Z | PSTATE_C | PSTATE_V)
+#define PSTATE_DAIF (PSTATE_D | PSTATE_A | PSTATE_I | PSTATE_F)
+#define CACHED_PSTATE_BITS (PSTATE_NZCV | PSTATE_DAIF)
+/* Mode values for AArch64 */
+#define PSTATE_MODE_EL3h 13
+#define PSTATE_MODE_EL3t 12
+#define PSTATE_MODE_EL2h 9
+#define PSTATE_MODE_EL2t 8
+#define PSTATE_MODE_EL1h 5
+#define PSTATE_MODE_EL1t 4
+#define PSTATE_MODE_EL0t 0
+
+#define HCR_VM        (1ULL << 0)
+#define HCR_SWIO      (1ULL << 1)
+#define HCR_PTW       (1ULL << 2)
+#define HCR_FMO       (1ULL << 3)
+#define HCR_IMO       (1ULL << 4)
+#define HCR_AMO       (1ULL << 5)
+#define HCR_VF        (1ULL << 6)
+#define HCR_VI        (1ULL << 7)
+#define HCR_VSE       (1ULL << 8)
+#define HCR_FB        (1ULL << 9)
+#define HCR_BSU_MASK  (3ULL << 10)
+#define HCR_DC        (1ULL << 12)
+#define HCR_TWI       (1ULL << 13)
+#define HCR_TWE       (1ULL << 14)
+#define HCR_TID0      (1ULL << 15)
+#define HCR_TID1      (1ULL << 16)
+#define HCR_TID2      (1ULL << 17)
+#define HCR_TID3      (1ULL << 18)
+#define HCR_TSC       (1ULL << 19)
+#define HCR_TIDCP     (1ULL << 20)
+#define HCR_TACR      (1ULL << 21)
+#define HCR_TSW       (1ULL << 22)
+#define HCR_TPC       (1ULL << 23)
+#define HCR_TPU       (1ULL << 24)
+#define HCR_TTLB      (1ULL << 25)
+#define HCR_TVM       (1ULL << 26)
+#define HCR_TGE       (1ULL << 27)
+#define HCR_TDZ       (1ULL << 28)
+#define HCR_HCD       (1ULL << 29)
+#define HCR_TRVM      (1ULL << 30)
+#define HCR_RW        (1ULL << 31)
+#define HCR_CD        (1ULL << 32)
+#define HCR_ID        (1ULL << 33)
+#define HCR_MASK      ((1ULL << 34) - 1)
+
+#define SCR_NS                (1U << 0)
+#define SCR_IRQ               (1U << 1)
+#define SCR_FIQ               (1U << 2)
+#define SCR_EA                (1U << 3)
+#define SCR_FW                (1U << 4)
+#define SCR_AW                (1U << 5)
+#define SCR_NET               (1U << 6)
+#define SCR_SMD               (1U << 7)
+#define SCR_HCE               (1U << 8)
+#define SCR_SIF               (1U << 9)
+#define SCR_RW                (1U << 10)
+#define SCR_ST                (1U << 11)
+#define SCR_TWI               (1U << 12)
+#define SCR_TWE               (1U << 13)
+#define SCR_AARCH32_MASK      (0x3fff & ~(SCR_RW | SCR_ST))
+#define SCR_AARCH64_MASK      (0x3fff & ~SCR_NET)
+
 #define ENCODE_CP_REG(cp, is64, crn, crm, opc1, opc2) \
     (((cp) << 16) | ((is64) << 15) | ((crn) << 11) | ((crm) << 7) | ((opc1) << 3) | (opc2))
+#define g2h(x) ((void *)((unsigned long)(target_ulong)(x) + GUEST_BASE))
+#define GUEST_BASE 0
 #endif /* CPU_H */

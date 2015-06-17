@@ -29,6 +29,7 @@
 #include "tb.h"
 #include "log.h"
 #include "tcg_functions.h"
+#include "softfloat.h"
 #include "helper-proto.h"
 
 TCGContext tcg_ctx;
@@ -10961,11 +10962,12 @@ undef:
 /* generate intermediate code in gen_opc_buf and gen_opparam_buf for
    basic block 'tb'. If search_pc is TRUE, also generate PC
    information for each intermediate instruction. */
-static inline void gen_intermediate_code_internal(CPU* cpu,
+static inline void gen_intermediate_code_internal(ARMCPU* cpu,
                                                   TranslationBlock *tb,
                                                   bool search_pc)
 {
     CPUARMState *env = &cpu->env;
+    CPUState* cs = CPU(cpu);
     DisasContext dc1, *dc = &dc1;
     uint16_t *gen_opc_end;
     int j, lj;
@@ -11005,7 +11007,7 @@ static inline void gen_intermediate_code_internal(CPU* cpu,
     dc->vec_len = ARM_TBFLAG_VECLEN(tb->flags);
     dc->vec_stride = ARM_TBFLAG_VECSTRIDE(tb->flags);
     dc->c15_cpar = ARM_TBFLAG_XSCALE_CPAR(tb->flags);
-    dc->cp_regs = cpu->cp_regs;
+    dc->cp_regs = cs->cp_regs;
     dc->current_el = arm_current_el(env);
     dc->features = env->features;
 
@@ -11305,7 +11307,7 @@ static const char *cpu_mode_names[16] = {
   "???", "???", "hyp", "und", "???", "???", "???", "sys"
 };
 
-void arm_cpu_dump_state(CPU *cpu, FILE *f, fprintf_function cpu_fprintf,
+void arm_cpu_dump_state(ARMCPU *cpu, FILE *f, fprintf_function cpu_fprintf,
                         int flags)
 {
     CPUARMState *env = &cpu->env;

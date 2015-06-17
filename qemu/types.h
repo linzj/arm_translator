@@ -6,10 +6,6 @@
 typedef uint8_t flag;
 typedef uint64_t target_ulong;
 typedef int64_t target_long;
-typedef uint16_t float16;
-typedef uint32_t float32;
-typedef uint64_t float64;
-
 #ifndef __cplusplus
 typedef uint8_t bool;
 #define true (bool)1
