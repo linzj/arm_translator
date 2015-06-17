@@ -43,6 +43,7 @@ TCGContext tcg_ctx;
 #define ENABLE_ARCH_8     arm_dc_feature(s, ARM_FEATURE_V8)
 
 #define ARCH(x) do { if (!ENABLE_ARCH_##x) goto illegal_op; } while(0)
+#define float64_val(x) (x)
 
 #define OPC_BUF_SIZE 640
 static uint32_t gen_opc_condexec_bits[OPC_BUF_SIZE];
@@ -71,6 +72,103 @@ static const char *regnames[] =
 static inline int arm_dc_feature(DisasContext *dc, int feature)
 {
     return (dc->features & (1ULL << feature)) != 0;
+}
+
+static inline int arm_feature(CPUARMState *env, int feature)
+{
+    return (env->features & (1ULL << feature)) != 0;
+}
+
+static inline int lduw_he_p(const void *ptr)
+{
+    uint16_t r;
+    memcpy(&r, ptr, sizeof(r));
+    return r;
+}
+
+static inline int lduw_le_p(const void *ptr)
+{
+    return (uint16_t)(lduw_he_p(ptr), 16);
+}
+
+static inline uint16_t bswap16(uint16_t x)
+{
+    return (((x & 0x00ff) << 8) |
+            ((x & 0xff00) >> 8));
+}
+
+static inline uint16_t arm_lduw_code(CPUARMState *env, target_ulong addr,
+                                     bool do_swap)
+{
+    uint16_t insn = lduw_le_p((const void*)addr);
+    if (do_swap) {
+        return bswap16(insn);
+    }
+    return insn;
+}
+
+int arm_rmode_to_sf(int rmode)
+{
+    switch (rmode) {
+    case FPROUNDING_TIEAWAY:
+        rmode = float_round_ties_away;
+        break;
+    case FPROUNDING_ODD:
+        /* FIXME: add support for TIEAWAY and ODD */
+        LOGE("arm: unimplemented rounding mode: %d\n",
+                      rmode);
+    case FPROUNDING_TIEEVEN:
+    default:
+        rmode = float_round_nearest_even;
+        break;
+    case FPROUNDING_POSINF:
+        rmode = float_round_up;
+        break;
+    case FPROUNDING_NEGINF:
+        rmode = float_round_down;
+        break;
+    case FPROUNDING_ZERO:
+        rmode = float_round_to_zero;
+        break;
+    }
+    return rmode;
+}
+
+static inline bool cp_access_ok(int current_el,
+                                const ARMCPRegInfo *ri, int isread)
+{
+    return (ri->access >> ((current_el * 2) + isread)) & 1;
+}
+
+static inline bool excp_is_internal(int excp)
+{
+    /* Return true if this exception number represents a QEMU-internal
+     * exception that will not be passed to the guest.
+     */
+    return excp == EXCP_INTERRUPT
+        || excp == EXCP_HLT
+        || excp == EXCP_DEBUG
+        || excp == EXCP_HALTED
+        || excp == EXCP_EXCEPTION_EXIT
+        || excp == EXCP_KERNEL_TRAP
+        || excp == EXCP_STREX;
+}
+
+static inline uint32_t extract32(uint32_t value, int start, int length)
+{
+    assert(start >= 0 && length > 0 && length <= 32 - start);
+    return (value >> start) & (~0U >> (32 - length));
+}
+
+static inline uint32_t cpsr_read(CPUARMState *env)
+{
+    int ZF;
+    ZF = (env->ZF == 0);
+    return env->uncached_cpsr | (env->NF & 0x80000000) | (ZF << 30) |
+        (env->CF << 29) | ((env->VF & 0x80000000) >> 3) | (env->QF << 27)
+        | (env->thumb << 5) | ((env->condexec_bits & 3) << 25)
+        | ((env->condexec_bits & 0xfc) << 8)
+        | (env->GE << 16) | (env->daif & CPSR_AIF);
 }
 
 /* initialize TCG globals.  */
@@ -179,7 +277,7 @@ static void gen_exception_internal(int excp)
 {
     TCGv_i32 tcg_excp = tcg_const_i32(excp);
 
-    assert(excp_is_internal(excp));
+    EMASSERT(excp_is_internal(excp));
     gen_helper_exception_internal(cpu_env, tcg_excp);
     tcg_temp_free_i32(tcg_excp);
 }
@@ -7110,7 +7208,7 @@ static int disas_coproc_insn(DisasContext *s, uint32_t insn)
                  * in which case the syndrome information won't actually be
                  * guest visible.
                  */
-                assert(!arm_dc_feature(s, ARM_FEATURE_V8));
+                EMASSERT(!arm_dc_feature(s, ARM_FEATURE_V8));
                 syndrome = syn_uncategorized();
                 break;
             }
@@ -11024,7 +11122,7 @@ static inline void gen_intermediate_code_internal(CPU* cpu,
              * "did not step an insn" case, and so the syndrome ISV and EX
              * bits should be zero.
              */
-            assert(num_insns == 0);
+            EMASSERT(num_insns == 0);
             gen_exception(EXCP_UDEF, syn_swstep(dc->ss_same_el, 0, 0));
             goto done_generating;
         }

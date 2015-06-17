@@ -531,4 +531,7 @@ enum CPUDumpFlags {
     CPU_DUMP_CCOP = 0x00040000,
 };
 
+#define ENCODE_CP_REG(cp, is64, crn, crm, opc1, opc2)   \
+    (((cp) << 16) | ((is64) << 15) | ((crn) << 11) |    \
+     ((crm) << 7) | ((opc1) << 3) | (opc2))
 #endif /* CPU_H */

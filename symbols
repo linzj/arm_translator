@@ -1,16 +1,3 @@
-
-a64_translate_init
-arm_dc_feature
-arm_feature
-arm_lduw_code
-arm_rmode_to_sf
-assert
-cp_access_ok
-cpsr_read
-ENCODE_CP_REG
-excp_is_internal
-extract32
-float64_val
 gen_helper_access_check_cp_reg
 gen_helper_add_saturate
 gen_helper_add_setq
@@ -480,7 +467,6 @@ gen_helper_vfp_uitos
 gen_helper_vfp_ultod
 gen_helper_vfp_ultos
 get_arm_cp_reginfo
-get_mem_index
 is_a64
 sextract32
 syn_aa32_bkpt

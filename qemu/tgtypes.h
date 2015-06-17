@@ -6,7 +6,7 @@ typedef struct TCGv_i32__* TCGv_i32;
 typedef struct TCGv_i64__* TCGv_i64;
 typedef struct TCGv_ptr__* TCGv_ptr;
 #define TCGv TCGv_i32
-#define TARGET_FMT_lx "%08x"
+#define TARGET_FMT_lx "%08lx"
 #define TCG_TARGET_REG_BITS 32
 #define TARGET_LONG_BITS 32
 typedef enum {
