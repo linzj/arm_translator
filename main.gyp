@@ -10,6 +10,10 @@
                 'main.cpp',
                 'qemu/translate.c',
                 'qemu/helper.c',
+                'qemu/neon_helper.c',
+                'qemu/iwmmxt_helper.c',
+                'qemu/aes.c',
+                'qemu/crypto_helper.c',
              ],
             'dependencies': [
                 '<(DEPTH)/llvm/llvm.gyp:libllvm',
