@@ -115,7 +115,38 @@ void tcg_gen_xori_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2);
 TCGv_i32 tcg_temp_local_new_i32(void);
 TCGv_i32 tcg_temp_new_i32(void);
 TCGv_i64 tcg_temp_new_i64(void);
-TCGv tcg_gen_helper_3(void* func, void* p1, void* p2);
+void tcg_gen_callN(void* s, void* func, TCGArg ret,
+    int nargs, TCGArg* args);
+
+static inline TCGv_i32 MAKE_TCGV_I32(intptr_t i)
+{
+    return (TCGv_i32)i;
+}
+
+static inline TCGv_i64 MAKE_TCGV_I64(intptr_t i)
+{
+    return (TCGv_i64)i;
+}
+
+static inline TCGv_ptr MAKE_TCGV_PTR(intptr_t i)
+{
+    return (TCGv_ptr)i;
+}
+
+static inline intptr_t GET_TCGV_I32(TCGv_i32 t)
+{
+    return (intptr_t)t;
+}
+
+static inline intptr_t GET_TCGV_I64(TCGv_i64 t)
+{
+    return (intptr_t)t;
+}
+
+static inline intptr_t GET_TCGV_PTR(TCGv_ptr t)
+{
+    return (intptr_t)t;
+}
 #ifdef __cplusplus
 }
 #endif

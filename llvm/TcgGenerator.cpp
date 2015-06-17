@@ -889,8 +889,12 @@ TCGv_i64 tcg_temp_new_i64(void)
     return wrapPointer<TCGv_i64>(g_output->buildAlloca(g_output->repo().int64));
 }
 
-TCGv tcg_gen_helper_3(void* func, void* p1, void* p2)
+void tcg_gen_callN(void*, void* func, TCGArg ret,
+    int nargs, TCGArg* args)
 {
-    LValue p1U = unwrapValue(p1);
-    LValue p2U = unwrapValue(p2);
+    LValue* argsV = reinterpret_cast<LValue*>(args);
+    LValue retVal = g_output->buildTcgHelperCall(func, nargs, argsV);
+    if (ret != TCG_CALL_DUMMY_ARG) {
+        storeToTCG(retVal, reinterpret_cast<TCGv_ptr>(ret));
+    }
 }

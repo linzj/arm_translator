@@ -1,5 +1,5 @@
-#include "helper.h"
-#define HELPER(a) helper_##a
+#include "helper-proto.h"
+#include "log.h"
 
 static void cpu_loop_exit(CPU* cpu)
 {
@@ -14,10 +14,9 @@ static void raise_exception(CPUARMState* env, int tt)
     cpu_loop_exit(cpu);
 }
 
-void HELPER(access_check_cp_reg)(CPUARMState* env, void* rip, void* syndrome_1)
+void HELPER(access_check_cp_reg)(CPUARMState* env, void* rip, uint32_t syndrome)
 {
     const ARMCPRegInfo* ri = rip;
-    uint32_t syndrome = (uint32_t)(uintptr_t)syndrome_1;
     if (arm_feature(env, ARM_FEATURE_XSCALE) && ri->cp < 14
         && extract32(env->cp15.c15_cpar, ri->cp, 1) == 0) {
         env->exception.syndrome = syndrome;

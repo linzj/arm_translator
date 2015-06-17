@@ -9,6 +9,7 @@ typedef struct TCGv_ptr__* TCGv_ptr;
 #define TARGET_FMT_lx "%08lx"
 #define TCG_TARGET_REG_BITS 32
 #define TARGET_LONG_BITS 32
+#define TCG_CALL_DUMMY_ARG      ((TCGArg)(-1))
 typedef enum {
     /* non-signed */
     TCG_COND_NEVER = 0 | 0 | 0 | 0,

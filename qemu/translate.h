@@ -76,7 +76,6 @@ typedef struct DisasContext {
     int tmp_a64_count;
     TCGv_i64 tmp_a64[TMP_A64_MAX];
 } DisasContext;
-#define glue(a, b) a##b
 
 extern const ARMCPRegInfo *get_arm_cp_reginfo(GHashTable *cpregs, uint32_t encoded_cp);
 

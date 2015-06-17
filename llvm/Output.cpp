@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <vector>
 #include <llvm/IR/IRBuilder.h>
 #include "CompilerState.h"
 #include "Output.h"
@@ -252,12 +253,21 @@ void Output::buildTcgIndirectPatch(void)
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
 }
 
-LValue Output::buildTcgHelperCall3(void* func, LValue p2, LValue p3)
+LValue Output::buildTcgHelperCall(void* func, int num, LValue* param)
 {
     PatchDesc desc = { PatchType::TcgHelper };
     LValue funcVal = constIntPtr(reinterpret_cast<uintptr_t>(func));
     funcVal = buildCast(LLVMBitCast, funcVal, repo().ref8);
-    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt32(m_stackMapsId), constInt32(0), funcVal, constInt32(3), m_arg, p2, p3);
+    std::vector<LValue> params(4 + num);
+    params.push_back(constInt32(m_stackMapsId));
+    params.push_back(repo().int32Zero);
+    params.push_back(funcVal);
+    params.push_back(constInt32(num));
+    for (int i = 0; i < num; ++i) {
+        LValue p = buildLoad(param[i]);
+        params.push_back(p);
+    }
+    LValue call = buildCall(repo().patchpointInt64Intrinsic(), params.data(), params.size());
     llvmAPI->SetInstructionCallConv(call, LLVMFastCallConv);
     // record the stack map info
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
