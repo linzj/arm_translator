@@ -170,7 +170,7 @@ static void patchProloge(void*, uint8_t* start)
     // 2 bytes
     *p++ = 0x89;
     p = doAMode_R(p, jit::RBP,
-        jit::RDI);
+        jit::RAX);
 }
 
 static void patchDirect(void*, uint8_t* p, void* entry)

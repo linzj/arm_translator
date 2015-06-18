@@ -14,6 +14,7 @@ Output::Output(CompilerState& state)
     m_argType = pointerType(arrayType(repo().intPtr, state.m_platformDesc.m_contextSize / sizeof(intptr_t)));
     state.m_function = addFunction(
         state.m_module, "main", functionType(repo().int64, m_argType));
+    llvmAPI->SetFunctionCallConv(state.m_function, LLVMFastCallConv);
     m_builder = llvmAPI->CreateBuilderInContext(state.m_context);
 
     m_prologue = appendBasicBlock("Prologue");
