@@ -1,7 +1,9 @@
 #ifndef REGISTEROPERATION_H
 #define REGISTEROPERATION_H
+#include <stdint.h>
 #include <unordered_map>
 #include <string>
+#include "cpu.h"
 
 class RegisterOperation {
 public:

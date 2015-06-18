@@ -7,13 +7,11 @@
 %parse-param {struct IRContext* context}
 %lex-param { void* scanner }
 %locations
-%defines
 %define parse.error verbose
 
 %union {
     unsigned long long num;
     char* text;
-    void* any;
 }
 
 %{
@@ -36,9 +34,7 @@ void yyerror(YYLTYPE* yylloc, struct IRContext* context, const char* reason)
 %token <num> INTNUM
 %token <text> REGISTER_NAME IDENTIFIER
 
-%type <any> expression readtmp_expression
 %type <num> numberic_expression
-%type <type> type_modifier
 
 %left PLUS MINUS
 %left MULTIPLE DIVIDE

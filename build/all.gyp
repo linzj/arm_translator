@@ -7,7 +7,7 @@
       'target_name': 'All',
       'type': 'none',
       'dependencies': [
-          '<(DEPTH)/main.gyp:*',
+          '<(DEPTH)/test/test.gyp:testQEMU',
       ]
     },
   ],

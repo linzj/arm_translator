@@ -5,7 +5,6 @@
 #define VG_TRC_INVARIANT_FAILED    47 /* TRC only; invariant violation */
 #define VG_TRC_CHAIN_ME_TO_SLOW_EP 49 /* TRC only; chain to slow EP */
 #define VG_TRC_CHAIN_ME_TO_FAST_EP 51 /* TRC only; chain to fast EP */
-#include "libvex_guest_offsets.h"	/* for OFFSET_amd64_RIP */
 
 
 /*------------------------------------------------------------*/
@@ -177,7 +176,7 @@ VG_(disp_cp_chain_me_to_fastEP):
 VG_(disp_cp_xindir):
 	/* Where are we going? */
 	movq	$VG_TRC_INNER_FASTMISS, %rax
-    movq	OFFSET_amd64_RIP(%rbp), %rdx
+    movq	4*15(%rbp), %rdx
 	jmp	postamble
 
 /* ------ Assisted jump ------ */

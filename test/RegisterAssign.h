@@ -2,6 +2,7 @@
 #define REGISTERASSIGN_H
 #include <memory>
 #include <string>
+#include "cpu.h"
 class RegisterOperation;
 
 class RegisterAssign {

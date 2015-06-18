@@ -1,5 +1,4 @@
 #include "RegisterOperation.h"
-#include "cpu.h"
 
 #define REGISTER_LIST(macro)                                       \
     macro("r0", offsetof(CPUARMState, regs[0]))                    \

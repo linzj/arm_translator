@@ -1,6 +1,5 @@
 #include "IRContextInternal.h"
 #include "log.h"
-#include "Helpers.h"
 #include "Check.h"
 #include "RegisterOperation.h"
 #include <stdio.h>
@@ -26,14 +25,7 @@ void contextSawInitOption(struct IRContext* context, const char* opt)
 {
     LOGE("%s: opt = %s.\n", __FUNCTION__, opt);
 
-    if (strcmp(opt, "novex") == 0) {
-        CONTEXT()
-            ->m_novex
-            = true;
-    }
-    else {
-        LOGE("%s:unknow option.\n", __FUNCTION__);
-    }
+    LOGE("%s:unknow option.\n", __FUNCTION__);
 }
 
 void contextSawRegisterInitMemory(struct IRContext* context, const char* registerName, unsigned long long size, unsigned long long val)
