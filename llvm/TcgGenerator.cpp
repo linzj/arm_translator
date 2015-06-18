@@ -1,8 +1,10 @@
 #include <unordered_map>
 #include <vector>
+#include <pthread.h>
 #include "TcgGenerator.h"
 #include "CompilerState.h"
 #include "IntrinsicRepository.h"
+#include "InitializeLLVM.h"
 #include "Output.h"
 #include "cpu.h"
 #include "log.h"
@@ -37,18 +39,16 @@ static LType argType()
     return myargType;
 }
 
-static inline LBasicBlock appendBasicBlock(const char* name)
-{
-    return jit::appendBasicBlock(g_state->m_context, g_state->m_function, name);
-}
+static pthread_once_t initLLVMOnce = PTHREAD_ONCE_INIT;
 
-void llvm_tcg_init(void)
+static void llvm_tcg_init(void)
 {
+    pthread_once(&initLLVMOnce, initLLVM);
     g_state = new CompilerState("qemu", g_desc);
     g_output = new Output(*g_state);
 }
 
-void llvm_tcg_deinit(void)
+static void llvm_tcg_deinit(void)
 {
     llvmAPI->DeleteFunction(g_state->m_function);
     delete g_output;
@@ -56,6 +56,12 @@ void llvm_tcg_deinit(void)
     delete g_state;
     g_state = nullptr;
     g_labelMap.clear();
+}
+
+void translate(CPUARMState* env, void** buffer, size_t* s)
+{
+    llvm_tcg_init();
+    llvm_tcg_deinit();
 }
 }
 

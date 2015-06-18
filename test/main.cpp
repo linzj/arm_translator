@@ -25,7 +25,7 @@ int yylex_destroy(yyscan_t yyscanner);
 void vex_disp_run_translations(uintptr_t* two_words,
     void* guest_state,
     void* host_addr);
-void yyset_in  (FILE * in_str ,yyscan_t yyscanner );
+void yyset_in(FILE* in_str, yyscan_t yyscanner);
 void vex_disp_cp_chain_me_to_slowEP(void);
 void vex_disp_cp_chain_me_to_fastEP(void);
 void vex_disp_cp_xindir(void);
@@ -66,30 +66,32 @@ static void splitPath(std::string& directory, std::string& fileName, const char*
     const char* lastSlash = strrchr(path, '/');
     const char* fileNameStart;
     if (lastSlash) {
-        directory.assign(path, std::distance(lastSlash + 1, path);
+        directory.assign(path, std::distance(lastSlash + 1, path));
         fileNameStart = lastSlash + 1;
-    } else {
+    }
+    else {
         fileNameStart = path;
     }
     const char* dot = strrchr(fileNameStart, '.');
     if (dot) {
         fileName.assign(fileNameStart, std::distance(dot, fileNameStart));
-    } else {
-        fileNameStart.assign(fileNameStart);
+    }
+    else {
+        fileName.assign(fileNameStart);
     }
 }
 
 static void assmbleAndLoad(const char* path, std::string& output)
 {
     std::string source;
+    std::string Ssource;
     {
         std::string directory, fileName;
-        splitPath(directory, fileName);
+        splitPath(directory, fileName, path);
         Ssource.assign(directory);
         Ssource.append(fileName);
+        Ssource.append(".S");
     }
-    std::string Ssource(source);
-    Ssource.append(".S");
     std::string Ofile(source);
     Ofile.append(".o");
     std::string binFile(source);
@@ -122,7 +124,7 @@ static void assmbleAndLoad(const char* path, std::string& output)
     }
     std::ifstream t(binFile, std::ios::in | std::ios::binary);
     std::string str((std::istreambuf_iterator<char>(t)),
-                     std::istreambuf_iterator<char>());
+        std::istreambuf_iterator<char>());
     output.swap(str);
     {
         // rm the intermediate files
@@ -169,6 +171,8 @@ int main(int argc, char** argv)
     cortex_a15_initfn(&cpu);
     // FIXME: translate here and copy to code to execMem
     initGuestState(cpu.env, context);
+    // setup pc
+    cpu.env.regs[15] = (uint32_t)(uintptr_t)binaryCode.data();
     uintptr_t twoWords[2];
     vex_disp_run_translations(twoWords, &cpu.env, execMem);
     checkRun("llvm", context, twoWords, cpu.env);

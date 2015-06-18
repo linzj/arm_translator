@@ -2,6 +2,7 @@
 #define TRANSLATE_H
 #include "tgtypes.h"
 #include "compatglib.h"
+#include "tb.h"
 
 #if TCG_TARGET_REG_BITS == 64
 # define TCG_AREG0 TCG_REG_R14
@@ -90,5 +91,8 @@ typedef struct {
     target_ulong gen_opc_pc[OPC_BUF_SIZE];
     uint16_t gen_opc_icount[OPC_BUF_SIZE];
 } TCGContext;
+void gen_intermediate_code_internal(ARMCPU* cpu,
+                                                  TranslationBlock *tb,
+                                                  bool search_pc);
 
 #endif /* TRANSLATE_H */

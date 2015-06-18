@@ -13,13 +13,6 @@ struct TranslationBlock {
 #define CF_COUNT_MASK  0x7fff
 #define CF_LAST_IO     0x8000 /* Last insn may be an IO access.  */
 
-    void *tc_ptr;    /* pointer to the translated code */
-    /* next matching tb for physical address. */
-    struct TranslationBlock *phys_hash_next;
-    /* first and second physical page containing code. The lower bit
-       of the pointer tells the index in page_next[] */
-    struct TranslationBlock *page_next[2];
-    tb_page_addr_t page_addr[2];
 
     /* the following data are used to directly call another TB from
        the code of this one. */

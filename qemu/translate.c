@@ -10910,7 +10910,7 @@ undef:
 /* generate intermediate code in gen_opc_buf and gen_opparam_buf for
    basic block 'tb'. If search_pc is TRUE, also generate PC
    information for each intermediate instruction. */
-static inline void gen_intermediate_code_internal(ARMCPU* cpu,
+void gen_intermediate_code_internal(ARMCPU* cpu,
                                                   TranslationBlock *tb,
                                                   bool search_pc)
 {
@@ -10994,9 +10994,7 @@ static inline void gen_intermediate_code_internal(ARMCPU* cpu,
     if (max_insns == 0)
         max_insns = CF_COUNT_MASK;
 
-    gen_tb_start();
 
-    tcg_clear_temp_count();
 
     /* A note on handling of the condexec (IT) bits:
      *
