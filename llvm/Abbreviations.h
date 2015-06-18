@@ -17,7 +17,7 @@ static inline LType int16Type(LContext context) { return llvmAPI->Int16TypeInCon
 static inline LType int32Type(LContext context) { return llvmAPI->Int32TypeInContext(context); }
 static inline LType int64Type(LContext context) { return llvmAPI->Int64TypeInContext(context); }
 static inline LType int128Type(LContext context) { return llvmAPI->IntTypeInContext(context, 128); }
-static inline LType intPtrType(LContext context) { return llvmAPI->Int64TypeInContext(context); }
+static inline LType intPtrType(LContext context) { return llvmAPI->Int32TypeInContext(context); }
 static inline LType floatType(LContext context) { return llvmAPI->FloatTypeInContext(context); }
 static inline LType doubleType(LContext context) { return llvmAPI->DoubleTypeInContext(context); }
 
