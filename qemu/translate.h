@@ -3,6 +3,9 @@
 #include "tgtypes.h"
 #include "compatglib.h"
 #include "tb.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #if TCG_TARGET_REG_BITS == 64
 # define TCG_AREG0 TCG_REG_R14
@@ -94,4 +97,7 @@ typedef struct {
 void gen_intermediate_code_internal(ARMCPU* cpu, TranslationBlock *tb);
                                                   
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* TRANSLATE_H */

@@ -887,6 +887,22 @@ enum arm_exception_class {
 #define ARM_EL_IL_SHIFT 25
 #define ARM_EL_IL (1 << ARM_EL_IL_SHIFT)
 
+static inline uint32_t syn_aa32_hvc(uint32_t imm16)
+{
+    return (EC_AA32_HVC << ARM_EL_EC_SHIFT) | ARM_EL_IL | (imm16 & 0xffff);
+}
+
+static inline uint32_t syn_aa32_smc(void)
+{
+    return (EC_AA32_SMC << ARM_EL_EC_SHIFT) | ARM_EL_IL;
+}
+
+static inline uint32_t syn_aa32_svc(uint32_t imm16, bool is_thumb)
+{
+    return (EC_AA32_SVC << ARM_EL_EC_SHIFT) | (imm16 & 0xffff)
+        | (is_thumb ? 0 : ARM_EL_IL);
+}
+
 static inline uint32_t syn_aa32_bkpt(uint32_t imm16, bool is_thumb)
 {
     return (EC_AA32_BKPT << ARM_EL_EC_SHIFT) | (imm16 & 0xffff)
@@ -1198,6 +1214,18 @@ static inline bool arm_singlestep_active(CPUARMState *env)
         && arm_generate_debug_exceptions(env);
 }
 
+/* Macros which are lvalues for the field in CPUARMState for the
+ * ARMCPRegInfo *ri.
+ */
+#define CPREG_FIELD32(env, ri) \
+    (*(uint32_t *)((char *)(env) + (ri)->fieldoffset))
+#define CPREG_FIELD64(env, ri) \
+    (*(uint64_t *)((char *)(env) + (ri)->fieldoffset))
+
+static inline bool cpreg_field_is_64bit(const ARMCPRegInfo *ri)
+{
+    return (ri->state == ARM_CP_STATE_AA64) || (ri->type & ARM_CP_64BIT);
+}
 #ifdef __cplusplus
 }
 #endif

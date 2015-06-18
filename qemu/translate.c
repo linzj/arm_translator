@@ -48,7 +48,7 @@ TCGContext tcg_ctx;
 #define ENABLE_ARCH_8     arm_dc_feature(s, ARM_FEATURE_V8)
 
 #define ARCH(x) do { if (!ENABLE_ARCH_##x) goto illegal_op; } while(0)
-#define float64_val(x) (x)
+#define tcg_check_temp_count() 0
 
 #define OPC_BUF_SIZE 640
 static uint32_t gen_opc_condexec_bits[OPC_BUF_SIZE];
@@ -120,6 +120,21 @@ static inline bool cp_access_ok(int current_el,
                                 const ARMCPRegInfo *ri, int isread)
 {
     return (ri->access >> ((current_el * 2) + isread)) & 1;
+}
+
+#define cpu_ldl_code(env1, p) ldl_raw(p)
+#define ldl_raw(p) ldl_p(laddr((p)))
+#define laddr(x) (uint8_t *)(intptr_t)(x)
+#define ldl_p(p) ldl_le_p(p)
+
+static inline uint32_t arm_ldl_code(CPUARMState *env, target_ulong addr,
+                                    bool do_swap)
+{
+    uint32_t insn = cpu_ldl_code(env, addr);
+    if (do_swap) {
+        return bswap32(insn);
+    }
+    return insn;
 }
 
 /* initialize TCG globals.  */
@@ -214,6 +229,10 @@ static void store_reg(DisasContext *s, int reg, TCGv_i32 var)
 #define gen_sxtb16(var) gen_helper_sxtb16(var, var)
 #define gen_uxtb16(var) gen_helper_uxtb16(var, var)
 
+static void gen_tb_end(TranslationBlock *tb, int num_insns)
+{
+    tcg_gen_exit_tb(0);
+}
 
 static inline void gen_set_cpsr(TCGv_i32 var, uint32_t mask)
 {

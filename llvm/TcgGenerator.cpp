@@ -217,7 +217,6 @@ void translate(CPUARMState* env, const TranslateDesc& desc, void** buffer, size_
 {
     llvm_tcg_init();
     ARMCPU* cpu = arm_env_get_cpu(env);
-    env->thumb = env->regs[15] & 1;
     target_ulong pc;
     uint64_t flags;
     cpu_get_tb_cpu_state(env, &pc, &flags);

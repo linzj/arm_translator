@@ -13,6 +13,7 @@
 #include "Check.h"
 #include "log.h"
 #include "cpuinit.h"
+#include "TcgGenerator.h"
 
 extern "C" {
 void yyparse(IRContext*);
@@ -174,6 +175,12 @@ int main(int argc, char** argv)
     // setup pc
     cpu.env.regs[15] = (uint32_t)(uintptr_t)binaryCode.data();
     uintptr_t twoWords[2];
+    void* codeBuffer;
+    size_t codeSize;
+    jit::TranslateDesc tdesc = { reinterpret_cast<void*>(vex_disp_cp_chain_me_to_fastEP), reinterpret_cast<void*>(vex_disp_cp_xindir), reinterpret_cast<void*>(vex_disp_cp_xassisted) };
+    jit::translate(&cpu.env, tdesc, &codeBuffer, &codeSize);
+    memcpy(execMem, codeBuffer, codeSize);
+    free(codeBuffer);
     vex_disp_run_translations(twoWords, &cpu.env, execMem);
     checkRun("llvm", context, twoWords, cpu.env);
     return 0;
