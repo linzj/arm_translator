@@ -1,8 +1,11 @@
+#include <stdarg.h>
 #include <limits.h>
 #include <string.h>
+#include <stdlib.h>
 #include "softfloat.h"
 #include "helper-proto.h"
 #include "bitops.h"
+#include "bswap.h"
 #include "log.h"
 
 #define SIGNBIT (uint32_t)0x80000000
@@ -21,6 +24,37 @@ static void raise_exception(CPUARMState* env, int tt)
     cpu_loop_exit(cs);
 }
 
+void switch_mode(CPUARMState *env, int mode)
+{
+    ARMCPU *cpu = arm_env_get_cpu(env);
+
+    if (mode != ARM_CPU_MODE_USR) {
+        cpu_abort(CPU(cpu), "Tried to switch out of user mode\n");
+    }
+}
+
+static int bad_mode_switch(CPUARMState *env, int mode)
+{
+    /* Return true if it is not valid for us to switch to
+     * this CPU mode (ie all the UNPREDICTABLE cases in
+     * the ARM ARM CPSRWriteByInstr pseudocode).
+     */
+    switch (mode) {
+    case ARM_CPU_MODE_USR:
+    case ARM_CPU_MODE_SYS:
+    case ARM_CPU_MODE_SVC:
+    case ARM_CPU_MODE_ABT:
+    case ARM_CPU_MODE_UND:
+    case ARM_CPU_MODE_IRQ:
+    case ARM_CPU_MODE_FIQ:
+        return 0;
+    case ARM_CPU_MODE_MON:
+        return !arm_is_secure(env);
+    default:
+        return 1;
+    }
+}
+
 static inline unsigned int aarch64_banked_spsr_index(unsigned int el)
 {
     static const unsigned int map[4] = {
@@ -30,24 +64,6 @@ static inline unsigned int aarch64_banked_spsr_index(unsigned int el)
     };
     EMASSERT(el >= 1 && el <= 3);
     return map[el];
-}
-
-static inline void aarch64_restore_sp(CPUARMState *env, int el)
-{
-    if (env->pstate & PSTATE_SP) {
-        env->xregs[31] = env->sp_el[el];
-    } else {
-        env->xregs[31] = env->sp_el[0];
-    }
-}
-
-static inline void aarch64_save_sp(CPUARMState *env, int el)
-{
-    if (env->pstate & PSTATE_SP) {
-        env->sp_el[el] = env->xregs[31];
-    } else {
-        env->sp_el[0] = env->xregs[31];
-    }
 }
 
 static inline bool arm_is_psci_call(ARMCPU *cpu, int excp_type)
@@ -61,6 +77,80 @@ static inline bool arm_singlestep_active(CPUARMState *env)
         && arm_el_is_aa64(env, arm_debug_target_el(env))
         && arm_generate_debug_exceptions(env);
 }
+
+uint32_t cpsr_read(CPUARMState *env)
+{
+    int ZF;
+    ZF = (env->ZF == 0);
+    return env->uncached_cpsr | (env->NF & 0x80000000) | (ZF << 30) |
+        (env->CF << 29) | ((env->VF & 0x80000000) >> 3) | (env->QF << 27)
+        | (env->thumb << 5) | ((env->condexec_bits & 3) << 25)
+        | ((env->condexec_bits & 0xfc) << 8)
+        | (env->GE << 16) | (env->daif & CPSR_AIF);
+}
+
+const ARMCPRegInfo *get_arm_cp_reginfo(GHashTable *cpregs, uint32_t encoded_cp)
+{
+    return g_hash_table_lookup(cpregs, &encoded_cp);
+}
+
+void cpu_abort(CPUState *cpu, const char *fmt, ...)
+{
+    va_list ap;
+    va_list ap2;
+
+    va_start(ap, fmt);
+    va_copy(ap2, ap);
+    fprintf(stderr, "qemu: fatal: ");
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
+    va_end(ap2);
+    va_end(ap);
+    abort();
+}
+
+void cpsr_write(CPUARMState *env, uint32_t val, uint32_t mask)
+{
+    if (mask & CPSR_NZCV) {
+        env->ZF = (~val) & CPSR_Z;
+        env->NF = val;
+        env->CF = (val >> 29) & 1;
+        env->VF = (val << 3) & 0x80000000;
+    }
+    if (mask & CPSR_Q)
+        env->QF = ((val & CPSR_Q) != 0);
+    if (mask & CPSR_T)
+        env->thumb = ((val & CPSR_T) != 0);
+    if (mask & CPSR_IT_0_1) {
+        env->condexec_bits &= ~3;
+        env->condexec_bits |= (val >> 25) & 3;
+    }
+    if (mask & CPSR_IT_2_7) {
+        env->condexec_bits &= 3;
+        env->condexec_bits |= (val >> 8) & 0xfc;
+    }
+    if (mask & CPSR_GE) {
+        env->GE = (val >> 16) & 0xf;
+    }
+
+    env->daif &= ~(CPSR_AIF & mask);
+    env->daif |= val & CPSR_AIF & mask;
+
+    if ((env->uncached_cpsr ^ val) & mask & CPSR_M) {
+        if (bad_mode_switch(env, val & CPSR_M)) {
+            /* Attempt to switch to an invalid mode: this is UNPREDICTABLE.
+             * We choose to ignore the attempt and leave the CPSR M field
+             * untouched.
+             */
+            mask &= ~CPSR_M;
+        } else {
+            switch_mode(env, val & CPSR_M);
+        }
+    }
+    mask &= ~CACHED_CPSR_BITS;
+    env->uncached_cpsr = (env->uncached_cpsr & ~mask) | (val & mask);
+}
+
 
 uint32_t HELPER(neon_tbl)(CPUARMState *env, uint32_t ireg, uint32_t def,
                           uint32_t rn, uint32_t maxindex)
@@ -326,7 +416,7 @@ void HELPER(access_check_cp_reg)(CPUARMState *env, void *rip, uint32_t syndrome)
         env->exception.syndrome = syn_uncategorized();
         break;
     default:
-        g_assert_not_reached();
+        EMUNREACHABLE();
     }
     raise_exception(env, EXCP_UDEF);
 }
@@ -380,7 +470,7 @@ void HELPER(msr_i_pstate)(CPUARMState *env, uint32_t op, uint32_t imm)
         env->daif &= ~((imm << 6) & PSTATE_DAIF);
         break;
     default:
-        g_assert_not_reached();
+        EMUNREACHABLE();
     }
 }
 
@@ -734,15 +824,6 @@ uint32_t HELPER(v7m_mrs)(CPUARMState *env, uint32_t reg)
 
     cpu_abort(CPU(cpu), "v7m_mrs %d\n", reg);
     return 0;
-}
-
-void switch_mode(CPUARMState *env, int mode)
-{
-    ARMCPU *cpu = arm_env_get_cpu(env);
-
-    if (mode != ARM_CPU_MODE_USR) {
-        cpu_abort(CPU(cpu), "Tried to switch out of user mode\n");
-    }
 }
 
 void HELPER(set_r13_banked)(CPUARMState *env, uint32_t mode, uint32_t val)
@@ -1550,7 +1631,7 @@ static bool round_to_inf(float_status *fpst, bool sign_bit)
         return false;
     }
 
-    g_assert_not_reached();
+    EMUNREACHABLE();
 }
 
 float32 HELPER(recpe_f32)(float32 input, void *fpstp)
@@ -1938,34 +2019,6 @@ float64 HELPER(rintd)(float64 x, void *fp_status)
     }
 
     return ret;
-}
-
-/* Convert ARM rounding mode to softfloat */
-int arm_rmode_to_sf(int rmode)
-{
-    switch (rmode) {
-    case FPROUNDING_TIEAWAY:
-        rmode = float_round_ties_away;
-        break;
-    case FPROUNDING_ODD:
-        /* FIXME: add support for TIEAWAY and ODD */
-        LOGE("arm: unimplemented rounding mode: %d\n",
-                      rmode);
-    case FPROUNDING_TIEEVEN:
-    default:
-        rmode = float_round_nearest_even;
-        break;
-    case FPROUNDING_POSINF:
-        rmode = float_round_up;
-        break;
-    case FPROUNDING_NEGINF:
-        rmode = float_round_down;
-        break;
-    case FPROUNDING_ZERO:
-        rmode = float_round_to_zero;
-        break;
-    }
-    return rmode;
 }
 
 /* CRC helpers.

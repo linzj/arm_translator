@@ -32,6 +32,7 @@
 #include "tcg_functions.h"
 #include "softfloat.h"
 #include "helper-proto.h"
+#include "bswap.h"
 
 TCGContext tcg_ctx;
 #include "helper-gen.h"
@@ -78,24 +79,6 @@ static inline int arm_dc_feature(DisasContext *dc, int feature)
     return (dc->features & (1ULL << feature)) != 0;
 }
 
-static inline int lduw_he_p(const void *ptr)
-{
-    uint16_t r;
-    memcpy(&r, ptr, sizeof(r));
-    return r;
-}
-
-static inline int lduw_le_p(const void *ptr)
-{
-    return (uint16_t)(lduw_he_p(ptr), 16);
-}
-
-static inline uint16_t bswap16(uint16_t x)
-{
-    return (((x & 0x00ff) << 8) |
-            ((x & 0xff00) >> 8));
-}
-
 static inline uint16_t arm_lduw_code(CPUARMState *env, target_ulong addr,
                                      bool do_swap)
 {
@@ -137,31 +120,6 @@ static inline bool cp_access_ok(int current_el,
                                 const ARMCPRegInfo *ri, int isread)
 {
     return (ri->access >> ((current_el * 2) + isread)) & 1;
-}
-
-static inline bool excp_is_internal(int excp)
-{
-    /* Return true if this exception number represents a QEMU-internal
-     * exception that will not be passed to the guest.
-     */
-    return excp == EXCP_INTERRUPT
-        || excp == EXCP_HLT
-        || excp == EXCP_DEBUG
-        || excp == EXCP_HALTED
-        || excp == EXCP_EXCEPTION_EXIT
-        || excp == EXCP_KERNEL_TRAP
-        || excp == EXCP_STREX;
-}
-
-static inline uint32_t cpsr_read(CPUARMState *env)
-{
-    int ZF;
-    ZF = (env->ZF == 0);
-    return env->uncached_cpsr | (env->NF & 0x80000000) | (ZF << 30) |
-        (env->CF << 29) | ((env->VF & 0x80000000) >> 3) | (env->QF << 27)
-        | (env->thumb << 5) | ((env->condexec_bits & 3) << 25)
-        | ((env->condexec_bits & 0xfc) << 8)
-        | (env->GE << 16) | (env->daif & CPSR_AIF);
 }
 
 /* initialize TCG globals.  */

@@ -5,6 +5,9 @@
 #include "ghash.h"
 #include "softfloat.h"
 #include "bitops.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct CPUARMState {
     /* Regs for current mode.  */
@@ -288,15 +291,6 @@ enum arm_features {
     ARM_FEATURE_V8_SHA256, /* implements SHA256 part of v8 Crypto Extensions */
     ARM_FEATURE_V8_PMULL, /* implements PMULL part of v8 Crypto Extensions */
 };
-
-typedef union {
-    double d;
-    struct {
-        uint32_t lower;
-        uint32_t upper;
-    } l;
-    uint64_t ll;
-} CPU_DoubleU;
 
 #define ARM_IWMMXT_wCID 0
 #define ARM_IWMMXT_wCon 1
@@ -770,4 +764,191 @@ static inline bool arm_generate_debug_exceptions(CPUARMState *env)
         return aa32_generate_debug_exceptions(env);
     }
 }
+uint32_t cpsr_read(CPUARMState *env);
+void cpsr_write(CPUARMState *env, uint32_t val, uint32_t mask);
+void QEMU_NORETURN cpu_abort(CPUState *cpu, const char *fmt, ...)
+    GCC_FMT_ATTR(2, 3);
+
+static inline bool excp_is_internal(int excp)
+{
+    /* Return true if this exception number represents a QEMU-internal
+     * exception that will not be passed to the guest.
+     */
+    return excp == EXCP_INTERRUPT
+        || excp == EXCP_HLT
+        || excp == EXCP_DEBUG
+        || excp == EXCP_HALTED
+        || excp == EXCP_EXCEPTION_EXIT
+        || excp == EXCP_KERNEL_TRAP
+        || excp == EXCP_STREX;
+}
+
+static inline uint32_t pstate_read(CPUARMState *env)
+{
+    int ZF;
+
+    ZF = (env->ZF == 0);
+    return (env->NF & 0x80000000) | (ZF << 30)
+        | (env->CF << 29) | ((env->VF & 0x80000000) >> 3)
+        | env->pstate | env->daif;
+}
+
+static inline void pstate_write(CPUARMState *env, uint32_t val)
+{
+    env->ZF = (~val) & PSTATE_Z;
+    env->NF = val;
+    env->CF = (val >> 29) & 1;
+    env->VF = (val << 3) & 0x80000000;
+    env->daif = val & PSTATE_DAIF;
+    env->pstate = val & ~CACHED_PSTATE_BITS;
+}
+
+enum arm_exception_class {
+    EC_UNCATEGORIZED          = 0x00,
+    EC_WFX_TRAP               = 0x01,
+    EC_CP15RTTRAP             = 0x03,
+    EC_CP15RRTTRAP            = 0x04,
+    EC_CP14RTTRAP             = 0x05,
+    EC_CP14DTTRAP             = 0x06,
+    EC_ADVSIMDFPACCESSTRAP    = 0x07,
+    EC_FPIDTRAP               = 0x08,
+    EC_CP14RRTTRAP            = 0x0c,
+    EC_ILLEGALSTATE           = 0x0e,
+    EC_AA32_SVC               = 0x11,
+    EC_AA32_HVC               = 0x12,
+    EC_AA32_SMC               = 0x13,
+    EC_AA64_SVC               = 0x15,
+    EC_AA64_HVC               = 0x16,
+    EC_AA64_SMC               = 0x17,
+    EC_SYSTEMREGISTERTRAP     = 0x18,
+    EC_INSNABORT              = 0x20,
+    EC_INSNABORT_SAME_EL      = 0x21,
+    EC_PCALIGNMENT            = 0x22,
+    EC_DATAABORT              = 0x24,
+    EC_DATAABORT_SAME_EL      = 0x25,
+    EC_SPALIGNMENT            = 0x26,
+    EC_AA32_FPTRAP            = 0x28,
+    EC_AA64_FPTRAP            = 0x2c,
+    EC_SERROR                 = 0x2f,
+    EC_BREAKPOINT             = 0x30,
+    EC_BREAKPOINT_SAME_EL     = 0x31,
+    EC_SOFTWARESTEP           = 0x32,
+    EC_SOFTWARESTEP_SAME_EL   = 0x33,
+    EC_WATCHPOINT             = 0x34,
+    EC_WATCHPOINT_SAME_EL     = 0x35,
+    EC_AA32_BKPT              = 0x38,
+    EC_VECTORCATCH            = 0x3a,
+    EC_AA64_BKPT              = 0x3c,
+};
+
+#define ARM_EL_EC_SHIFT 26
+#define ARM_EL_IL_SHIFT 25
+#define ARM_EL_IL (1 << ARM_EL_IL_SHIFT)
+
+static inline uint32_t syn_aa32_bkpt(uint32_t imm16, bool is_thumb)
+{
+    return (EC_AA32_BKPT << ARM_EL_EC_SHIFT) | (imm16 & 0xffff)
+        | (is_thumb ? 0 : ARM_EL_IL);
+}
+
+static inline uint32_t syn_cp14_rrt_trap(int cv, int cond, int opc1, int crm,
+                                         int rt, int rt2, int isread,
+                                         bool is_thumb)
+{
+    return (EC_CP14RRTTRAP << ARM_EL_EC_SHIFT)
+        | (is_thumb ? 0 : ARM_EL_IL)
+        | (cv << 24) | (cond << 20) | (opc1 << 16)
+        | (rt2 << 10) | (rt << 5) | (crm << 1) | isread;
+}
+
+static inline uint32_t syn_cp14_rt_trap(int cv, int cond, int opc1, int opc2,
+                                        int crn, int crm, int rt, int isread,
+                                        bool is_thumb)
+{
+    return (EC_CP14RTTRAP << ARM_EL_EC_SHIFT)
+        | (is_thumb ? 0 : ARM_EL_IL)
+        | (cv << 24) | (cond << 20) | (opc2 << 17) | (opc1 << 14)
+        | (crn << 10) | (rt << 5) | (crm << 1) | isread;
+}
+
+static inline uint32_t syn_cp15_rrt_trap(int cv, int cond, int opc1, int crm,
+                                         int rt, int rt2, int isread,
+                                         bool is_thumb)
+{
+    return (EC_CP15RRTTRAP << ARM_EL_EC_SHIFT)
+        | (is_thumb ? 0 : ARM_EL_IL)
+        | (cv << 24) | (cond << 20) | (opc1 << 16)
+        | (rt2 << 10) | (rt << 5) | (crm << 1) | isread;
+}
+
+static inline uint32_t syn_cp15_rt_trap(int cv, int cond, int opc1, int opc2,
+                                        int crn, int crm, int rt, int isread,
+                                        bool is_thumb)
+{
+    return (EC_CP15RTTRAP << ARM_EL_EC_SHIFT)
+        | (is_thumb ? 0 : ARM_EL_IL)
+        | (cv << 24) | (cond << 20) | (opc2 << 17) | (opc1 << 14)
+        | (crn << 10) | (rt << 5) | (crm << 1) | isread;
+}
+
+static inline uint32_t syn_fp_access_trap(int cv, int cond, bool is_thumb)
+{
+    return (EC_ADVSIMDFPACCESSTRAP << ARM_EL_EC_SHIFT)
+        | (is_thumb ? 0 : ARM_EL_IL)
+        | (cv << 24) | (cond << 20);
+}
+
+static inline uint32_t syn_uncategorized(void)
+{
+    return (EC_UNCATEGORIZED << ARM_EL_EC_SHIFT) | ARM_EL_IL;
+}
+
+static inline uint32_t syn_swstep(int same_el, int isv, int ex)
+{
+    return (EC_SOFTWARESTEP << ARM_EL_EC_SHIFT) | (same_el << ARM_EL_EC_SHIFT)
+        | (isv << 24) | (ex << 6) | 0x22;
+}
+
+static inline void aarch64_restore_sp(CPUARMState *env, int el)
+{
+    if (env->pstate & PSTATE_SP) {
+        env->xregs[31] = env->sp_el[el];
+    } else {
+        env->xregs[31] = env->sp_el[0];
+    }
+}
+
+static inline void aarch64_save_sp(CPUARMState *env, int el)
+{
+    if (env->pstate & PSTATE_SP) {
+        env->sp_el[el] = env->xregs[31];
+    } else {
+        env->sp_el[0] = env->xregs[31];
+    }
+}
+
+
+static inline void update_spsel(CPUARMState *env, uint32_t imm)
+{
+    unsigned int cur_el = arm_current_el(env);
+    /* Update PSTATE SPSel bit; this requires us to update the
+     * working stack pointer in xregs[31].
+     */
+    if (!((imm ^ env->pstate) & PSTATE_SP)) {
+        return;
+    }
+    aarch64_save_sp(env, cur_el);
+    env->pstate = deposit32(env->pstate, 0, 1, imm);
+
+    /* We rely on illegal updates to SPsel from EL0 to get trapped
+     * at translation time.
+     */
+    EMASSERT(cur_el >= 1 && cur_el <= 3);
+    aarch64_restore_sp(env, cur_el);
+}
+
+int arm_rmode_to_sf(int rmode);
+#ifdef __cplusplus
+}
+#endif
 #endif /* CPU_H */

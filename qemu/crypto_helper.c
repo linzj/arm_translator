@@ -16,6 +16,7 @@
 #include "aes.h"
 #include "bitops.h"
 #include "log.h"
+#include "bswap.h"
 
 union CRYPTO_STATE {
     uint8_t    bytes[16];
@@ -265,7 +266,7 @@ void HELPER(crypto_sha1_3reg)(CPUARMState *env, uint32_t rd, uint32_t rn,
                 t = maj(d.words[1], d.words[2], d.words[3]);
                 break;
             default:
-                g_assert_not_reached();
+                EMUNREACHABLE();
             }
             t += rol32(d.words[0], 5) + n.words[0] + m.words[i];
 
