@@ -15,6 +15,9 @@ static const ARMCPRegInfo cortexa15_cp_reginfo[] = {
 
 void cortex_a15_initfn(ARMCPU* cpu)
 {
+    cpu->cp_regs = g_hash_table_new_full(g_int_hash, g_int_equal,
+                                         g_free, g_free);
+    cpu->psci_version = 2; /* TCG implements PSCI 0.2 */
     set_feature(&cpu->env, ARM_FEATURE_V7);
     set_feature(&cpu->env, ARM_FEATURE_VFP4);
     set_feature(&cpu->env, ARM_FEATURE_NEON);
