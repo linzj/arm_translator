@@ -22,6 +22,7 @@ int yylex_destroy(yyscan_t yyscanner);
 void vex_disp_run_translations(uintptr_t* two_words,
     void* guest_state,
     void* host_addr);
+void yyset_in  (FILE * in_str ,yyscan_t yyscanner );
 void vex_disp_cp_chain_me_to_slowEP(void);
 void vex_disp_cp_chain_me_to_fastEP(void);
 void vex_disp_cp_xindir(void);
@@ -57,10 +58,20 @@ static void checkRun(const char* who, const IRContextInternal& context, const ui
     LOGE("passed %u, failed %u.\n", checkPassed, checkFailed);
 }
 
-int main()
+int main(int argc, char** argv)
 {
+    if (argc <= 1) {
+        LOGE("need one arg.");
+        exit(1);
+    }
+    FILE* inputFile = fopen(argv[1], "r");
+    if (!inputFile) {
+        LOGE("fails to open input file.");
+        exit(1);
+    }
     IRContextInternal context;
     yylex_init_extra(&context, &context.m_scanner);
+    yyset_in(inputFile, &context.m_scanner);
     yyparse(&context);
     yylex_destroy(context.m_scanner);
 
