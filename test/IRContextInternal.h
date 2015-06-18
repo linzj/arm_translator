@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include "IRContext.h"
 #include "RegisterInit.h"
-#include "VexHeaders.h"
 
 struct IRContextInternal : IRContext {
     typedef std::vector<RegisterInit> RegisterInitVector;

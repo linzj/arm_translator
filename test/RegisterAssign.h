@@ -8,6 +8,6 @@ class RegisterAssign {
 public:
     RegisterAssign();
     ~RegisterAssign();
-    void assign(VexGuestState* state, const std::string& registerName, unsigned long long val);
+    void assign(CPUARMState* state, const std::string& registerName, unsigned long long val);
 };
 #endif /* REGISTERASSIGN_H */

@@ -14,7 +14,7 @@ public:
     }
 
 private:
-    virtual bool check(const VexGuestState* state, const uintptr_t*, std::string& info) const override
+    virtual bool check(const CPUARMState* state, const uintptr_t*, std::string& info) const override
     {
         RegisterOperation& op = RegisterOperation::getDefault();
         const uintptr_t* p = op.getRegisterPointer(state, m_regName);
@@ -39,7 +39,7 @@ public:
     }
 
 private:
-    virtual bool check(const VexGuestState* state, const uintptr_t*, std::string& info) const override
+    virtual bool check(const CPUARMState* state, const uintptr_t*, std::string& info) const override
     {
         RegisterOperation& op = RegisterOperation::getDefault();
         const uintptr_t* p1 = op.getRegisterPointer(state, m_regName1);
@@ -63,7 +63,7 @@ public:
     }
 
 private:
-    virtual bool check(const VexGuestState*, const uintptr_t* w, std::string& info) const override
+    virtual bool check(const CPUARMState*, const uintptr_t* w, std::string& info) const override
     {
         std::ostringstream oss;
         oss << "CheckState " << ((w[0] == m_val) ? "PASSED" : "FAILED")
@@ -84,7 +84,7 @@ public:
     }
 
 private:
-    virtual bool check(const VexGuestState* state, const uintptr_t*, std::string& info) const override
+    virtual bool check(const CPUARMState* state, const uintptr_t*, std::string& info) const override
     {
         std::ostringstream oss;
         RegisterOperation& op = RegisterOperation::getDefault();
