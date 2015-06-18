@@ -71,13 +71,6 @@ static inline bool arm_is_psci_call(ARMCPU *cpu, int excp_type)
     return false;
 }
 
-static inline bool arm_singlestep_active(CPUARMState *env)
-{
-    return extract32(env->cp15.mdscr_el1, 0, 1)
-        && arm_el_is_aa64(env, arm_debug_target_el(env))
-        && arm_generate_debug_exceptions(env);
-}
-
 uint32_t cpsr_read(CPUARMState *env)
 {
     int ZF;

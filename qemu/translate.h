@@ -91,8 +91,7 @@ typedef struct {
     target_ulong gen_opc_pc[OPC_BUF_SIZE];
     uint16_t gen_opc_icount[OPC_BUF_SIZE];
 } TCGContext;
-void gen_intermediate_code_internal(ARMCPU* cpu,
-                                                  TranslationBlock *tb,
-                                                  bool search_pc);
+void gen_intermediate_code_internal(ARMCPU* cpu, TranslationBlock *tb);
+                                                  
 
 #endif /* TRANSLATE_H */

@@ -551,7 +551,7 @@ typedef struct {
 } ARMCPU;
 #ifndef container_of
 #define container_of(ptr, type, member) ({			\
-	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+	const __typeof__( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) ); })
 #endif
 #define arm_env_get_cpu(env) container_of(env, ARMCPU, env)
@@ -1190,6 +1190,13 @@ static inline bool cptype_valid(int cptype)
     (((F) & ARM_TBFLAG_AA64_SS_ACTIVE_MASK) >> ARM_TBFLAG_AA64_SS_ACTIVE_SHIFT)
 #define ARM_TBFLAG_AA64_PSTATE_SS(F) \
     (((F) & ARM_TBFLAG_AA64_PSTATE_SS_MASK) >> ARM_TBFLAG_AA64_PSTATE_SS_SHIFT)
+
+static inline bool arm_singlestep_active(CPUARMState *env)
+{
+    return extract32(env->cp15.mdscr_el1, 0, 1)
+        && arm_el_is_aa64(env, arm_debug_target_el(env))
+        && arm_generate_debug_exceptions(env);
+}
 
 #ifdef __cplusplus
 }

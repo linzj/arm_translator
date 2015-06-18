@@ -7,6 +7,8 @@
 #include "InitializeLLVM.h"
 #include "Output.h"
 #include "cpu.h"
+#include "tb.h"
+#include "translate.h"
 #include "log.h"
 
 namespace jit {
@@ -58,9 +60,93 @@ static void llvm_tcg_deinit(void)
     g_labelMap.clear();
 }
 
+static inline void cpu_get_tb_cpu_state(CPUARMState* env, target_ulong* pc,
+    uint64_t* flags)
+{
+    int fpen;
+
+    if (arm_feature(env, ARM_FEATURE_V6)) {
+        fpen = extract32(env->cp15.c1_coproc, 20, 2);
+    }
+    else {
+        /* CPACR doesn't exist before v6, so VFP is always accessible */
+        fpen = 3;
+    }
+
+    if (is_a64(env)) {
+        *pc = env->pc;
+        *flags = ARM_TBFLAG_AARCH64_STATE_MASK
+            | (arm_current_el(env) << ARM_TBFLAG_AA64_EL_SHIFT);
+        if (fpen == 3 || (fpen == 1 && arm_current_el(env) != 0)) {
+            *flags |= ARM_TBFLAG_AA64_FPEN_MASK;
+        }
+        /* The SS_ACTIVE and PSTATE_SS bits correspond to the state machine
+         * states defined in the ARM ARM for software singlestep:
+         *  SS_ACTIVE   PSTATE.SS   State
+         *     0            x       Inactive (the TB flag for SS is always 0)
+         *     1            0       Active-pending
+         *     1            1       Active-not-pending
+         */
+        if (arm_singlestep_active(env)) {
+            *flags |= ARM_TBFLAG_AA64_SS_ACTIVE_MASK;
+            if (env->pstate & PSTATE_SS) {
+                *flags |= ARM_TBFLAG_AA64_PSTATE_SS_MASK;
+            }
+        }
+    }
+    else {
+        int privmode;
+        *pc = env->regs[15];
+        *flags = (env->thumb << ARM_TBFLAG_THUMB_SHIFT)
+            | (env->vfp.vec_len << ARM_TBFLAG_VECLEN_SHIFT)
+            | (env->vfp.vec_stride << ARM_TBFLAG_VECSTRIDE_SHIFT)
+            | (env->condexec_bits << ARM_TBFLAG_CONDEXEC_SHIFT)
+            | (env->bswap_code << ARM_TBFLAG_BSWAP_CODE_SHIFT);
+        if (arm_feature(env, ARM_FEATURE_M)) {
+            privmode = !((env->v7m.exception == 0) && (env->v7m.control & 1));
+        }
+        else {
+            privmode = (env->uncached_cpsr & CPSR_M) != ARM_CPU_MODE_USR;
+        }
+        if (privmode) {
+            *flags |= ARM_TBFLAG_PRIV_MASK;
+        }
+        if (env->vfp.xregs[ARM_VFP_FPEXC] & (1 << 30)
+            || arm_el_is_aa64(env, 1)) {
+            *flags |= ARM_TBFLAG_VFPEN_MASK;
+        }
+        if (fpen == 3 || (fpen == 1 && arm_current_el(env) != 0)) {
+            *flags |= ARM_TBFLAG_CPACR_FPEN_MASK;
+        }
+        /* The SS_ACTIVE and PSTATE_SS bits correspond to the state machine
+         * states defined in the ARM ARM for software singlestep:
+         *  SS_ACTIVE   PSTATE.SS   State
+         *     0            x       Inactive (the TB flag for SS is always 0)
+         *     1            0       Active-pending
+         *     1            1       Active-not-pending
+         */
+        if (arm_singlestep_active(env)) {
+            *flags |= ARM_TBFLAG_SS_ACTIVE_MASK;
+            if (env->uncached_cpsr & PSTATE_SS) {
+                *flags |= ARM_TBFLAG_PSTATE_SS_MASK;
+            }
+        }
+        *flags |= (extract32(env->cp15.c15_cpar, 0, 2)
+            << ARM_TBFLAG_XSCALE_CPAR_SHIFT);
+    }
+}
+
 void translate(CPUARMState* env, void** buffer, size_t* s)
 {
     llvm_tcg_init();
+    ARMCPU* cpu = arm_env_get_cpu(env);
+    env->thumb = env->regs[15] & 1;
+    target_ulong pc;
+    uint64_t flags;
+    cpu_get_tb_cpu_state(env, &pc, &flags);
+    TranslationBlock tb = { pc, flags };
+
+    gen_intermediate_code_internal(cpu, &tb);
     llvm_tcg_deinit();
 }
 }

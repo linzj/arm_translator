@@ -10908,16 +10908,14 @@ undef:
 }
 
 /* generate intermediate code in gen_opc_buf and gen_opparam_buf for
-   basic block 'tb'. If search_pc is TRUE, also generate PC
-   information for each intermediate instruction. */
+   basic block 'tb'. */
 void gen_intermediate_code_internal(ARMCPU* cpu,
-                                                  TranslationBlock *tb,
-                                                  bool search_pc)
+                                                  TranslationBlock *tb)
 {
     CPUARMState *env = &cpu->env;
     CPUState* cs = CPU(cpu);
     DisasContext dc1, *dc = &dc1;
-    uint16_t *gen_opc_end;
+    /* disable for llvm uint16_t *gen_opc_end; */
     int j, lj;
     target_ulong pc_start;
     target_ulong next_page_start;
@@ -10938,7 +10936,7 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
 
     dc->tb = tb;
 
-    gen_opc_end = tcg_ctx.gen_opc_buf + OPC_MAX_SIZE;
+    /* disable for llvm gen_opc_end = tcg_ctx.gen_opc_buf + OPC_MAX_SIZE; */
 
     dc->is_jmp = DISAS_NEXT;
     dc->pc = pc_start;
@@ -10990,9 +10988,7 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
     next_page_start = (pc_start & TARGET_PAGE_MASK) + TARGET_PAGE_SIZE;
     lj = -1;
     num_insns = 0;
-    max_insns = tb->cflags & CF_COUNT_MASK;
-    if (max_insns == 0)
-        max_insns = CF_COUNT_MASK;
+    max_insns = CF_COUNT_MASK;
 
 
 
@@ -11045,21 +11041,6 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
             break;
         }
 
-        if (search_pc) {
-            j = tcg_ctx.gen_opc_ptr - tcg_ctx.gen_opc_buf;
-            if (lj < j) {
-                lj++;
-                while (lj < j)
-                    tcg_ctx.gen_opc_instr_start[lj++] = 0;
-            }
-            tcg_ctx.gen_opc_pc[lj] = dc->pc;
-            gen_opc_condexec_bits[lj] = (dc->condexec_cond << 4) | (dc->condexec_mask >> 1);
-            tcg_ctx.gen_opc_instr_start[lj] = 1;
-            tcg_ctx.gen_opc_icount[lj] = num_insns;
-        }
-
-        if (num_insns + 1 == max_insns && (tb->cflags & CF_LAST_IO))
-            gen_io_start();
 
         if (dc->ss_active && !dc->pstate_ss) {
             /* Singlestep state is Active-pending.
@@ -11108,21 +11089,14 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
          * Also stop translation when a page boundary is reached.  This
          * ensures prefetch aborts occur at the right place.  */
         num_insns ++;
-    } while (!dc->is_jmp && tcg_ctx.gen_opc_ptr < gen_opc_end &&
+    } while (!dc->is_jmp && 
+            /* disable for llvm tcg_ctx.gen_opc_ptr < gen_opc_end && */
              true &&
              true &&
              !dc->ss_active &&
              dc->pc < next_page_start &&
              num_insns < max_insns);
 
-    if (tb->cflags & CF_LAST_IO) {
-        if (dc->condjmp) {
-            /* FIXME:  This can theoretically happen with self-modifying
-               code.  */
-            LOGE( "IO on conditional branch instruction");
-        }
-        gen_io_end();
-    }
 
     /* At this stage dc->condjmp will only be set when the skipped
        instruction was a conditional branch or trap, and the PC has
@@ -11218,35 +11192,9 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
 done_generating:
     gen_tb_end(tb, num_insns);
 
-#ifdef DEBUG_DISAS
-    if (qemu_loglevel_mask(CPU_LOG_TB_IN_ASM)) {
-        qemu_log("----------------\n");
-        qemu_log("IN: %s\n", lookup_symbol(pc_start));
-        log_target_disas(env, pc_start, dc->pc - pc_start,
-                         dc->thumb | (dc->bswap_code << 1));
-        qemu_log("\n");
-    }
-#endif
-    if (search_pc) {
-        j = tcg_ctx.gen_opc_ptr - tcg_ctx.gen_opc_buf;
-        lj++;
-        while (lj <= j)
-            tcg_ctx.gen_opc_instr_start[lj++] = 0;
-    } else {
-        tb->size = dc->pc - pc_start;
-        tb->icount = num_insns;
-    }
+    tb->size = dc->pc - pc_start;
+    tb->icount = num_insns;
 }
-
-//void gen_intermediate_code(CPUARMState *env, TranslationBlock *tb)
-//{
-//    gen_intermediate_code_internal(arm_env_get_cpu(env), tb, false);
-//}
-//
-//void gen_intermediate_code_pc(CPUARMState *env, TranslationBlock *tb)
-//{
-//    gen_intermediate_code_internal(arm_env_get_cpu(env), tb, true);
-//}
 
 static const char *cpu_mode_names[16] = {
   "usr", "fiq", "irq", "svc", "???", "???", "mon", "abt",
@@ -11301,6 +11249,8 @@ void arm_cpu_dump_state(ARMCPU *cpu, FILE *f, fprintf_function cpu_fprintf,
     }
 }
 
+/*
+ * disable for llvm
 void restore_state_to_opc(CPUARMState *env, TranslationBlock *tb, int pc_pos)
 {
     if (is_a64(env)) {
@@ -11311,4 +11261,5 @@ void restore_state_to_opc(CPUARMState *env, TranslationBlock *tb, int pc_pos)
         env->condexec_bits = gen_opc_condexec_bits[pc_pos];
     }
 }
+*/
 
