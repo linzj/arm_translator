@@ -231,6 +231,7 @@ static void store_reg(DisasContext *s, int reg, TCGv_i32 var)
 
 static void gen_tb_end(TranslationBlock *tb, int num_insns)
 {
+    tcg_gen_exit_tb(1);
 }
 
 static inline void gen_set_cpsr(TCGv_i32 var, uint32_t mask)
