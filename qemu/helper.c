@@ -91,7 +91,8 @@ uint32_t cpsr_read(CPUARMState *env)
 
 const ARMCPRegInfo *get_arm_cp_reginfo(GHashTable *cpregs, uint32_t encoded_cp)
 {
-    return g_hash_table_lookup(cpregs, &encoded_cp);
+    // return g_hash_table_lookup(cpregs, &encoded_cp);
+    return NULL;
 }
 
 void cpu_abort(CPUState *cpu, const char *fmt, ...)
