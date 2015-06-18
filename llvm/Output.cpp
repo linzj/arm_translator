@@ -13,7 +13,7 @@ Output::Output(CompilerState& state)
 {
     m_argType = pointerType(arrayType(repo().intPtr, state.m_platformDesc.m_contextSize / sizeof(intptr_t)));
     state.m_function = addFunction(
-        state.m_module, "main", functionType(repo().int64, m_argType));
+        state.m_module, "main", functionType(repo().voidType, m_argType));
     llvmAPI->SetFunctionCallConv(state.m_function, LLVMFastCallConv);
     m_builder = llvmAPI->CreateBuilderInContext(state.m_context);
 
@@ -227,7 +227,7 @@ void Output::buildPatchCommon(LValue where, const PatchDesc& desc, size_t patchS
 {
     LValue constIndex[] = { constInt32(0), constInt32(m_state.m_platformDesc.m_pcFieldOffset / sizeof(intptr_t)) };
     buildStore(where, llvmAPI->BuildInBoundsGEP(m_builder, m_arg, constIndex, 2, ""));
-    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt32(m_stackMapsId), constInt32(patchSize), constNull(repo().ref8), constInt32(0));
+    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt64(m_stackMapsId), constInt32(patchSize), constNull(repo().ref8), constInt32(0));
     llvmAPI->SetInstructionCallConv(call, LLVMAnyRegCallConv);
     buildUnreachable(m_builder);
     // record the stack map info
@@ -237,7 +237,7 @@ void Output::buildPatchCommon(LValue where, const PatchDesc& desc, size_t patchS
 void Output::buildTcgDirectPatch(void)
 {
     PatchDesc desc = { PatchType::TcgDirect };
-    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt32(m_stackMapsId), constInt32(m_state.m_platformDesc.m_tcgSize), constNull(repo().ref8), constInt32(0));
+    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt64(m_stackMapsId), constInt32(m_state.m_platformDesc.m_tcgSize), constNull(repo().ref8), constInt32(0));
     llvmAPI->SetInstructionCallConv(call, LLVMAnyRegCallConv);
     buildUnreachable(m_builder);
     // record the stack map info
@@ -247,7 +247,7 @@ void Output::buildTcgDirectPatch(void)
 void Output::buildTcgIndirectPatch(void)
 {
     PatchDesc desc = { PatchType::TcgIndirect };
-    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt32(m_stackMapsId), constInt32(m_state.m_platformDesc.m_tcgSize), constNull(repo().ref8), constInt32(0));
+    LValue call = buildCall(repo().patchpointInt64Intrinsic(), constInt64(m_stackMapsId), constInt32(m_state.m_platformDesc.m_tcgSize), constNull(repo().ref8), constInt32(0));
     llvmAPI->SetInstructionCallConv(call, LLVMAnyRegCallConv);
     buildUnreachable(m_builder);
     // record the stack map info
@@ -259,17 +259,16 @@ LValue Output::buildTcgHelperCall(void* func, int num, LValue* param)
     PatchDesc desc = { PatchType::TcgHelper };
     LValue funcVal = constIntPtr(reinterpret_cast<uintptr_t>(func));
     funcVal = buildCast(LLVMIntToPtr, funcVal, repo().ref8);
-    std::vector<LValue> params(4 + num);
-    params.push_back(constInt32(m_stackMapsId));
-    params.push_back(repo().int32Zero);
+    std::vector<LValue> params;
+    params.push_back(constInt64(m_stackMapsId));
+    params.push_back(repo().int32ThirtyTwo);
     params.push_back(funcVal);
     params.push_back(constInt32(num));
     for (int i = 0; i < num; ++i) {
-        LValue p = buildLoad(param[i]);
+        LValue p = param[i];
         params.push_back(p);
     }
     LValue call = buildCall(repo().patchpointInt64Intrinsic(), params.data(), params.size());
-    llvmAPI->SetInstructionCallConv(call, LLVMFastCallConv);
     // record the stack map info
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
     return call;
