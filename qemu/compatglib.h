@@ -119,6 +119,9 @@ GHashTable* g_hash_table_new_full (GHashFunc hash_func,
 #endif
 void
 g_free (gpointer mem);
+gpointer
+g_malloc_n (gsize n_blocks,
+	    gsize n_block_bytes);
 #define G_UNLIKELY(expr) (__builtin_expect (!!(expr), 0))
 #if     __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 8)
 #define G_GNUC_EXTENSION __extension__
