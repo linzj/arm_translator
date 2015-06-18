@@ -257,7 +257,7 @@ LValue Output::buildTcgHelperCall(void* func, int num, LValue* param)
 {
     PatchDesc desc = { PatchType::TcgHelper };
     LValue funcVal = constIntPtr(reinterpret_cast<uintptr_t>(func));
-    funcVal = buildCast(LLVMBitCast, funcVal, repo().ref8);
+    funcVal = buildCast(LLVMIntToPtr, funcVal, repo().ref8);
     std::vector<LValue> params(4 + num);
     params.push_back(constInt32(m_stackMapsId));
     params.push_back(repo().int32Zero);
@@ -284,12 +284,6 @@ LValue Output::buildStoreArgIndex(LValue val, int index)
 {
     LValue constIndex[] = { constInt32(0), constInt32(index) };
     return buildStore(val, llvmAPI->BuildInBoundsGEP(m_builder, m_arg, constIndex, 2, ""));
-}
-
-LValue Output::buildArgBytePointer()
-{
-    LValue casted = buildCast(LLVMBitCast, m_arg, repo().ref8);
-    return casted;
 }
 
 LValue Output::buildSelect(LValue condition, LValue taken, LValue notTaken)

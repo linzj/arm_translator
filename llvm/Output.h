@@ -42,7 +42,6 @@ public:
     LValue buildRetVoid(void);
     LValue buildLoadArgIndex(int index);
     LValue buildStoreArgIndex(LValue val, int index);
-    LValue buildArgBytePointer();
     LValue buildSelect(LValue condition, LValue taken, LValue notTaken);
     LValue buildICmp(LIntPredicate cond, LValue left, LValue right);
     LValue buildAtomicCmpXchg(LValue addr, LValue cmp, LValue val);

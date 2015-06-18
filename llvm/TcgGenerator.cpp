@@ -329,13 +329,13 @@ static LValue tcgPointerToLLVM(TCGMemOp op, TCGv pointer)
     LValue pointerBeforeCast = unwrapValue(pointer);
     switch (op) {
     case MO_8:
-        return g_output->buildCast(LLVMBitCast, pointerBeforeCast, g_output->repo().ref8);
+        return g_output->buildCast(LLVMIntToPtr, pointerBeforeCast, g_output->repo().ref8);
     case MO_16:
-        return g_output->buildCast(LLVMBitCast, pointerBeforeCast, g_output->repo().ref16);
+        return g_output->buildCast(LLVMIntToPtr, pointerBeforeCast, g_output->repo().ref16);
     case MO_32:
-        return g_output->buildCast(LLVMBitCast, pointerBeforeCast, g_output->repo().ref32);
+        return g_output->buildCast(LLVMIntToPtr, pointerBeforeCast, g_output->repo().ref32);
     case MO_64:
-        return g_output->buildCast(LLVMBitCast, pointerBeforeCast, g_output->repo().ref64);
+        return g_output->buildCast(LLVMIntToPtr, pointerBeforeCast, g_output->repo().ref64);
     default:
         EMASSERT("unknown pointer type." && false);
     }
@@ -1089,13 +1089,13 @@ void tcg_gen_callN(void*, void* func, TCGArg ret,
 TCGv_ptr TCGV_NAT_TO_PTR(TCGv_i32 a)
 {
     LValue val = unwrapValue(a);
-    val = g_output->buildCast(LLVMBitCast, val, g_output->repo().ref8);
+    val = g_output->buildCast(LLVMIntToPtr, val, g_output->repo().ref8);
     return wrapValue<TCGv_ptr>(val);
 }
 
 TCGv_i32 TCGV_PTR_TO_NAT(TCGv_ptr n)
 {
     LValue val = unwrapValue(n);
-    val = g_output->buildCast(LLVMBitCast, val, g_output->repo().int32);
+    val = g_output->buildCast(LLVMPtrToInt, val, g_output->repo().int32);
     return wrapValue<TCGv_i32>(val);
 }
