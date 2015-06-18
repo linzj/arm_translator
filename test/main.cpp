@@ -67,7 +67,7 @@ static void splitPath(std::string& directory, std::string& fileName, const char*
     const char* lastSlash = strrchr(path, '/');
     const char* fileNameStart;
     if (lastSlash) {
-        directory.assign(path, std::distance(lastSlash + 1, path));
+        directory.assign(path, std::distance(path, lastSlash + 1));
         fileNameStart = lastSlash + 1;
     }
     else {
@@ -75,7 +75,7 @@ static void splitPath(std::string& directory, std::string& fileName, const char*
     }
     const char* dot = strrchr(fileNameStart, '.');
     if (dot) {
-        fileName.assign(fileNameStart, std::distance(dot, fileNameStart));
+        fileName.assign(fileNameStart, std::distance(fileNameStart, dot));
     }
     else {
         fileName.assign(fileNameStart);
@@ -106,7 +106,7 @@ static void assmbleAndLoad(const char* path, std::string& output)
         commandAssemble.append(Ssource);
         commandAssemble.append(" -o ");
         commandAssemble.append(Ofile);
-        if (!system(commandAssemble.c_str())) {
+        if (system(commandAssemble.c_str())) {
             LOGE("execute command %s fails.\n", commandAssemble.c_str());
             exit(1);
         }
@@ -118,7 +118,7 @@ static void assmbleAndLoad(const char* path, std::string& output)
         commandObjCopy.append(Ofile);
         commandObjCopy.append(" ");
         commandObjCopy.append(binFile);
-        if (!system(commandObjCopy.c_str())) {
+        if (system(commandObjCopy.c_str())) {
             LOGE("execute command %s fails.\n", commandObjCopy.c_str());
             exit(1);
         }
@@ -134,7 +134,7 @@ static void assmbleAndLoad(const char* path, std::string& output)
         rmCommand.append(Ofile);
         rmCommand.append(" ");
         rmCommand.append(binFile);
-        if (!system(rmCommand.c_str())) {
+        if (system(rmCommand.c_str())) {
             LOGE("execute command %s fails.\n", rmCommand.c_str());
             exit(1);
         }
@@ -157,7 +157,7 @@ int main(int argc, char** argv)
     assmbleAndLoad(argv[1], binaryCode);
     IRContextInternal context;
     yylex_init_extra(&context, &context.m_scanner);
-    yyset_in(inputFile, &context.m_scanner);
+    yyset_in(inputFile, context.m_scanner);
     yyparse(&context);
     yylex_destroy(context.m_scanner);
 

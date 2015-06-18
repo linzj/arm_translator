@@ -151,7 +151,7 @@ g_malloc_n (gsize n_blocks,
                G_STRLOC, n_blocks, n_block_bytes);
     }
 
-  return malloc (n_blocks * n_block_bytes);
+  return calloc (n_blocks, n_block_bytes);
 }
 
 /* GLIB - Library of useful routines for C programming
