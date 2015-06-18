@@ -2,14 +2,17 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <string.h>
-#include <string>
 #include <sys/mman.h>
 #include <memory>
+#include <fstream>
+#include <streambuf>
+#include <string>
 #include "IRContextInternal.h"
 #include "RegisterInit.h"
 #include "RegisterAssign.h"
 #include "Check.h"
 #include "log.h"
+#include "cpuinit.h"
 
 extern "C" {
 void yyparse(IRContext*);
@@ -58,6 +61,83 @@ static void checkRun(const char* who, const IRContextInternal& context, const ui
     LOGE("passed %u, failed %u.\n", checkPassed, checkFailed);
 }
 
+static void splitPath(std::string& directory, std::string& fileName, const char* path)
+{
+    const char* lastSlash = strrchr(path, '/');
+    const char* fileNameStart;
+    if (lastSlash) {
+        directory.assign(path, std::distance(lastSlash + 1, path);
+        fileNameStart = lastSlash + 1;
+    } else {
+        fileNameStart = path;
+    }
+    const char* dot = strrchr(fileNameStart, '.');
+    if (dot) {
+        fileName.assign(fileNameStart, std::distance(dot, fileNameStart));
+    } else {
+        fileNameStart.assign(fileNameStart);
+    }
+}
+
+static void assmbleAndLoad(const char* path, std::string& output)
+{
+    std::string source;
+    {
+        std::string directory, fileName;
+        splitPath(directory, fileName);
+        Ssource.assign(directory);
+        Ssource.append(fileName);
+    }
+    std::string Ssource(source);
+    Ssource.append(".S");
+    std::string Ofile(source);
+    Ofile.append(".o");
+    std::string binFile(source);
+    binFile.append(".bin");
+
+    // do the shell job.
+    {
+        std::string commandAssemble;
+        // arm-linux-androideabi-as test1.S -o test.o
+        commandAssemble.append("arm-linux-androideabi-as ");
+        commandAssemble.append(Ssource);
+        commandAssemble.append(" -o ");
+        commandAssemble.append(Ofile);
+        if (!system(commandAssemble.c_str())) {
+            LOGE("execute command %s fails.\n", commandAssemble.c_str());
+            exit(1);
+        }
+    }
+    {
+        std::string commandObjCopy;
+        // arm-linux-androideabi-objcopy -O binary -j .text test.o test.bin
+        commandObjCopy.append("arm-linux-androideabi-objcopy -O binary -j .text ");
+        commandObjCopy.append(Ofile);
+        commandObjCopy.append(" ");
+        commandObjCopy.append(binFile);
+        if (!system(commandObjCopy.c_str())) {
+            LOGE("execute command %s fails.\n", commandObjCopy.c_str());
+            exit(1);
+        }
+    }
+    std::ifstream t(binFile, std::ios::in | std::ios::binary);
+    std::string str((std::istreambuf_iterator<char>(t)),
+                     std::istreambuf_iterator<char>());
+    output.swap(str);
+    {
+        // rm the intermediate files
+        std::string rmCommand;
+        rmCommand.append("rm ");
+        rmCommand.append(Ofile);
+        rmCommand.append(" ");
+        rmCommand.append(binFile);
+        if (!system(rmCommand.c_str())) {
+            LOGE("execute command %s fails.\n", rmCommand.c_str());
+            exit(1);
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     if (argc <= 1) {
@@ -69,6 +149,9 @@ int main(int argc, char** argv)
         LOGE("fails to open input file.");
         exit(1);
     }
+    // assemble and load the binary
+    std::string binaryCode;
+    assmbleAndLoad(argv[1], binaryCode);
     IRContextInternal context;
     yylex_init_extra(&context, &context.m_scanner);
     yyset_in(inputFile, &context.m_scanner);
@@ -81,7 +164,9 @@ int main(int argc, char** argv)
     EMASSERT(execMem != MAP_FAILED);
 
     // run with llvm
-    ARMCPU cpu;
+    ARMCPU cpu = { 0 };
+
+    cortex_a15_initfn(&cpu);
     // FIXME: translate here and copy to code to execMem
     initGuestState(cpu.env, context);
     uintptr_t twoWords[2];
