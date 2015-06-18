@@ -22,9 +22,8 @@
                 'libraries': [
                     '<!(llvm-config --libs)',
                     '-ldl',
-                    '-lz',
                     '-lpthread',
-                    '-lcurses',
+                    '-lz',
                 ],
                 'ldflags': [
                     '<!(llvm-config --ldflags)',

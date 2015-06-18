@@ -31,6 +31,18 @@
       'configurations': {
           'Common_Base': {
               'abstract': 1,
+              'conditions': [
+                ['OS == "linux"',
+                  {
+                      'cflags': [
+                        '-m32',
+                      ],
+                      'ldflags': [
+                        '-m32',
+                      ]
+                  }
+                ],
+              ],
           },
           'Debug_Base': {
               'abstract': 1,

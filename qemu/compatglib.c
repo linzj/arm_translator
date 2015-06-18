@@ -6,7 +6,7 @@
 #undef	MAX
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
 #define GPOINTER_TO_UINT(p) ((guint) (gulong) (p))
-#define G_GSIZE_FORMAT "lu"
+#define G_GSIZE_FORMAT "u"
 #define G_STRLOC __FILE__ ":" G_STRINGIFY (__LINE__)
 #define G_STRINGIFY(macro_or_string) G_STRINGIFY_ARG (macro_or_string)
 #define G_STRINGIFY_ARG(contents) #contents
