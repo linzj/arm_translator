@@ -16,6 +16,8 @@
                 'qemu/crypto_helper.c',
                 'qemu/softfloat.c',
                 'qemu/crc32c.c',
+                'qemu/cpuinit.c',
+                'qemu/compatglib.c',
              ],
             'dependencies': [
                 '<(DEPTH)/llvm/llvm.gyp:libllvm',

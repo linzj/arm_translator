@@ -2,7 +2,7 @@
 #define CPU_H
 #include <setjmp.h>
 #include "tgtypes.h"
-#include "ghash.h"
+#include "compatglib.h"
 #include "softfloat.h"
 #include "bitops.h"
 #ifdef __cplusplus
@@ -504,8 +504,50 @@ typedef struct {
 typedef struct {
     CPUARMState env;
     CPUState state;
+    GHashTable *cp_regs;
+    uint32_t midr;
+    uint32_t reset_fpsid;
+    uint32_t mvfr0;
+    uint32_t mvfr1;
+    uint32_t mvfr2;
+    uint32_t ctr;
+    uint32_t reset_sctlr;
+    uint32_t id_pfr0;
+    uint32_t id_pfr1;
+    uint32_t id_dfr0;
+    uint32_t id_afr0;
+    uint32_t id_mmfr0;
+    uint32_t id_mmfr1;
+    uint32_t id_mmfr2;
+    uint32_t id_mmfr3;
+    uint32_t id_isar0;
+    uint32_t id_isar1;
+    uint32_t id_isar2;
+    uint32_t id_isar3;
+    uint32_t id_isar4;
+    uint32_t id_isar5;
+    uint64_t id_aa64pfr0;
+    uint64_t id_aa64pfr1;
+    uint64_t id_aa64dfr0;
+    uint64_t id_aa64dfr1;
+    uint64_t id_aa64afr0;
+    uint64_t id_aa64afr1;
+    uint64_t id_aa64isar0;
+    uint64_t id_aa64isar1;
+    uint64_t id_aa64mmfr0;
+    uint64_t id_aa64mmfr1;
     uint32_t dbgdidr;
+    uint32_t clidr;
+    /* The elements of this array are the CCSIDR values for each cache,
+     * in the order L1DCache, L1ICache, L2DCache, L2ICache, etc.
+     */
+    uint32_t ccsidr[16];
+    uint64_t reset_cbar;
+    uint32_t reset_auxcr;
+    bool reset_hivecs;
+    /* DCZ blocksize, in log_2(words), ie low 4 bits of DCZID_EL0 */
     uint32_t dcz_blocksize;
+    uint64_t rvbar;
 } ARMCPU;
 #ifndef container_of
 #define container_of(ptr, type, member) ({			\
@@ -948,6 +990,126 @@ static inline void update_spsel(CPUARMState *env, uint32_t imm)
 }
 
 int arm_rmode_to_sf(int rmode);
+
+/* Access rights:
+ * We define bits for Read and Write access for what rev C of the v7-AR ARM ARM
+ * defines as PL0 (user), PL1 (fiq/irq/svc/abt/und/sys, ie privileged), and
+ * PL2 (hyp). The other level which has Read and Write bits is Secure PL1
+ * (ie any of the privileged modes in Secure state, or Monitor mode).
+ * If a register is accessible in one privilege level it's always accessible
+ * in higher privilege levels too. Since "Secure PL1" also follows this rule
+ * (ie anything visible in PL2 is visible in S-PL1, some things are only
+ * visible in S-PL1) but "Secure PL1" is a bit of a mouthful, we bend the
+ * terminology a little and call this PL3.
+ * In AArch64 things are somewhat simpler as the PLx bits line up exactly
+ * with the ELx exception levels.
+ *
+ * If access permissions for a register are more complex than can be
+ * described with these bits, then use a laxer set of restrictions, and
+ * do the more restrictive/complex check inside a helper function.
+ */
+#define PL3_R 0x80
+#define PL3_W 0x40
+#define PL2_R (0x20 | PL3_R)
+#define PL2_W (0x10 | PL3_W)
+#define PL1_R (0x08 | PL2_R)
+#define PL1_W (0x04 | PL2_W)
+#define PL0_R (0x02 | PL1_R)
+#define PL0_W (0x01 | PL1_W)
+
+#define PL3_RW (PL3_R | PL3_W)
+#define PL2_RW (PL2_R | PL2_W)
+#define PL1_RW (PL1_R | PL1_W)
+#define PL0_RW (PL0_R | PL0_W)
+
+void define_arm_cp_regs_with_opaque(ARMCPU *cpu,
+                                    const ARMCPRegInfo *regs, void *opaque);
+
+void define_one_arm_cp_reg_with_opaque(ARMCPU *cpu,
+                                       const ARMCPRegInfo *regs, void *opaque);
+static inline void define_arm_cp_regs(ARMCPU *cpu, const ARMCPRegInfo *regs)
+{
+    define_arm_cp_regs_with_opaque(cpu, regs, 0);
+}
+
+#define CP_ANY 0xff
+/* Valid values for ARMCPRegInfo state field, indicating which of
+ * the AArch32 and AArch64 execution states this register is visible in.
+ * If the reginfo doesn't explicitly specify then it is AArch32 only.
+ * If the reginfo is declared to be visible in both states then a second
+ * reginfo is synthesised for the AArch32 view of the AArch64 register,
+ * such that the AArch32 view is the lower 32 bits of the AArch64 one.
+ * Note that we rely on the values of these enums as we iterate through
+ * the various states in some places.
+ */
+enum {
+    ARM_CP_STATE_AA32 = 0,
+    ARM_CP_STATE_AA64 = 1,
+    ARM_CP_STATE_BOTH = 2,
+};
+/* Return true if cptype is a valid type field. This is used to try to
+ * catch errors where the sentinel has been accidentally left off the end
+ * of a list of registers.
+ */
+static inline bool cptype_valid(int cptype)
+{
+    return ((cptype & ~ARM_CP_FLAG_MASK) == 0)
+        || ((cptype & ARM_CP_SPECIAL) &&
+            ((cptype & ~ARM_CP_FLAG_MASK) <= ARM_LAST_SPECIAL));
+}
+
+#define CP_REG_ARM64                   0x6000000000000000ULL
+#define CP_REG_ARM_COPROC_MASK         0x000000000FFF0000
+#define CP_REG_ARM_COPROC_SHIFT        16
+#define CP_REG_ARM64_SYSREG            (0x0013 << CP_REG_ARM_COPROC_SHIFT)
+#define CP_REG_ARM64_SYSREG_OP0_MASK   0x000000000000c000
+#define CP_REG_ARM64_SYSREG_OP0_SHIFT  14
+#define CP_REG_ARM64_SYSREG_OP1_MASK   0x0000000000003800
+#define CP_REG_ARM64_SYSREG_OP1_SHIFT  11
+#define CP_REG_ARM64_SYSREG_CRN_MASK   0x0000000000000780
+#define CP_REG_ARM64_SYSREG_CRN_SHIFT  7
+#define CP_REG_ARM64_SYSREG_CRM_MASK   0x0000000000000078
+#define CP_REG_ARM64_SYSREG_CRM_SHIFT  3
+#define CP_REG_ARM64_SYSREG_OP2_MASK   0x0000000000000007
+#define CP_REG_ARM64_SYSREG_OP2_SHIFT  0
+
+/* No kernel define but it's useful to QEMU */
+/* When looking up a coprocessor register we look for it
+ * via an integer which encodes all of:
+ *  coprocessor number
+ *  Crn, Crm, opc1, opc2 fields
+ *  32 or 64 bit register (ie is it accessed via MRC/MCR
+ *    or via MRRC/MCRR?)
+ * We allow 4 bits for opc1 because MRRC/MCRR have a 4 bit field.
+ * (In this case crn and opc2 should be zero.)
+ * For AArch64, there is no 32/64 bit size distinction;
+ * instead all registers have a 2 bit op0, 3 bit op1 and op2,
+ * and 4 bit CRn and CRm. The encoding patterns are chosen
+ * to be easy to convert to and from the KVM encodings, and also
+ * so that the hashtable can contain both AArch32 and AArch64
+ * registers (to allow for interprocessing where we might run
+ * 32 bit code on a 64 bit core).
+ */
+/* This bit is private to our hashtable cpreg; in KVM register
+ * IDs the AArch64/32 distinction is the KVM_REG_ARM/ARM64
+ * in the upper bits of the 64 bit ID.
+ */
+#define CP_REG_AA64_SHIFT 28
+#define CP_REG_AA64_MASK (1 << CP_REG_AA64_SHIFT)
+
+#define ENCODE_CP_REG(cp, is64, crn, crm, opc1, opc2)   \
+    (((cp) << 16) | ((is64) << 15) | ((crn) << 11) |    \
+     ((crm) << 7) | ((opc1) << 3) | (opc2))
+#define CP_REG_ARM64_SYSREG_CP (CP_REG_ARM64_SYSREG >> CP_REG_ARM_COPROC_SHIFT)
+#define ENCODE_AA64_CP_REG(cp, crn, crm, op0, op1, op2) \
+    (CP_REG_AA64_MASK |                                 \
+     ((cp) << CP_REG_ARM_COPROC_SHIFT) |                \
+     ((op0) << CP_REG_ARM64_SYSREG_OP0_SHIFT) |         \
+     ((op1) << CP_REG_ARM64_SYSREG_OP1_SHIFT) |         \
+     ((crn) << CP_REG_ARM64_SYSREG_CRN_SHIFT) |         \
+     ((crm) << CP_REG_ARM64_SYSREG_CRM_SHIFT) |         \
+     ((op2) << CP_REG_ARM64_SYSREG_OP2_SHIFT))
+
 #ifdef __cplusplus
 }
 #endif
