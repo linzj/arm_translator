@@ -4,6 +4,7 @@
 #include "tgtypes.h"
 #include "ghash.h"
 #include "softfloat.h"
+#include "bitops.h"
 
 typedef struct CPUARMState {
     /* Regs for current mode.  */
@@ -680,4 +681,93 @@ enum arm_cpu_mode {
     (((cp) << 16) | ((is64) << 15) | ((crn) << 11) | ((crm) << 7) | ((opc1) << 3) | (opc2))
 #define g2h(x) ((void *)((unsigned long)(target_ulong)(x) + GUEST_BASE))
 #define GUEST_BASE 0
+
+static inline int arm_feature(CPUARMState *env, int feature)
+{
+    return (env->features & (1ULL << feature)) != 0;
+}
+
+static inline bool arm_is_secure(CPUARMState *env)
+{
+    return false;
+}
+
+static inline bool is_a64(CPUARMState *env)
+{
+    return env->aarch64;
+}
+
+static inline bool arm_el_is_aa64(CPUARMState *env, int el)
+{
+    /* We don't currently support EL2, and this isn't valid for EL0
+     * (if we're in EL0, is_a64() is what you want, and if we're not in EL0
+     * then the state of EL0 isn't well defined.)
+     */
+    EMASSERT(el == 1 || el == 3);
+
+    /* AArch64-capable CPUs always run with EL1 in AArch64 mode. This
+     * is a QEMU-imposed simplification which we may wish to change later.
+     * If we in future support EL2 and/or EL3, then the state of lower
+     * exception levels is controlled by the HCR.RW and SCR.RW bits.
+     */
+    return arm_feature(env, ARM_FEATURE_AARCH64);
+}
+
+static inline int arm_current_el(CPUARMState *env)
+{
+    if (is_a64(env)) {
+        return extract32(env->pstate, 2, 2);
+    }
+
+    switch (env->uncached_cpsr & 0x1f) {
+    case ARM_CPU_MODE_USR:
+        return 0;
+    case ARM_CPU_MODE_HYP:
+        return 2;
+    case ARM_CPU_MODE_MON:
+        return 3;
+    default:
+        if (arm_is_secure(env) && !arm_el_is_aa64(env, 3)) {
+            /* If EL3 is 32-bit then all secure privileged modes run in
+             * EL3
+             */
+            return 3;
+        }
+
+        return 1;
+    }
+}
+
+static inline int arm_debug_target_el(CPUARMState *env)
+{
+    return 1;
+}
+
+static inline bool aa64_generate_debug_exceptions(CPUARMState *env)
+{
+    if (arm_current_el(env) == arm_debug_target_el(env)) {
+        if ((extract32(env->cp15.mdscr_el1, 13, 1) == 0)
+            || (env->daif & PSTATE_D)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static inline bool aa32_generate_debug_exceptions(CPUARMState *env)
+{
+    if (arm_current_el(env) == 0 && arm_el_is_aa64(env, 1)) {
+        return aa64_generate_debug_exceptions(env);
+    }
+    return arm_current_el(env) != 2;
+}
+
+static inline bool arm_generate_debug_exceptions(CPUARMState *env)
+{
+    if (env->aarch64) {
+        return aa64_generate_debug_exceptions(env);
+    } else {
+        return aa32_generate_debug_exceptions(env);
+    }
+}
 #endif /* CPU_H */

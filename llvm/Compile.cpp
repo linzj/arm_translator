@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <string.h>
 #include "log.h"
 #include "LLVMAPI.h"
@@ -27,7 +26,7 @@ static uint8_t* mmAllocateCodeSection(
     size_t additionSize = state.m_platformDesc.m_prologueSize;
     size += additionSize;
     bb.resize(size);
-    assert((reinterpret_cast<uintptr_t>(bb.data()) & (alignment - 1)) == 0);
+    EMASSERT((reinterpret_cast<uintptr_t>(bb.data()) & (alignment - 1)) == 0);
 
     return const_cast<uint8_t*>(bb.data() + additionSize);
 }
@@ -43,7 +42,7 @@ static uint8_t* mmAllocateDataSection(
 
     jit::ByteBuffer& bb(state.m_dataSectionList.back());
     bb.resize(size);
-    assert((reinterpret_cast<uintptr_t>(bb.data()) & (alignment - 1)) == 0);
+    EMASSERT((reinterpret_cast<uintptr_t>(bb.data()) & (alignment - 1)) == 0);
     if (!strcmp(sectionName, SECTION_NAME("llvm_stackmaps"))) {
         state.m_stackMapsSection = &bb;
     }
@@ -71,7 +70,7 @@ void compile(State& state)
         &state, mmAllocateCodeSection, mmAllocateDataSection, mmApplyPermissions, mmDestroy);
     if (llvmAPI->CreateMCJITCompilerForModule(&engine, state.m_module, &options, sizeof(options), &error)) {
         LOGE("FATAL: Could not create LLVM execution engine: %s", error);
-        assert(false);
+        EMASSERT(false);
     }
     LLVMModuleRef module = state.m_module;
     LLVMPassManagerRef functionPasses = 0;

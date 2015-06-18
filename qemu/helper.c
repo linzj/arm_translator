@@ -21,6 +21,47 @@ static void raise_exception(CPUARMState* env, int tt)
     cpu_loop_exit(cs);
 }
 
+static inline unsigned int aarch64_banked_spsr_index(unsigned int el)
+{
+    static const unsigned int map[4] = {
+        [1] = 0, /* EL1.  */
+        [2] = 6, /* EL2.  */
+        [3] = 7, /* EL3.  */
+    };
+    EMASSERT(el >= 1 && el <= 3);
+    return map[el];
+}
+
+static inline void aarch64_restore_sp(CPUARMState *env, int el)
+{
+    if (env->pstate & PSTATE_SP) {
+        env->xregs[31] = env->sp_el[el];
+    } else {
+        env->xregs[31] = env->sp_el[0];
+    }
+}
+
+static inline void aarch64_save_sp(CPUARMState *env, int el)
+{
+    if (env->pstate & PSTATE_SP) {
+        env->sp_el[el] = env->xregs[31];
+    } else {
+        env->sp_el[0] = env->xregs[31];
+    }
+}
+
+static inline bool arm_is_psci_call(ARMCPU *cpu, int excp_type)
+{
+    return false;
+}
+
+static inline bool arm_singlestep_active(CPUARMState *env)
+{
+    return extract32(env->cp15.mdscr_el1, 0, 1)
+        && arm_el_is_aa64(env, arm_debug_target_el(env))
+        && arm_generate_debug_exceptions(env);
+}
+
 uint32_t HELPER(neon_tbl)(CPUARMState *env, uint32_t ireg, uint32_t def,
                           uint32_t rn, uint32_t maxindex)
 {
@@ -202,7 +243,7 @@ void HELPER(exception_internal)(CPUARMState *env, uint32_t excp)
 {
     CPUState *cs = CPU(arm_env_get_cpu(env));
 
-    assert(excp_is_internal(excp));
+    EMASSERT(excp_is_internal(excp));
     cs->exception_index = excp;
     cpu_loop_exit(cs);
 }
@@ -213,7 +254,7 @@ void HELPER(exception_with_syndrome)(CPUARMState *env, uint32_t excp,
 {
     CPUState *cs = CPU(arm_env_get_cpu(env));
 
-    assert(!excp_is_internal(excp));
+    EMASSERT(!excp_is_internal(excp));
     cs->exception_index = excp;
     env->exception.syndrome = syndrome;
     cpu_loop_exit(cs);

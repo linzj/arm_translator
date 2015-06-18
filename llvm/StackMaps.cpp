@@ -81,7 +81,7 @@ void StackMaps::LiveOut::parse(StackMaps::ParseContext& context)
 bool StackMaps::Record::parse(StackMaps::ParseContext& context)
 {
     int64_t id = context.view->read<int64_t>(context.offset, true);
-    assert(static_cast<int32_t>(id) == id);
+    EMASSERT(static_cast<int32_t>(id) == id);
     patchpointID = static_cast<uint32_t>(id);
     if (static_cast<int32_t>(patchpointID) < 0)
         return false;
@@ -102,7 +102,7 @@ bool StackMaps::Record::parse(StackMaps::ParseContext& context)
 
     if (context.version >= 1) {
         if (context.offset & 7) {
-            assert(!(context.offset & 3));
+            EMASSERT(!(context.offset & 3));
             context.view->read<uint32_t>(context.offset, true); // padding
         }
     }
@@ -126,7 +126,7 @@ RegisterSet StackMaps::Record::liveOutsSet() const
     for (unsigned i = liveOuts.size(); i--;) {
         LiveOut liveOut = liveOuts[i];
         Reg reg = liveOut.dwarfReg.reg();
-        // FIXME: Either assert that size is not greater than sizeof(pointer), or actually
+        // FIXME: Either EMASSERT that size is not greater than sizeof(pointer), or actually
         // save the high bits of registers.
         // https://bugs.webkit.org/show_bug.cgi?id=130885
         result.set(reg.val() << (reg.isFloat() ? 32 : 0));
@@ -200,7 +200,7 @@ StackMaps::RecordMap StackMaps::computeRecordMap() const
 
 unsigned StackMaps::stackSize() const
 {
-    assert(stackSizes.size() == 1);
+    EMASSERT(stackSizes.size() == 1);
 
     return stackSizes[0].size;
 }

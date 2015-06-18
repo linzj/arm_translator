@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <assert.h>
+#include "log.h"
 #include "LLVMAPI.h"
 #include "InitializeLLVM.h"
 #include <llvm/Support/CommandLine.h>
@@ -15,7 +15,7 @@ static void llvmCrash(const char*) __attribute__((noreturn));
 void llvmCrash(const char* reason)
 {
     fprintf(stderr, "LLVM fatal error: %s", reason);
-    assert(false);
+    EMASSERT(false);
 }
 
 static LLVMAPI* initializeAndGetLLVMAPI(void)

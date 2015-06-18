@@ -1,11 +1,11 @@
 #ifndef STACKMAPS_H
 #define STACKMAPS_H
-#include <assert.h>
 #include <stdint.h>
 #include <vector>
 #include <unordered_map>
 #include <bitset>
 #include "Registers.h"
+#include "log.h"
 namespace jit {
 
 class DataView {
@@ -17,7 +17,7 @@ public:
     template <typename T>
     T read(unsigned& off, bool littenEndian)
     {
-        assert(littenEndian == true);
+        EMASSERT(littenEndian == true);
         T t = *reinterpret_cast<const T*>(m_data + off);
         off += sizeof(T);
         return t;

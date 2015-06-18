@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
+#include "bitops.h"
 #include "cpu.h"
 #include "translate.h"
 #include "tb.h"
@@ -75,11 +76,6 @@ static const char *regnames[] =
 static inline int arm_dc_feature(DisasContext *dc, int feature)
 {
     return (dc->features & (1ULL << feature)) != 0;
-}
-
-static inline int arm_feature(CPUARMState *env, int feature)
-{
-    return (env->features & (1ULL << feature)) != 0;
 }
 
 static inline int lduw_he_p(const void *ptr)
@@ -155,12 +151,6 @@ static inline bool excp_is_internal(int excp)
         || excp == EXCP_EXCEPTION_EXIT
         || excp == EXCP_KERNEL_TRAP
         || excp == EXCP_STREX;
-}
-
-static inline uint32_t extract32(uint32_t value, int start, int length)
-{
-    assert(start >= 0 && length > 0 && length <= 32 - start);
-    return (value >> start) & (~0U >> (32 - length));
 }
 
 static inline uint32_t cpsr_read(CPUARMState *env)

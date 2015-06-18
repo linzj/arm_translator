@@ -15,6 +15,7 @@
 #include "helper-proto.h"
 #include "aes.h"
 #include "bitops.h"
+#include "log.h"
 
 union CRYPTO_STATE {
     uint8_t    bytes[16];
@@ -38,7 +39,7 @@ void HELPER(crypto_aese)(CPUARMState *env, uint32_t rd, uint32_t rm,
     } };
     int i;
 
-    assert(decrypt < 2);
+    EMASSERT(decrypt < 2);
 
     /* xor state vector with round key */
     rk.l[0] ^= st.l[0];
@@ -195,7 +196,7 @@ void HELPER(crypto_aesmc)(CPUARMState *env, uint32_t rd, uint32_t rm,
     } };
     int i;
 
-    assert(decrypt < 2);
+    EMASSERT(decrypt < 2);
 
     for (i = 0; i < 16; i += 4) {
         st.words[i >> 2] = cpu_to_le32(

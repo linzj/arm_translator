@@ -20,7 +20,7 @@ enum {
 #define BITOPS_H
 
 #include <stdint.h>
-#include <assert.h>
+#include "log.h"
 
 #include "host-utils.h"
 
@@ -297,7 +297,7 @@ static inline uint64_t ror64(uint64_t word, unsigned int shift)
  */
 static inline uint32_t extract32(uint32_t value, int start, int length)
 {
-    assert(start >= 0 && length > 0 && length <= 32 - start);
+    EMASSERT(start >= 0 && length > 0 && length <= 32 - start);
     return (value >> start) & (~0U >> (32 - length));
 }
 
@@ -316,7 +316,7 @@ static inline uint32_t extract32(uint32_t value, int start, int length)
  */
 static inline uint64_t extract64(uint64_t value, int start, int length)
 {
-    assert(start >= 0 && length > 0 && length <= 64 - start);
+    EMASSERT(start >= 0 && length > 0 && length <= 64 - start);
     return (value >> start) & (~0ULL >> (64 - length));
 }
 
@@ -338,7 +338,7 @@ static inline uint64_t extract64(uint64_t value, int start, int length)
  */
 static inline int32_t sextract32(uint32_t value, int start, int length)
 {
-    assert(start >= 0 && length > 0 && length <= 32 - start);
+    EMASSERT(start >= 0 && length > 0 && length <= 32 - start);
     /* Note that this implementation relies on right shift of signed
      * integers being an arithmetic shift.
      */
@@ -363,7 +363,7 @@ static inline int32_t sextract32(uint32_t value, int start, int length)
  */
 static inline uint64_t sextract64(uint64_t value, int start, int length)
 {
-    assert(start >= 0 && length > 0 && length <= 64 - start);
+    EMASSERT(start >= 0 && length > 0 && length <= 64 - start);
     /* Note that this implementation relies on right shift of signed
      * integers being an arithmetic shift.
      */
@@ -391,7 +391,7 @@ static inline uint32_t deposit32(uint32_t value, int start, int length,
                                  uint32_t fieldval)
 {
     uint32_t mask;
-    assert(start >= 0 && length > 0 && length <= 32 - start);
+    EMASSERT(start >= 0 && length > 0 && length <= 32 - start);
     mask = (~0U >> (32 - length)) << start;
     return (value & ~mask) | ((fieldval << start) & mask);
 }
@@ -417,7 +417,7 @@ static inline uint64_t deposit64(uint64_t value, int start, int length,
                                  uint64_t fieldval)
 {
     uint64_t mask;
-    assert(start >= 0 && length > 0 && length <= 64 - start);
+    EMASSERT(start >= 0 && length > 0 && length <= 64 - start);
     mask = (~0ULL >> (64 - length)) << start;
     return (value & ~mask) | ((fieldval << start) & mask);
 }
