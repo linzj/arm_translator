@@ -1,4 +1,4 @@
-#include "cpu.h"
+#include "cpuinit.h"
 
 #define REGINFO_SENTINEL { .type = ARM_CP_SENTINEL }
 
