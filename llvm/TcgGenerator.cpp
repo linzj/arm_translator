@@ -1,6 +1,9 @@
 #include <unordered_map>
 #include <vector>
 #include <pthread.h>
+#include "Registers.h"
+#include "Compile.h"
+#include "Link.h"
 #include "TcgGenerator.h"
 #include "CompilerState.h"
 #include "IntrinsicRepository.h"
@@ -27,11 +30,9 @@ LabelMap g_labelMap;
 static PlatformDesc g_desc = {
     sizeof(CPUARMState),
     static_cast<size_t>(offsetof(CPUARMState, regs[15])), /* offset of pc */
-    11, /* prologue size */
-    17, /* direct size */
-    17, /* indirect size */
-    17, /* assist size */
-    17, /* tcg size */
+    2, /* prologue size */
+    10, /* assist size */
+    10, /* tcg size */
 };
 
 static LType argType()
@@ -136,7 +137,83 @@ static inline void cpu_get_tb_cpu_state(CPUARMState* env, target_ulong* pc,
     }
 }
 
-void translate(CPUARMState* env, void** buffer, size_t* s)
+static inline unsigned iregEnc3210(unsigned in)
+{
+    return in;
+}
+
+inline static uint8_t mkModRegRM(unsigned mod, unsigned reg, unsigned regmem)
+{
+    return (uint8_t)(((mod & 3) << 6) | ((reg & 7) << 3) | (regmem & 7));
+}
+
+inline static uint8_t* doAMode_R__wrk(uint8_t* p, unsigned gregEnc3210, unsigned eregEnc3210)
+{
+    *p++ = mkModRegRM(3, gregEnc3210 & 7, eregEnc3210 & 7);
+    return p;
+}
+
+static uint8_t* doAMode_R(uint8_t* p, unsigned greg, unsigned ereg)
+{
+    return doAMode_R__wrk(p, iregEnc3210(greg), iregEnc3210(ereg));
+}
+
+static uint8_t* emit32(uint8_t* p, uint32_t w32)
+{
+    *reinterpret_cast<uint32_t*>(p) = 32;
+    return p + sizeof(w32);
+}
+
+static void patchProloge(void*, uint8_t* start)
+{
+    uint8_t* p = start;
+    // 2 bytes
+    *p++ = 0x89;
+    p = doAMode_R(p, jit::RBP,
+        jit::RDI);
+}
+
+static void patchDirect(void*, uint8_t* p, void* entry)
+{
+    // epilogue
+
+    // 2 bytes
+    *p++ = 0x89;
+    p = doAMode_R(p, jit::RBP,
+        jit::RSP);
+    // 1 bytes pop rbp
+    *p++ = 0x5d;
+
+    /* 5 bytes: mov $target, %eax */
+    *p++ = 0xB8;
+    p = emit32(p, reinterpret_cast<uintptr_t>(entry));
+
+    /* 2 bytes: call*%eax */
+    *p++ = 0xff;
+    *p++ = 0xd0;
+}
+
+void patchIndirect(void*, uint8_t* p, void* entry)
+{
+    // epilogue
+
+    // 2 bytes
+    *p++ = 0x89;
+    p = doAMode_R(p, jit::RBP,
+        jit::RSP);
+    // 1 bytes pop rbp
+    *p++ = 0x5d;
+
+    /* 5 bytes: mov $target, %eax */
+    *p++ = 0xB8;
+    p = emit32(p, reinterpret_cast<uintptr_t>(entry));
+
+    /* 2 bytes: jmp *%eax */
+    *p++ = 0xff;
+    *p++ = 0xe0;
+}
+
+void translate(CPUARMState* env, const TranslateDesc& desc, void** buffer, size_t* s)
 {
     llvm_tcg_init();
     ARMCPU* cpu = arm_env_get_cpu(env);
@@ -147,6 +224,24 @@ void translate(CPUARMState* env, void** buffer, size_t* s)
     TranslationBlock tb = { pc, flags };
 
     gen_intermediate_code_internal(cpu, &tb);
+    dumpModule(g_state->m_module);
+    compile(*g_state);
+    LinkDesc linkDesc = {
+        nullptr,
+        desc.m_dispAssist,
+        desc.m_dispDirect,
+        desc.m_dispIndirect,
+        patchProloge,
+        patchDirect,
+        patchDirect,
+        patchIndirect,
+    };
+    link(*g_state, linkDesc);
+    const void* codeBuffer = g_state->m_codeSectionList.front().data();
+    size_t codeSize = g_state->m_codeSectionList.front().size();
+    *buffer = malloc(codeSize);
+    *s = codeSize;
+    memcpy(*buffer, codeBuffer, codeSize);
     llvm_tcg_deinit();
 }
 }
