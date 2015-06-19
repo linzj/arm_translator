@@ -644,7 +644,14 @@ void tcg_gen_mov_i32(TCGv_i32 ret, TCGv_i32 arg)
 {
     if (arg == ret)
         return;
-    *ret = *arg;
+    storeToTCG(unwrap(arg), ret);
+}
+
+void tcg_gen_mov_i64(TCGv_i64 ret, TCGv_i64 arg)
+{
+    if (ret == arg)
+        return;
+    storeToTCG(unwrap(arg), ret);
 }
 
 void tcg_gen_exit_tb(int direct)
@@ -759,13 +766,6 @@ void tcg_gen_movcond_i64(TCGCond cond, TCGv_i64 ret,
 
     LValue retVal = g_output->buildSelect(t0, unwrap(v1), unwrap(v2));
     storeToTCG(retVal, ret);
-}
-
-void tcg_gen_mov_i64(TCGv_i64 ret, TCGv_i64 arg)
-{
-    if (ret == arg)
-        return;
-    *ret = *arg;
 }
 
 void tcg_gen_movi_i32(TCGv_i32 ret, int32_t arg)
