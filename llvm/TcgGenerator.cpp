@@ -14,6 +14,15 @@
 #include "translate.h"
 #include "log.h"
 
+extern "C" {
+void trampolineForHelper32_0(void);
+void trampolineForHelper32_1(void);
+void trampolineForHelper32_2(void);
+void trampolineForHelper32_3(void);
+void trampolineForHelper32_4(void);
+void trampolineForHelper32_5(void);
+}
+
 struct TCGCommonStruct {
     jit::LValue m_value;
     bool m_isMem;
@@ -25,7 +34,6 @@ struct TCGv_i64__ : public TCGCommonStruct {
 };
 struct TCGv_ptr__ : public TCGCommonStruct {
 };
-
 
 namespace jit {
 
@@ -85,7 +93,6 @@ static void llvm_tcg_init(void)
 
 static void llvm_tcg_deinit(void)
 {
-    llvmAPI->DeleteFunction(g_state->m_function);
     delete g_output;
     g_output = nullptr;
     delete g_state;
@@ -193,7 +200,7 @@ static uint8_t* doAMode_R(uint8_t* p, unsigned greg, unsigned ereg)
 
 static uint8_t* emit32(uint8_t* p, uint32_t w32)
 {
-    *reinterpret_cast<uint32_t*>(p) = 32;
+    *reinterpret_cast<uint32_t*>(p) = w32;
     return p + sizeof(w32);
 }
 
@@ -203,7 +210,7 @@ static void patchProloge(void*, uint8_t* start)
     // 2 bytes
     *p++ = 0x89;
     p = doAMode_R(p, jit::RBP,
-        jit::RAX);
+        jit::RCX);
 }
 
 static void patchDirect(void*, uint8_t* p, void* entry)
@@ -305,7 +312,8 @@ static LValue unwrap(TCGType v)
     EMASSERT(v->m_value != nullptr);
     if (v->m_isMem) {
         return g_output->buildLoad(v->m_value);
-    } else {
+    }
+    else {
         return v->m_value;
     }
 }
@@ -315,7 +323,8 @@ static void storeToTCG(LValue v, TCGType ret)
 {
     if (!ret->m_isMem) {
         ret->m_value = v;
-    } else {
+    }
+    else {
         EMASSERT(ret->m_value != nullptr);
         g_output->buildStore(v, ret->m_value);
     }
@@ -404,7 +413,7 @@ static LValue tcgMemCastTo32(TCGMemOp op, LValue val)
 
 TCGv_i64 tcg_global_mem_new_i64(int, intptr_t offset, const char* name)
 {
-    LValue v = g_output->buildGEP(g_output->arg(), offset / sizeof(target_ulong));
+    LValue v = g_output->buildArgGEP(offset / sizeof(target_ulong));
     LValue v2 = g_output->buildPointerCast(v, g_output->repo().ref64);
 
     return wrapMem<TCGv_i64>(v2);
@@ -412,23 +421,29 @@ TCGv_i64 tcg_global_mem_new_i64(int, intptr_t offset, const char* name)
 
 TCGv_i32 tcg_global_mem_new_i32(int, intptr_t offset, const char* name)
 {
-    LValue v = g_output->buildGEP(g_output->arg(), offset / sizeof(target_ulong));
+    LValue v = g_output->buildArgGEP(offset / sizeof(target_ulong));
     LValue v2 = g_output->buildPointerCast(v, g_output->repo().ref32);
 
     return wrapMem<TCGv_i32>(v2);
 }
 
-TCGv_i32 tcg_global_reg_new_i32(int, const char* name)
+TCGv_ptr tcg_global_reg_new_ptr(int, const char* name)
 {
-    LValue retVal = g_output->arg();
-    retVal = g_output->buildCast(LLVMPtrToInt, retVal, g_output->repo().int32);
-    return wrap<TCGv_i32>(retVal);
+    LValue v = g_output->buildArgGEP(0);
+    return wrap<TCGv_ptr>(v);
 }
 
 TCGv_i32 tcg_const_i32(int32_t val)
 {
     LValue v = g_output->constInt32(val);
     return wrap<TCGv_i32>(v);
+}
+
+TCGv_ptr tcg_const_ptr(const void* val)
+{
+    LValue v = g_output->constIntPtr(reinterpret_cast<uintptr_t>(val));
+    v = g_output->buildCast(LLVMIntToPtr, v, g_output->repo().ref8);
+    return wrap<TCGv_ptr>(v);
 }
 
 TCGv_i64 tcg_const_i64(int64_t val)
@@ -499,6 +514,15 @@ void tcg_gen_addi_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
         v = unwrap(arg1);
     }
     storeToTCG(v, ret);
+}
+
+void tcg_gen_addi_ptr(TCGv_ptr ret, TCGv_ptr arg1, int32_t arg2)
+{
+    LValue constant = g_output->constInt32(arg2);
+    LValue arg1V = unwrap(arg1);
+    arg1V = g_output->buildCast(LLVMPtrToInt, arg1V, g_output->repo().intPtr);
+    LValue retVal = g_output->buildAdd(arg1V, constant);
+    storeToTCG(g_output->buildCast(LLVMIntToPtr, retVal, g_output->repo().ref8), ret);
 }
 
 void tcg_gen_addi_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
@@ -1047,7 +1071,7 @@ void tcg_gen_st_i32(TCGv_i32 arg1, TCGv_ptr arg2, tcg_target_long offset)
 {
     LValue pointer = g_output->buildPointerCast(unwrap(arg2), g_output->repo().ref8);
     pointer = g_output->buildGEP(pointer, offset);
-    pointer = g_output->buildPointerCast(pointer, g_output->repo().int32);
+    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref32);
     g_output->buildStore(unwrap(arg1), pointer);
 }
 
@@ -1056,7 +1080,7 @@ void tcg_gen_st_i64(TCGv_i64 arg1, TCGv_ptr arg2,
 {
     LValue pointer = g_output->buildPointerCast(unwrap(arg2), g_output->repo().ref8);
     pointer = g_output->buildGEP(pointer, offset);
-    pointer = g_output->buildPointerCast(pointer, g_output->repo().int64);
+    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref64);
     g_output->buildStore(unwrap(arg1), pointer);
 }
 
@@ -1112,6 +1136,11 @@ TCGv_i32 tcg_temp_new_i32(void)
     return tcg_temp_local_new_i32();
 }
 
+TCGv_ptr tcg_temp_new_ptr(void)
+{
+    return allocateTcg<TCGv_ptr>();
+}
+
 TCGv_i64 tcg_temp_new_i64(void)
 {
     return allocateTcg<TCGv_i64>();
@@ -1120,26 +1149,39 @@ TCGv_i64 tcg_temp_new_i64(void)
 void tcg_gen_callN(void*, void* func, TCGArg ret,
     int nargs, TCGArg* args)
 {
-    LValue argsV[nargs];
-    for (int i = 0; i < nargs; ++i) {
-        argsV[i] = unwrap(reinterpret_cast<TCGCommonStruct*>(args[i]));
+    // function retval other parameters
+    LValue argsV[2 + nargs];
+    for (int i = 2; i < 2 + nargs; ++i) {
+        argsV[i] = unwrap(reinterpret_cast<TCGCommonStruct*>(args[i - 2]));
     }
-    LValue retVal = g_output->buildTcgHelperCall(func, nargs, argsV);
+    LValue retVal = g_output->buildAlloca(g_output->repo().int64);
+    argsV[0] = g_output->constIntPtr(reinterpret_cast<uint32_t>(func));
+    argsV[1] = retVal;
+    void* trampoline;
+    switch (nargs) {
+    case 0:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32_0);
+        break;
+    case 1:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32_1);
+        break;
+    case 2:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32_2);
+        break;
+    case 3:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32_3);
+        break;
+    case 4:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32_4);
+        break;
+    case 5:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32_5);
+        break;
+    default:
+        EMASSERT("unsupported arg number." && false);
+    }
+    g_output->buildTcgHelperCall(trampoline, nargs + 2, argsV);
     if (ret != TCG_CALL_DUMMY_ARG) {
         storeToTCG(retVal, reinterpret_cast<TCGv_ptr>(ret));
     }
-}
-
-TCGv_ptr TCGV_NAT_TO_PTR(TCGv_i32 a)
-{
-    LValue val = unwrap(a);
-    val = g_output->buildCast(LLVMIntToPtr, val, g_output->repo().ref8);
-    return wrap<TCGv_ptr>(val);
-}
-
-TCGv_i32 TCGV_PTR_TO_NAT(TCGv_ptr n)
-{
-    LValue val = unwrap(n);
-    val = g_output->buildCast(LLVMPtrToInt, val, g_output->repo().int32);
-    return wrap<TCGv_i32>(val);
 }

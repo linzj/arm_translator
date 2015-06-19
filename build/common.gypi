@@ -39,6 +39,7 @@
                       ],
                       'ldflags': [
                         '-m32',
+                        '-fuse-ld=gold',
                       ]
                   }
                 ],

@@ -5,17 +5,11 @@
 extern "C" {
 #endif
 
-#define tcg_const_ptr(V) TCGV_NAT_TO_PTR(tcg_const_i32((intptr_t)(V)))
-#define tcg_gen_addi_ptr(R, A, B) \
-    tcg_gen_addi_i32(TCGV_PTR_TO_NAT(R), TCGV_PTR_TO_NAT(A), (B))
-#define tcg_global_reg_new_ptr(R, N) \
-    TCGV_NAT_TO_PTR(tcg_global_reg_new_i32((R), (N)))
 #define tcg_temp_free tcg_temp_free_i32
 #define tcg_temp_free_i32(a)
 #define tcg_temp_free_i64(a)
-#define tcg_temp_free_ptr(T) tcg_temp_free_i32(TCGV_PTR_TO_NAT(T))
+#define tcg_temp_free_ptr(T) 
 #define tcg_temp_new() (TCGv) tcg_temp_new_i32();
-#define tcg_temp_new_ptr() TCGV_NAT_TO_PTR(tcg_temp_new_i32())
 #define TCGV_UNUSED_I32(a) ((void)a)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
@@ -23,9 +17,10 @@ int gen_new_label(void);
 void gen_set_label(int n);
 TCGv_i64 tcg_global_mem_new_i64(int reg, intptr_t offset, const char* name);
 TCGv_i32 tcg_global_mem_new_i32(int reg, intptr_t offset, const char* name);
-TCGv_i32 tcg_global_reg_new_i32(int reg, const char* name);
+TCGv_ptr tcg_global_reg_new_ptr(int reg, const char* name);
 
 TCGv_i32 tcg_const_i32(int32_t val);
+TCGv_ptr tcg_const_ptr(const void* val);
 TCGv_i64 tcg_const_i64(int64_t val);
 
 void tcg_gen_add2_i32(TCGv_i32 rl, TCGv_i32 rh, TCGv_i32 al,
@@ -34,6 +29,7 @@ void tcg_gen_add2_i32(TCGv_i32 rl, TCGv_i32 rh, TCGv_i32 al,
 void tcg_gen_add_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
 void tcg_gen_add_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2);
 void tcg_gen_addi_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2);
+void tcg_gen_addi_ptr(TCGv_ptr ret, TCGv_ptr arg1, int32_t arg2);
 void tcg_gen_addi_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2);
 void tcg_gen_andc_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
 void tcg_gen_and_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
@@ -111,11 +107,10 @@ void tcg_gen_xor_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2);
 void tcg_gen_xori_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2);
 TCGv_i32 tcg_temp_local_new_i32(void);
 TCGv_i32 tcg_temp_new_i32(void);
+TCGv_ptr tcg_temp_new_ptr(void);
 TCGv_i64 tcg_temp_new_i64(void);
 void tcg_gen_callN(void* s, void* func, TCGArg ret,
     int nargs, TCGArg* args);
-TCGv_ptr TCGV_NAT_TO_PTR(TCGv_i32 a);
-TCGv_i32 TCGV_PTR_TO_NAT(TCGv_ptr n);
 
 
 static inline TCGv_i32 MAKE_TCGV_I32(intptr_t i)

@@ -26,7 +26,6 @@ static uint8_t* mmAllocateCodeSection(
     size_t additionSize = state.m_platformDesc.m_prologueSize;
     size += additionSize;
     bb.resize(size);
-    EMASSERT((reinterpret_cast<uintptr_t>(bb.data()) & (alignment - 1)) == 0);
 
     return const_cast<uint8_t*>(bb.data() + additionSize);
 }

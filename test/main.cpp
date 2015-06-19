@@ -36,13 +36,15 @@ void vex_disp_cp_evcheck_fail(void);
 
 static void initGuestState(CPUARMState& state, const IRContextInternal& context)
 {
-    memset(&state, 0, sizeof(state));
     RegisterAssign assign;
     for (auto&& ri : context.m_registerInit) {
         ri.m_control->reset();
         uintptr_t val = ri.m_control->init();
         assign.assign(&state, ri.m_name, val);
     }
+    // init sp
+    state.regs[13] = reinterpret_cast<intptr_t>(malloc(1024));
+    state.regs[13] += 1024;
 }
 
 static void checkRun(const char* who, const IRContextInternal& context, const uintptr_t* twoWords, const CPUARMState& guestState)

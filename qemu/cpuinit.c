@@ -1,25 +1,30 @@
 #include <string.h>
 #include "cpuinit.h"
 
-#define REGINFO_SENTINEL { .type = ARM_CP_SENTINEL }
+#define REGINFO_SENTINEL        \
+    {                           \
+        .type = ARM_CP_SENTINEL \
+    }
 
-static inline void set_feature(CPUARMState *env, int feature)
+static inline void set_feature(CPUARMState* env, int feature)
 {
     env->features |= 1ULL << feature;
 }
 
 static const ARMCPRegInfo cortexa15_cp_reginfo[] = {
-    { .name = "L2ECTLR", .cp = 15, .crn = 9, .crm = 0, .opc1 = 1, .opc2 = 3,
-      .access = PL1_RW, .type = ARM_CP_CONST, .resetvalue = 0 },
+    {.name = "L2ECTLR", .cp = 15, .crn = 9, .crm = 0, .opc1 = 1, .opc2 = 3, .access = PL1_RW, .type = ARM_CP_CONST, .resetvalue = 0 },
     REGINFO_SENTINEL
 };
 
-static void arm_cpu_reset(CPUState *s);
+static void arm_cpu_reset(CPUState* s);
 
 void cortex_a15_initfn(ARMCPU* cpu)
 {
     cpu->cp_regs = g_hash_table_new_full(g_int_hash, g_int_equal,
-                                         g_free, g_free);
+        g_free, g_free);
+    set_feature(&cpu->env, ARM_FEATURE_V4T);
+    set_feature(&cpu->env, ARM_FEATURE_V5);
+    set_feature(&cpu->env, ARM_FEATURE_V6);
     set_feature(&cpu->env, ARM_FEATURE_V7);
     set_feature(&cpu->env, ARM_FEATURE_VFP4);
     set_feature(&cpu->env, ARM_FEATURE_NEON);
@@ -61,8 +66,8 @@ void cortex_a15_initfn(ARMCPU* cpu)
 static void cp_reg_reset(gpointer key, gpointer value, gpointer opaque)
 {
     /* Reset a single ARMCPRegInfo register */
-    ARMCPRegInfo *ri = value;
-    ARMCPU *cpu = opaque;
+    ARMCPRegInfo* ri = value;
+    ARMCPU* cpu = opaque;
 
     if (ri->type & ARM_CP_SPECIAL) {
         return;
@@ -84,16 +89,16 @@ static void cp_reg_reset(gpointer key, gpointer value, gpointer opaque)
 
     if (cpreg_field_is_64bit(ri)) {
         CPREG_FIELD64(&cpu->env, ri) = ri->resetvalue;
-    } else {
+    }
+    else {
         CPREG_FIELD32(&cpu->env, ri) = ri->resetvalue;
     }
 }
 
-void arm_cpu_reset(CPUState *s)
+void arm_cpu_reset(CPUState* s)
 {
-    ARMCPU *cpu = ARM_CPU(s);
-    CPUARMState *env = &cpu->env;
-
+    ARMCPU* cpu = ARM_CPU(s);
+    CPUARMState* env = &cpu->env;
 
     memset(env, 0, offsetof(CPUARMState, features));
     g_hash_table_foreach(cpu->cp_regs, cp_reg_reset, cpu);
@@ -101,7 +106,6 @@ void arm_cpu_reset(CPUState *s)
     env->vfp.xregs[ARM_VFP_MVFR0] = cpu->mvfr0;
     env->vfp.xregs[ARM_VFP_MVFR1] = cpu->mvfr1;
     env->vfp.xregs[ARM_VFP_MVFR2] = cpu->mvfr2;
-
 
     if (arm_feature(env, ARM_FEATURE_IWMMXT)) {
         env->iwmmxt.cregs[ARM_IWMMXT_wCID] = 0x69051000 | 'Q';
@@ -115,7 +119,8 @@ void arm_cpu_reset(CPUState *s)
         env->cp15.c1_sys |= SCTLR_UCT | SCTLR_UCI | SCTLR_DZE;
         /* and to the FP/Neon instructions */
         env->cp15.c1_coproc = deposit64(env->cp15.c1_coproc, 20, 2, 3);
-    } else {
+    }
+    else {
         /* Userspace expects access to cp10 and cp11 for FP/Neon */
         env->cp15.c1_coproc = deposit64(env->cp15.c1_coproc, 20, 4, 0xf);
     }
@@ -125,16 +130,15 @@ void arm_cpu_reset(CPUState *s)
     env->vfp.xregs[ARM_VFP_FPEXC] = 1 << 30;
     if (arm_feature(env, ARM_FEATURE_IWMMXT)) {
         env->cp15.c15_cpar = 3;
-    } else if (arm_feature(env, ARM_FEATURE_XSCALE)) {
+    }
+    else if (arm_feature(env, ARM_FEATURE_XSCALE)) {
         env->cp15.c15_cpar = 1;
     }
     set_flush_to_zero(1, &env->vfp.standard_fp_status);
     set_flush_inputs_to_zero(1, &env->vfp.standard_fp_status);
     set_default_nan_mode(1, &env->vfp.standard_fp_status);
     set_float_detect_tininess(float_tininess_before_rounding,
-                              &env->vfp.fp_status);
+        &env->vfp.fp_status);
     set_float_detect_tininess(float_tininess_before_rounding,
-                              &env->vfp.standard_fp_status);
-
-
+        &env->vfp.standard_fp_status);
 }
