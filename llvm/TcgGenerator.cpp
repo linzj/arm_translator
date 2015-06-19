@@ -28,7 +28,6 @@ void trampolineForHelper32Ret32_2(void);
 void trampolineForHelper32Ret32_3(void);
 void trampolineForHelper32Ret32_4(void);
 void trampolineForHelper32Ret32_5(void);
-void trampolineForHelper32RetNone(void);
 }
 
 struct TCGCommonStruct {
@@ -1253,16 +1252,11 @@ static void myhandleCallRet32(void* func, TCGArg ret,
 
 static void myhandleCallRetNone(void* func, int nargs, TCGArg* args)
 {
-    // 0 0 0 function other parameters
-    LValue argsV[4 + nargs];
-    for (int i = 4; i < 4 + nargs; ++i) {
-        argsV[i] = unwrap(reinterpret_cast<TCGCommonStruct*>(args[i - 2]));
+    LValue argsV[nargs];
+    for (int i = 0; i < nargs; ++i) {
+        argsV[i] = unwrap(reinterpret_cast<TCGCommonStruct*>(args[i]));
     }
-    argsV[0] = argsV[1] = argsV[2] = g_output->repo().int32Zero;
-    argsV[3] = g_output->constIntPtr(reinterpret_cast<uintptr_t>(func));
-    void* trampoline;
-    trampoline = reinterpret_cast<void*>(trampolineForHelper32RetNone);
-    g_output->buildTcgHelperCall(trampoline, nargs + 2, argsV);
+    g_output->buildTcgHelperCall(func, nargs, argsV);
 }
 
 void tcg_gen_callN(void*, void* func, TCGArg ret,

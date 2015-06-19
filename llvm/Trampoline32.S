@@ -198,12 +198,6 @@ trampolineForHelper32Ret32_5:
     ret
 .size trampolineForHelper32Ret32_5, .-trampolineForHelper32Ret32_5
 
-.globl trampolineForHelper32RetNone
-.type  trampolineForHelper32RetNone, @function
-trampolineForHelper32RetNone:
-    addl $16, %esp
-    jmp *-4(%esp)
-.size trampolineForHelper32RetNone, .-trampolineForHelper32RetNone
 /* Let the linker know we don't need an executable stack */
 .section .note.GNU-stack,"",@progbits
 
