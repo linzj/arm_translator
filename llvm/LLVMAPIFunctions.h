@@ -584,6 +584,7 @@
     macro(void, AddDeadStoreEliminationPass, (LLVMPassManagerRef PM)) \
     macro(void, AddFunctionInliningPass, (LLVMPassManagerRef PM)) \
     macro(void, AddGlobalDCEPass, (LLVMPassManagerRef PM)) \
+    macro(void, AddLowerSwitchPass, (LLVMPassManagerRef PM)) \
     macro(void, AddPruneEHPass, (LLVMPassManagerRef PM)) \
     macro(void, AddIPSCCPPass, (LLVMPassManagerRef PM)) \
     macro(void, AddDeadArgEliminationPass, (LLVMPassManagerRef PM)) \

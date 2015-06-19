@@ -79,25 +79,26 @@ void compile(State& state)
     llvmAPI->SetDataLayout(module, stringRepOfTargetData);
     free(stringRepOfTargetData);
 
-    LLVMPassManagerBuilderRef passBuilder = llvmAPI->PassManagerBuilderCreate();
-    llvmAPI->PassManagerBuilderSetOptLevel(passBuilder, 2);
-    llvmAPI->PassManagerBuilderUseInlinerWithThreshold(passBuilder, 275);
-    llvmAPI->PassManagerBuilderSetSizeLevel(passBuilder, 0);
-
-    functionPasses = llvmAPI->CreateFunctionPassManagerForModule(module);
     modulePasses = llvmAPI->CreatePassManager();
+    llvmAPI->AddTargetData(targetData, modulePasses);
+    llvmAPI->AddAnalysisPasses(llvmAPI->GetExecutionEngineTargetMachine(engine), modulePasses);
+    llvmAPI->AddPromoteMemoryToRegisterPass(modulePasses);
+    llvmAPI->AddGlobalOptimizerPass(modulePasses);
+    llvmAPI->AddFunctionInliningPass(modulePasses);
+    llvmAPI->AddPruneEHPass(modulePasses);
+    llvmAPI->AddGlobalDCEPass(modulePasses);
+    llvmAPI->AddConstantPropagationPass(modulePasses);
+    llvmAPI->AddAggressiveDCEPass(modulePasses);
+    llvmAPI->AddInstructionCombiningPass(modulePasses);
+    // BEGIN - DO NOT CHANGE THE ORDER OF THE ALIAS ANALYSIS PASSES
+    llvmAPI->AddTypeBasedAliasAnalysisPass(modulePasses);
+    llvmAPI->AddBasicAliasAnalysisPass(modulePasses);
+    // END - DO NOT CHANGE THE ORDER OF THE ALIAS ANALYSIS PASSES
+    llvmAPI->AddGVNPass(modulePasses);
+    llvmAPI->AddCFGSimplificationPass(modulePasses);
+    llvmAPI->AddDeadStoreEliminationPass(modulePasses);
 
-    llvmAPI->AddTargetData(llvmAPI->GetExecutionEngineTargetData(engine), modulePasses);
-
-    llvmAPI->PassManagerBuilderPopulateFunctionPassManager(passBuilder, functionPasses);
-    llvmAPI->PassManagerBuilderPopulateModulePassManager(passBuilder, modulePasses);
-
-    llvmAPI->PassManagerBuilderDispose(passBuilder);
-
-    llvmAPI->InitializeFunctionPassManager(functionPasses);
-    for (LLVMValueRef function = llvmAPI->GetFirstFunction(module); function; function = llvmAPI->GetNextFunction(function))
-        llvmAPI->RunFunctionPassManager(functionPasses, function);
-    llvmAPI->FinalizeFunctionPassManager(functionPasses);
+    llvmAPI->AddLowerSwitchPass(modulePasses);
 
     llvmAPI->RunPassManager(modulePasses, module);
     state.m_entryPoint = reinterpret_cast<void*>(llvmAPI->GetPointerToGlobal(engine, state.m_function));
