@@ -1,0 +1,7 @@
+r0 = 9
+r1 = 3
+%%
+CheckEqual r7 12
+CheckEqual r8 6
+CheckEqual r9 27
+CheckEqual r10 3

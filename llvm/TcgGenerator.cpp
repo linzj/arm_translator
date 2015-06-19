@@ -15,16 +15,25 @@
 #include "log.h"
 
 extern "C" {
-void trampolineForHelper32_0(void);
-void trampolineForHelper32_1(void);
-void trampolineForHelper32_2(void);
-void trampolineForHelper32_3(void);
-void trampolineForHelper32_4(void);
-void trampolineForHelper32_5(void);
+void trampolineForHelper32Ret64_0(void);
+void trampolineForHelper32Ret64_1(void);
+void trampolineForHelper32Ret64_2(void);
+void trampolineForHelper32Ret64_3(void);
+void trampolineForHelper32Ret64_4(void);
+void trampolineForHelper32Ret64_5(void);
+
+void trampolineForHelper32Ret32_0(void);
+void trampolineForHelper32Ret32_1(void);
+void trampolineForHelper32Ret32_2(void);
+void trampolineForHelper32Ret32_3(void);
+void trampolineForHelper32Ret32_4(void);
+void trampolineForHelper32Ret32_5(void);
+void trampolineForHelper32RetNone(void);
 }
 
 struct TCGCommonStruct {
     jit::LValue m_value;
+    int m_size; // 32 or 64
     bool m_isMem;
 };
 
@@ -33,6 +42,25 @@ struct TCGv_i32__ : public TCGCommonStruct {
 struct TCGv_i64__ : public TCGCommonStruct {
 };
 struct TCGv_ptr__ : public TCGCommonStruct {
+};
+
+template <typename Ty>
+struct TcgSizeTrait {
+};
+
+template <>
+struct TcgSizeTrait<TCGv_i32> {
+    static const size_t m_size = 32;
+};
+
+template <>
+struct TcgSizeTrait<TCGv_ptr> {
+    static const size_t m_size = 64;
+};
+
+template <>
+struct TcgSizeTrait<TCGv_i64> {
+    static const size_t m_size = 64;
 };
 
 namespace jit {
@@ -68,6 +96,7 @@ static Type allocateTcg()
     Type r = reinterpret_cast<Type>(g_currentBufferPointer);
     g_currentBufferPointer += sizeof(*r);
     r->m_value = nullptr;
+    r->m_size = TcgSizeTrait<Type>::m_size;
     r->m_isMem = false;
     return r;
 }
@@ -1146,7 +1175,7 @@ TCGv_i64 tcg_temp_new_i64(void)
     return allocateTcg<TCGv_i64>();
 }
 
-void tcg_gen_callN(void*, void* func, TCGArg ret,
+static void myhandleCallRet64(void* func, TCGArg ret,
     int nargs, TCGArg* args)
 {
     // function retval other parameters
@@ -1155,33 +1184,102 @@ void tcg_gen_callN(void*, void* func, TCGArg ret,
         argsV[i] = unwrap(reinterpret_cast<TCGCommonStruct*>(args[i - 2]));
     }
     LValue retVal = g_output->buildAlloca(g_output->repo().int64);
-    argsV[0] = g_output->constIntPtr(reinterpret_cast<uint32_t>(func));
+    argsV[0] = g_output->constIntPtr(reinterpret_cast<uintptr_t>(func));
     argsV[1] = retVal;
     void* trampoline;
     switch (nargs) {
     case 0:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32_0);
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_0);
         break;
     case 1:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32_1);
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_1);
         break;
     case 2:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32_2);
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_2);
         break;
     case 3:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32_3);
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_3);
         break;
     case 4:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32_4);
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_4);
         break;
     case 5:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32_5);
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_5);
         break;
     default:
         EMASSERT("unsupported arg number." && false);
     }
     g_output->buildTcgHelperCall(trampoline, nargs + 2, argsV);
+    storeToTCG(g_output->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
+}
+
+static void myhandleCallRet32(void* func, TCGArg ret,
+    int nargs, TCGArg* args)
+{
+    // function retval other parameters
+    LValue argsV[2 + nargs];
+    for (int i = 2; i < 2 + nargs; ++i) {
+        argsV[i] = unwrap(reinterpret_cast<TCGCommonStruct*>(args[i - 2]));
+    }
+    LValue retVal = g_output->buildAlloca(g_output->repo().int32);
+    argsV[0] = g_output->constIntPtr(reinterpret_cast<uintptr_t>(func));
+    argsV[1] = retVal;
+    void* trampoline;
+    switch (nargs) {
+    case 0:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_0);
+        break;
+    case 1:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_1);
+        break;
+    case 2:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_2);
+        break;
+    case 3:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_3);
+        break;
+    case 4:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_4);
+        break;
+    case 5:
+        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_5);
+        break;
+    default:
+        EMASSERT("unsupported arg number." && false);
+    }
+    g_output->buildTcgHelperCall(trampoline, nargs + 2, argsV);
+    storeToTCG(g_output->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
+}
+
+static void myhandleCallRetNone(void* func, int nargs, TCGArg* args)
+{
+    // 0 0 0 function other parameters
+    LValue argsV[4 + nargs];
+    for (int i = 4; i < 4 + nargs; ++i) {
+        argsV[i] = unwrap(reinterpret_cast<TCGCommonStruct*>(args[i - 2]));
+    }
+    argsV[0] = argsV[1] = argsV[2] = g_output->repo().int32Zero;
+    argsV[3] = g_output->constIntPtr(reinterpret_cast<uintptr_t>(func));
+    void* trampoline;
+    trampoline = reinterpret_cast<void*>(trampolineForHelper32RetNone);
+    g_output->buildTcgHelperCall(trampoline, nargs + 2, argsV);
+}
+
+void tcg_gen_callN(void*, void* func, TCGArg ret,
+    int nargs, TCGArg* args)
+{
     if (ret != TCG_CALL_DUMMY_ARG) {
-        storeToTCG(retVal, reinterpret_cast<TCGv_ptr>(ret));
+        if (reinterpret_cast<TCGv_ptr>(ret)->m_size == 64) {
+            myhandleCallRet64(func, ret, nargs, args);
+        }
+        else if (reinterpret_cast<TCGv_ptr>(ret)->m_size == 32) {
+            myhandleCallRet32(func, ret, nargs, args);
+        }
+        else {
+            EMASSERT("ret can only be 32/64" && false);
+        }
+    }
+    else {
+        myhandleCallRetNone(func, nargs, args);
     }
 }

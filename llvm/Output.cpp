@@ -267,7 +267,7 @@ LValue Output::buildTcgHelperCall(void* func, int num, LValue* param)
     funcVal = buildCast(LLVMIntToPtr, funcVal, repo().ref8);
     std::vector<LValue> params;
     params.push_back(constInt64(m_stackMapsId));
-    params.push_back(repo().int32Sixteen);
+    params.push_back(repo().int32Eight);
     params.push_back(funcVal);
     params.push_back(constInt32(num));
     for (int i = 0; i < num; ++i) {
