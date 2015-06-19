@@ -1,0 +1,7 @@
+r0 = Memory(4, 0x404851ec)
+r1 = Memory(4, 0x4091eb85)
+%%
+CheckEqual r0 7
+CheckEqual r1 -1
+CheckEqual r2 14
+CheckEqual r3 0

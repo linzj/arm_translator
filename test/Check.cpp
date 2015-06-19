@@ -17,9 +17,9 @@ private:
     virtual bool check(const CPUARMState* state, const uintptr_t*, std::string& info) const override
     {
         RegisterOperation& op = RegisterOperation::getDefault();
-        const uintptr_t* p = op.getRegisterPointer(state, m_regName);
+        const intptr_t* p = reinterpret_cast<const intptr_t*>(op.getRegisterPointer(state, m_regName));
         std::ostringstream oss;
-        oss << "CheckRegisterEqConst " << ((*p == m_val) ? "PASSED" : "FAILED")
+        oss << "CheckRegisterEqConst " << ((*p == static_cast<long long>(m_val)) ? "PASSED" : "FAILED")
             << "; m_regName = " << m_regName
             << "; m_val = " << std::hex
             << m_val;

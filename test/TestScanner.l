@@ -19,7 +19,7 @@ nmstart         [_a-zA-Z]|{nonascii}|{escape}
 nmchar          [_a-zA-Z0-9-]|{nonascii}|{escape}
 string1         \"([^\n\r\f\\"]|\\{nl}|{escape})*\"
 string2         \'([^\n\r\f\\']|\\{nl}|{escape})*\'
-intnum          (0x)?[[:xdigit:]]+
+intnum          -?(0x)?[[:xdigit:]]+
 
 
 ident           -?{nmstart}{nmchar}*
