@@ -5,3 +5,4 @@ CheckEqual r7 12
 CheckEqual r8 6
 CheckEqual r9 27
 CheckEqual r10 3
+CheckEqual r11 3

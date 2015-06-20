@@ -20,6 +20,7 @@ test:
     sub r8, r0, r1
     mul r9, r0, r1
     sdiv r10, r0, r1
+    udiv r11, r0, r1
 	bx	lr
 	.size	test, .-test
 	.section	.note.GNU-stack,"",%progbits

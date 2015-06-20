@@ -176,6 +176,11 @@ LValue Output::buildMul(LValue lhs, LValue rhs)
     return jit::buildMul(m_builder, lhs, rhs);
 }
 
+LValue Output::buildDiv(LValue lhs, LValue rhs)
+{
+    return jit::buildDiv(m_builder, lhs, rhs);
+}
+
 LValue Output::buildNot(LValue value)
 {
     return llvmAPI->BuildNot(m_builder, value, "");

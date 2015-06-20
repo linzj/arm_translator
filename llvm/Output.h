@@ -31,6 +31,7 @@ public:
     LValue buildAnd(LValue lhs, LValue rhs);
     LValue buildXor(LValue lhs, LValue rhs);
     LValue buildMul(LValue lhs, LValue rhs);
+    LValue buildDiv(LValue lhs, LValue rhs);
     LValue buildNot(LValue value);
     LValue buildNeg(LValue value);
     LValue buildOr(LValue left, LValue right);

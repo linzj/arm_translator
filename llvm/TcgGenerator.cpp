@@ -1215,3 +1215,62 @@ void tcg_gen_callN(void*, void* func, TCGArg ret,
         myhandleCallRetNone(func, nargs, args);
     }
 }
+
+void tcg_gen_sdiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    LValue num = unwrap(arg1);
+    LValue den = unwrap(arg2);
+    LBasicBlock denZeroTaken = g_output->appendBasicBlock("denZeroTaken");
+    LBasicBlock denZeroNotTaken = g_output->appendBasicBlock("denZeroNotTaken");
+
+    LBasicBlock minTaken = g_output->appendBasicBlock("minTaken");
+    LBasicBlock minNotTaken = g_output->appendBasicBlock("minNotTaken");
+    LBasicBlock merge = g_output->appendBasicBlock("merge");
+    LValue denCompZero = g_output->buildICmp(LLVMIntEQ, den, g_output->repo().int32Zero);
+    g_output->buildCondBr(denCompZero, denZeroTaken, denZeroNotTaken);
+    g_output->positionToBBEnd(denZeroNotTaken);
+    LValue intMin = g_output->constInt32(INT_MIN);
+    LValue intMinCmp = g_output->buildICmp(LLVMIntEQ, num, intMin);
+    LValue denCompNegOne = g_output->buildICmp(LLVMIntEQ, den, g_output->repo().int32NegativeOne);
+    LValue andBoth = g_output->buildAnd(intMinCmp, denCompNegOne);
+
+    g_output->buildCondBr(andBoth, minTaken, minNotTaken);
+    g_output->positionToBBEnd(minNotTaken);
+    LValue signDiv = g_output->buildDiv(num, den);
+    g_output->buildBr(merge);
+    g_output->positionToBBEnd(denZeroTaken);
+    g_output->buildBr(merge);
+    g_output->positionToBBEnd(minTaken);
+    g_output->buildBr(merge);
+    g_output->positionToBBEnd(merge);
+    LValue phi = g_output->buildPhi(g_output->repo().int32);
+    LValue zero = g_output->repo().int32Zero;
+    jit::addIncoming(phi, &signDiv, &minNotTaken, 1);
+    jit::addIncoming(phi, &zero, &denZeroTaken, 1);
+    jit::addIncoming(phi, &intMin, &minTaken, 1);
+    storeToTCG(phi, ret);
+}
+
+void tcg_gen_udiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    LValue num = unwrap(arg1);
+    LValue den = unwrap(arg2);
+    LBasicBlock denZeroTaken = g_output->appendBasicBlock("denZeroTaken");
+    LBasicBlock denZeroNotTaken = g_output->appendBasicBlock("denZeroNotTaken");
+
+    LBasicBlock merge = g_output->appendBasicBlock("merge");
+    LValue denCompZero = g_output->buildICmp(LLVMIntEQ, den, g_output->repo().int32Zero);
+    g_output->buildCondBr(denCompZero, denZeroTaken, denZeroNotTaken);
+    g_output->positionToBBEnd(denZeroNotTaken);
+
+    LValue signDiv = g_output->buildDiv(num, den);
+    g_output->buildBr(merge);
+    g_output->positionToBBEnd(denZeroTaken);
+    g_output->buildBr(merge);
+    g_output->positionToBBEnd(merge);
+    LValue phi = g_output->buildPhi(g_output->repo().int32);
+    LValue zero = g_output->repo().int32Zero;
+    jit::addIncoming(phi, &signDiv, &denZeroNotTaken, 1);
+    jit::addIncoming(phi, &zero, &denZeroTaken, 1);
+    storeToTCG(phi, ret);
+}

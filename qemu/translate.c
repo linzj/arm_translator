@@ -8644,9 +8644,9 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
                         tmp = load_reg(s, rm);
                         tmp2 = load_reg(s, rs);
                         if (insn & (1 << 21)) {
-                            gen_helper_udiv(tmp, tmp, tmp2);
+                            tcg_gen_udiv(tmp, tmp, tmp2);
                         } else {
-                            gen_helper_sdiv(tmp, tmp, tmp2);
+                            tcg_gen_sdiv(tmp, tmp, tmp2);
                         }
                         tcg_temp_free_i32(tmp2);
                         store_reg(s, rn, tmp);
@@ -9617,9 +9617,9 @@ static int disas_thumb2_insn(CPUARMState *env, DisasContext *s, uint16_t insn_hw
                     goto illegal_op;
                 }
                 if (op & 0x20)
-                    gen_helper_udiv(tmp, tmp, tmp2);
+                    tcg_gen_udiv(tmp, tmp, tmp2);
                 else
-                    gen_helper_sdiv(tmp, tmp, tmp2);
+                    tcg_gen_sdiv(tmp, tmp, tmp2);
                 tcg_temp_free_i32(tmp2);
                 store_reg(s, rd, tmp);
             } else if ((op & 0xe) == 0xc) {

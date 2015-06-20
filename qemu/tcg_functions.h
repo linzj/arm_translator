@@ -112,6 +112,8 @@ TCGv_i64 tcg_temp_new_i64(void);
 void tcg_gen_callN(void* s, void* func, TCGArg ret,
     int nargs, TCGArg* args);
 
+void tcg_gen_sdiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
+void tcg_gen_udiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
 
 static inline TCGv_i32 MAKE_TCGV_I32(intptr_t i)
 {
