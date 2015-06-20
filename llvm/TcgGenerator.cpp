@@ -321,7 +321,7 @@ void translate(CPUARMState* env, const TranslateDesc& desc, void** buffer, size_
 template <typename Type>
 static Type allocateTcg(DisasContext* s)
 {
-    static_cast<MyDisCtx*>(s)->allocateTcg<Type>();
+    return static_cast<MyDisCtx*>(s)->allocateTcg<Type>();
 }
 
 template <typename TCGType>
