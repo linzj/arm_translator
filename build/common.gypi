@@ -37,6 +37,9 @@
                       'cflags': [
                         '-m32',
                       ],
+                      'cflags_cc': [
+                        '-std=c++11',
+                      ],
                       'ldflags': [
                         '-m32',
                         '-fuse-ld=gold',
@@ -57,9 +60,6 @@
                       'cflags': [
                         '-O0',
                         '-g3',
-                      ],
-                      'cflags_cc': [
-                        '-std=c++11',
                       ],
                   }
                 ],

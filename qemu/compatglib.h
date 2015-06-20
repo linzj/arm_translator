@@ -77,46 +77,11 @@ GHashTable* g_hash_table_new_full (GHashFunc hash_func,
 #define g_new(struct_type, n_structs)			_G_NEW (struct_type, n_structs, malloc)
 #define g_new0(struct_type, n_structs)			_G_NEW (struct_type, n_structs, malloc)
 
-#if defined (__GNUC__) && (__GNUC__ >= 2) && defined (__OPTIMIZE__)
-#  define _G_NEW(struct_type, n_structs, func) \
-	(struct_type *) (G_GNUC_EXTENSION ({			\
-	  gsize __n = (gsize) (n_structs);			\
-	  gsize __s = sizeof (struct_type);			\
-	  gpointer __p;						\
-	  if (__s == 1)						\
-	    __p = g_##func (__n);				\
-	  else if (__builtin_constant_p (__n) &&		\
-	           (__s == 0 || __n <= G_MAXSIZE / __s))	\
-	    __p = g_##func (__n * __s);				\
-	  else							\
-	    __p = g_##func##_n (__n, __s);			\
-	  __p;							\
-	}))
-#  define _G_RENEW(struct_type, mem, n_structs, func) \
-	(struct_type *) (G_GNUC_EXTENSION ({			\
-	  gsize __n = (gsize) (n_structs);			\
-	  gsize __s = sizeof (struct_type);			\
-	  gpointer __p = (gpointer) (mem);			\
-	  if (__s == 1)						\
-	    __p = g_##func (__p, __n);				\
-	  else if (__builtin_constant_p (__n) &&		\
-	           (__s == 0 || __n <= G_MAXSIZE / __s))	\
-	    __p = g_##func (__p, __n * __s);			\
-	  else							\
-	    __p = g_##func##_n (__p, __n, __s);			\
-	  __p;							\
-	}))
-
-#else
-
-/* Unoptimised version: always call the _n() function. */
-
 #define _G_NEW(struct_type, n_structs, func) \
         ((struct_type *) g_##func##_n ((n_structs), sizeof (struct_type)))
 #define _G_RENEW(struct_type, mem, n_structs, func) \
         ((struct_type *) g_##func##_n (mem, (n_structs), sizeof (struct_type)))
 
-#endif
 void
 g_free (gpointer mem);
 gpointer
