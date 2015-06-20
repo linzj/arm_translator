@@ -1,3 +1,4 @@
+#include "X86Assembler.h"
 #include "StackMaps.h"
 #include "CompilerState.h"
 #include "Abbreviations.h"
@@ -5,6 +6,18 @@
 #include "log.h"
 
 namespace jit {
+
+static void handleTcgHelper(const LinkDesc& desc, const StackMaps::Record& record, uint8_t* body)
+{
+    uint8_t* p = body + record.instructionOffset;
+    JSC::X86Assembler assembler;
+    // calculate align value
+
+    // push the argument
+    for (size_t i = 2; i < record.locations.size(); ++i) {
+        auto& location = record.locations[i];
+    }
+}
 
 void link(CompilerState& state, const LinkDesc& desc)
 {
@@ -33,7 +46,10 @@ void link(CompilerState& state, const LinkDesc& desc)
             auto& recordUnit = record.second[0];
             desc.m_patchTcgIndirect(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcgIndirect);
         } break;
+        case PatchType::TcgHelperNotReturn: {
+        } break;
         case PatchType::TcgHelper: {
+            handleTcgHelper(desc, record.second[0], body);
         } break;
         default:
             __builtin_unreachable();

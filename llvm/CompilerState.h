@@ -13,6 +13,7 @@ enum class PatchType {
     TcgDirect,
     TcgIndirect,
     TcgHelper,
+    TcgHelperNotReturn,
 };
 
 struct PatchDesc {

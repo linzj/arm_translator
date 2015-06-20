@@ -10,6 +10,8 @@ struct LinkDesc {
     void (*m_patchAssist)(void* opaque, uint8_t* toFill, void*);
     void (*m_patchTcgDirect)(void* opaque, uint8_t* toFill, void*);
     void (*m_patchTcgIndirect)(void* opaque, uint8_t* toFill, void*);
+    uint8_t* (*m_patchMovRegToMem)(void* opaque, uint8_t* toFill);
+    uint8_t* (*m_patchMovMemToMem)(void* opaque, uint8_t* toFill);
 };
 
 void link(CompilerState& state, const LinkDesc& desc);

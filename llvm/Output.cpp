@@ -260,21 +260,40 @@ void Output::buildTcgIndirectPatch(void)
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
 }
 
-LValue Output::buildTcgHelperCall(void* func, int num, LValue* param)
+LValue Output::buildTcgHelperCallNotRet(void* func, int num, LValue* param)
 {
-    PatchDesc desc = { PatchType::TcgHelper };
+    PatchDesc desc = { PatchType::TcgHelperNotReturn };
     LValue funcVal = constIntPtr(reinterpret_cast<uintptr_t>(func));
     funcVal = buildCast(LLVMIntToPtr, funcVal, repo().ref8);
-    std::vector<LValue> params;
-    params.push_back(constInt64(m_stackMapsId));
-    params.push_back(repo().int32Eight);
-    params.push_back(funcVal);
-    params.push_back(constInt32(num));
-    for (int i = 0; i < num; ++i) {
-        LValue p = param[i];
-        params.push_back(p);
+    LValue params[4 + num];
+    params[0] = constInt32(m_stackMapsId);
+    params[1] = repo().int32Eight;
+    params[2] = funcVal;
+    params[3] = constInt32(num);
+    for (int i = 4; i < num + 4; ++i) {
+        LValue p = param[i - 4];
+        params[i] = p;
     }
-    LValue call = buildCall(repo().patchpointVoidIntrinsic(), params.data(), params.size());
+    LValue call = buildCall(repo().patchpointVoidIntrinsic(), params, 4 + num);
+    // record the stack map info
+    m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+    return call;
+}
+
+LValue Output::buildTcgHelperCall(int num, LValue* param)
+{
+    PatchDesc desc = { PatchType::TcgHelper };
+    LValue params[4 + num];
+    params[0] = constInt32(m_stackMapsId);
+    params[1] = repo().int32ThirtyTwo;
+    params[2] = constNull(repo().ref8);
+    params[3] = constInt32(num);
+    for (int i = 4; i < num + 4; ++i) {
+        LValue p = param[i - 4];
+        params[i] = p;
+    }
+    LValue call = buildCall(repo().patchpointInt64Intrinsic(), params, 4 + num);
+    jit::setInstructionCallingConvention(call, LLVMAnyRegCallConv);
     // record the stack map info
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
     return call;

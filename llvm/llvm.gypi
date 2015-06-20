@@ -15,7 +15,6 @@
             'StackMaps.cpp',
             'Link.cpp',
             'TcgGenerator.cpp',
-            'Trampoline32.S',
         ],
         'llvmlog_level': 0,
     },
