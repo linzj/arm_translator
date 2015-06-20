@@ -4,6 +4,7 @@
 #include <memory.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <pthread.h>
 #include <memory>
 #include <fstream>
 #include <streambuf>
@@ -145,20 +146,18 @@ static void assmbleAndLoad(const char* path, std::string& output)
     }
 }
 
-int main(int argc, char** argv)
+static void* worker(void* p)
 {
-    if (argc <= 1) {
-        LOGE("need one arg.");
-        exit(1);
-    }
-    FILE* inputFile = fopen(argv[1], "r");
-    if (!inputFile) {
-        LOGE("fails to open input file.");
-        exit(1);
-    }
     // assemble and load the binary
+    const char* fileName = static_cast<const char*>(p);
+
+    FILE* inputFile = fopen(fileName, "r");
+    if (!inputFile) {
+        LOGE("fails to open input file: %s.", fileName);
+        exit(1);
+    }
     std::string binaryCode;
-    assmbleAndLoad(argv[1], binaryCode);
+    assmbleAndLoad(fileName, binaryCode);
     IRContextInternal context;
     yylex_init_extra(&context, &context.m_scanner);
     yyset_in(inputFile, context.m_scanner);
@@ -193,5 +192,27 @@ int main(int argc, char** argv)
     free(codeBuffer);
     vex_disp_run_translations(twoWords, &cpu.env, execMem);
     checkRun("llvm", context, twoWords, cpu.env);
+}
+
+int main(int argc, char** argv)
+{
+    if (argc <= 1) {
+        LOGE("need one arg.");
+        exit(1);
+    }
+    std::vector<pthread_t> mythreads;
+    for (int i = 1; i < argc; ++i) {
+        pthread_t thread;
+        if (0 != pthread_create(&thread, nullptr, worker, argv[i])) {
+            LOGE("create thread error.\n");
+            exit(1);
+        }
+        mythreads.push_back(thread);
+    }
+    for (auto t : mythreads) {
+        void* threadRet;
+        pthread_join(t, &threadRet);
+        pthread_detach(t);
+    }
     return 0;
 }

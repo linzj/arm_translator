@@ -84,7 +84,9 @@ static PlatformDesc g_desc = {
 static pthread_once_t initLLVMOnce = PTHREAD_ONCE_INIT;
 
 MyDisCtx::MyDisCtx(void)
-    : m_labelCount(0)
+    : m_currentBufferPointer(nullptr)
+    , m_currentBufferEnd(nullptr)
+    , m_labelCount(0)
 {
     pthread_once(&initLLVMOnce, initLLVM);
     m_state.reset(new CompilerState("qemu", g_desc));
