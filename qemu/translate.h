@@ -79,6 +79,19 @@ typedef struct DisasContext {
 #define TMP_A64_MAX 16
     int tmp_a64_count;
     TCGv_i64 tmp_a64[TMP_A64_MAX];
+    TCGv_ptr __cpu_env;
+    /* We reuse the same 64-bit temporaries for efficiency.  */
+    TCGv_i64 __cpu_V0, __cpu_V1, __cpu_M0;
+    TCGv_i32 __cpu_R[16];
+    TCGv_i32 __cpu_CF, __cpu_NF, __cpu_VF, __cpu_ZF;
+    TCGv_i64 __cpu_exclusive_addr;
+    TCGv_i64 __cpu_exclusive_val;
+    TCGv_i64 __cpu_exclusive_test;
+    TCGv_i32 __cpu_exclusive_info;
+
+    /* FIXME:  These should be removed.  */
+    TCGv_i32 __cpu_F0s, __cpu_F1s;
+    TCGv_i64 __cpu_F0d, __cpu_F1d;
 } DisasContext;
 
 extern const ARMCPRegInfo *get_arm_cp_reginfo(GHashTable *cpregs, uint32_t encoded_cp);
@@ -96,7 +109,6 @@ typedef struct {
 } TCGContext;
 
 void gen_intermediate_code_internal(ARMCPU* cpu, TranslationBlock *tb);
-void arm_translate_init(void);
                                                   
 
 #ifdef __cplusplus

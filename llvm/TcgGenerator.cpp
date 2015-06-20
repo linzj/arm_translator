@@ -274,7 +274,6 @@ void translate(CPUARMState* env, const TranslateDesc& desc, void** buffer, size_
     cpu_get_tb_cpu_state(env, &pc, &flags);
     TranslationBlock tb = { pc, flags };
 
-    arm_translate_init();
     gen_intermediate_code_internal(cpu, &tb);
     dumpModule(g_state->m_module);
     compile(*g_state);
