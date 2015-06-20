@@ -14,22 +14,6 @@
 #include "translate.h"
 #include "log.h"
 
-extern "C" {
-void trampolineForHelper32Ret64_0(void);
-void trampolineForHelper32Ret64_1(void);
-void trampolineForHelper32Ret64_2(void);
-void trampolineForHelper32Ret64_3(void);
-void trampolineForHelper32Ret64_4(void);
-void trampolineForHelper32Ret64_5(void);
-
-void trampolineForHelper32Ret32_0(void);
-void trampolineForHelper32Ret32_1(void);
-void trampolineForHelper32Ret32_2(void);
-void trampolineForHelper32Ret32_3(void);
-void trampolineForHelper32Ret32_4(void);
-void trampolineForHelper32Ret32_5(void);
-}
-
 struct TCGCommonStruct {
     jit::LValue m_value;
     int m_size; // 32 or 64
@@ -1185,30 +1169,7 @@ static void myhandleCallRet64(void* func, TCGArg ret,
     LValue retVal = g_output->buildAlloca(g_output->repo().int64);
     argsV[0] = g_output->constIntPtr(reinterpret_cast<uintptr_t>(func));
     argsV[1] = retVal;
-    void* trampoline;
-    switch (nargs) {
-    case 0:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_0);
-        break;
-    case 1:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_1);
-        break;
-    case 2:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_2);
-        break;
-    case 3:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_3);
-        break;
-    case 4:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_4);
-        break;
-    case 5:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret64_5);
-        break;
-    default:
-        EMASSERT("unsupported arg number." && false);
-    }
-    g_output->buildTcgHelperCall(trampoline, nargs + 2, argsV);
+    g_output->buildTcgHelperCall(nargs + 2, argsV, true);
     storeToTCG(g_output->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
 }
 
@@ -1223,30 +1184,7 @@ static void myhandleCallRet32(void* func, TCGArg ret,
     LValue retVal = g_output->buildAlloca(g_output->repo().int32);
     argsV[0] = g_output->constIntPtr(reinterpret_cast<uintptr_t>(func));
     argsV[1] = retVal;
-    void* trampoline;
-    switch (nargs) {
-    case 0:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_0);
-        break;
-    case 1:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_1);
-        break;
-    case 2:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_2);
-        break;
-    case 3:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_3);
-        break;
-    case 4:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_4);
-        break;
-    case 5:
-        trampoline = reinterpret_cast<void*>(trampolineForHelper32Ret32_5);
-        break;
-    default:
-        EMASSERT("unsupported arg number." && false);
-    }
-    g_output->buildTcgHelperCall(trampoline, nargs + 2, argsV);
+    g_output->buildTcgHelperCall(nargs + 2, argsV, false);
     storeToTCG(g_output->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
 }
 
@@ -1256,7 +1194,7 @@ static void myhandleCallRetNone(void* func, int nargs, TCGArg* args)
     for (int i = 0; i < nargs; ++i) {
         argsV[i] = unwrap(reinterpret_cast<TCGCommonStruct*>(args[i]));
     }
-    g_output->buildTcgHelperCall(func, nargs, argsV);
+    g_output->buildTcgHelperCallNotRet(func, nargs, argsV);
 }
 
 void tcg_gen_callN(void*, void* func, TCGArg ret,
