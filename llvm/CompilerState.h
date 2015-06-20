@@ -12,7 +12,8 @@ enum class PatchType {
     Assist,
     TcgDirect,
     TcgIndirect,
-    TcgHelper,
+    TcgHelper32,
+    TcgHelper64,
     TcgHelperNotReturn,
 };
 

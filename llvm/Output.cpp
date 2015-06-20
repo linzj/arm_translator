@@ -266,7 +266,7 @@ LValue Output::buildTcgHelperCallNotRet(void* func, int num, LValue* param)
     LValue funcVal = constIntPtr(reinterpret_cast<uintptr_t>(func));
     funcVal = buildCast(LLVMIntToPtr, funcVal, repo().ref8);
     LValue params[4 + num];
-    params[0] = constInt32(m_stackMapsId);
+    params[0] = constInt64(m_stackMapsId);
     params[1] = repo().int32Eight;
     params[2] = funcVal;
     params[3] = constInt32(num);
@@ -280,11 +280,11 @@ LValue Output::buildTcgHelperCallNotRet(void* func, int num, LValue* param)
     return call;
 }
 
-LValue Output::buildTcgHelperCall(int num, LValue* param)
+LValue Output::buildTcgHelperCall(int num, LValue* param, bool return64)
 {
-    PatchDesc desc = { PatchType::TcgHelper };
+    PatchDesc desc = { return64 ? PatchType::TcgHelper64 : PatchType::TcgHelper32 };
     LValue params[4 + num];
-    params[0] = constInt32(m_stackMapsId);
+    params[0] = constInt64(m_stackMapsId);
     params[1] = repo().int32ThirtyTwo;
     params[2] = constNull(repo().ref8);
     params[3] = constInt32(num);
@@ -292,7 +292,7 @@ LValue Output::buildTcgHelperCall(int num, LValue* param)
         LValue p = param[i - 4];
         params[i] = p;
     }
-    LValue call = buildCall(repo().patchpointInt64Intrinsic(), params, 4 + num);
+    LValue call = buildCall(repo().patchpointVoidIntrinsic(), params, 4 + num);
     jit::setInstructionCallingConvention(call, LLVMAnyRegCallConv);
     // record the stack map info
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));

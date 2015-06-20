@@ -2298,7 +2298,6 @@ public:
 
     static void fillNops(void* base, size_t size)
     {
-#if CPU(X86_64)
         static const uint8_t nops[10][10] = {
             // nop
             { 0x90 },
@@ -2335,9 +2334,7 @@ public:
 
             size -= nopSize;
         }
-#else
-        memset(base, OP_NOP, size);
-#endif
+        // memset(base, OP_NOP, size);
     }
 
     // This is a no-op on x86

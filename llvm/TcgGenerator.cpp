@@ -1169,7 +1169,7 @@ static void myhandleCallRet64(void* func, TCGArg ret,
     LValue retVal = g_output->buildAlloca(g_output->repo().int64);
     argsV[0] = g_output->constIntPtr(reinterpret_cast<uintptr_t>(func));
     argsV[1] = retVal;
-    g_output->buildTcgHelperCall(nargs + 2, argsV);
+    g_output->buildTcgHelperCall(nargs + 2, argsV, true);
     storeToTCG(g_output->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
 }
 
@@ -1184,7 +1184,7 @@ static void myhandleCallRet32(void* func, TCGArg ret,
     LValue retVal = g_output->buildAlloca(g_output->repo().int32);
     argsV[0] = g_output->constIntPtr(reinterpret_cast<uintptr_t>(func));
     argsV[1] = retVal;
-    g_output->buildTcgHelperCall(nargs + 2, argsV);
+    g_output->buildTcgHelperCall(nargs + 2, argsV, false);
     storeToTCG(g_output->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
 }
 
