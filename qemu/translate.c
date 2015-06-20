@@ -10938,11 +10938,11 @@ undef:
 /* generate intermediate code in gen_opc_buf and gen_opparam_buf for
    basic block 'tb'. */
 void gen_intermediate_code_internal(ARMCPU* cpu,
-                                                  TranslationBlock *tb)
+                                        TranslationBlock *tb,
+                                        DisasContext* dc)
 {
     CPUARMState *env = &cpu->env;
     CPUState* cs = CPU(cpu);
-    DisasContext dc1, *dc = &dc1;
     /* disable for llvm uint16_t *gen_opc_end; */
     int j, lj;
     target_ulong pc_start;

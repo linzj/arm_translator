@@ -1,5 +1,6 @@
 #include <unordered_map>
 #include <vector>
+#include <memory>
 #include <pthread.h>
 #include "Registers.h"
 #include "Compile.h"
@@ -46,19 +47,32 @@ struct TcgSizeTrait<TCGv_i64> {
     static const size_t m_size = 64;
 };
 
-namespace jit {
+using namespace jit;
+namespace {
 
-const static size_t allocate_unit = 4096 * 16;
-typedef std::vector<void*> TcgBufferList;
-static TcgBufferList g_bufferList;
-uint8_t* g_currentBufferPointer;
-uint8_t* g_currentBufferEnd;
+class MyDisCtx : public DisasContext {
+public:
+    MyDisCtx();
+    ~MyDisCtx();
+    inline Output* output() { return m_output.get(); }
+    inline CompilerState* state() { return m_state.get(); }
+    template <typename Type>
+    Type allocateTcg();
+    LBasicBlock labelToBB(int n);
+    int newLabel();
 
-static CompilerState* g_state;
-static Output* g_output;
-
-typedef std::unordered_map<int, LBasicBlock> LabelMap;
-LabelMap g_labelMap;
+private:
+    uint8_t* m_currentBufferPointer;
+    uint8_t* m_currentBufferEnd;
+    const static size_t allocate_unit = 4096 * 16;
+    typedef std::vector<void*> TcgBufferList;
+    TcgBufferList m_bufferList;
+    std::unique_ptr<CompilerState> m_state;
+    std::unique_ptr<Output> m_output;
+    typedef std::unordered_map<int, LBasicBlock> LabelMap;
+    LabelMap m_labelMap;
+    int m_labelCount;
+};
 
 static PlatformDesc g_desc = {
     sizeof(CPUARMState),
@@ -69,31 +83,52 @@ static PlatformDesc g_desc = {
 };
 static pthread_once_t initLLVMOnce = PTHREAD_ONCE_INIT;
 
-static void llvm_tcg_init(void)
+MyDisCtx::MyDisCtx(void)
+    : m_labelCount(0)
 {
     pthread_once(&initLLVMOnce, initLLVM);
-    g_state = new CompilerState("qemu", g_desc);
-    g_output = new Output(*g_state);
+    m_state.reset(new CompilerState("qemu", g_desc));
+    m_output.reset(new Output(*m_state));
 }
 
-static void clearTcgBuffer()
+MyDisCtx::~MyDisCtx(void)
 {
-    for (void* b : g_bufferList) {
+    m_labelMap.clear();
+    for (void* b : m_bufferList) {
         free(b);
     }
-    g_bufferList.clear();
-    g_currentBufferPointer = nullptr;
-    g_currentBufferEnd = nullptr;
+    m_bufferList.clear();
 }
 
-static void llvm_tcg_deinit(void)
+template <typename Type>
+Type MyDisCtx::allocateTcg()
 {
-    delete g_output;
-    g_output = nullptr;
-    delete g_state;
-    g_state = nullptr;
-    g_labelMap.clear();
-    clearTcgBuffer();
+    if (m_currentBufferPointer >= m_currentBufferEnd) {
+        m_currentBufferPointer = static_cast<uint8_t*>(malloc(allocate_unit));
+        m_currentBufferEnd = m_currentBufferPointer + allocate_unit;
+        m_bufferList.push_back(m_currentBufferPointer);
+    }
+    Type r = reinterpret_cast<Type>(m_currentBufferPointer);
+    m_currentBufferPointer += sizeof(*r);
+    r->m_value = nullptr;
+    r->m_size = TcgSizeTrait<Type>::m_size;
+    r->m_isMem = false;
+    return r;
+}
+
+LBasicBlock MyDisCtx::labelToBB(int n)
+{
+    auto found = m_labelMap.find(n);
+    EMASSERT(found != m_labelMap.end());
+    LBasicBlock bb = found->second;
+    return bb;
+}
+
+int MyDisCtx::newLabel()
+{
+    LBasicBlock bb = output()->appendBasicBlock("");
+    m_labelMap.insert(std::make_pair(m_labelCount, bb));
+    return m_labelCount++;
 }
 
 static inline void cpu_get_tb_cpu_state(CPUARMState* env, target_ulong* pc,
@@ -247,19 +282,21 @@ void patchIndirect(void*, uint8_t* p, void* entry)
     *p++ = 0xff;
     *p++ = 0xe0;
 }
+}
+namespace jit {
 
 void translate(CPUARMState* env, const TranslateDesc& desc, void** buffer, size_t* s)
 {
-    llvm_tcg_init();
+    MyDisCtx ctx;
     ARMCPU* cpu = arm_env_get_cpu(env);
     target_ulong pc;
     uint64_t flags;
     cpu_get_tb_cpu_state(env, &pc, &flags);
     TranslationBlock tb = { pc, flags };
 
-    gen_intermediate_code_internal(cpu, &tb);
-    dumpModule(g_state->m_module);
-    compile(*g_state);
+    gen_intermediate_code_internal(cpu, &tb, &ctx);
+    dumpModule(ctx.state()->m_module);
+    compile(*ctx.state());
     LinkDesc linkDesc = {
         nullptr,
         desc.m_dispAssist,
@@ -270,36 +307,23 @@ void translate(CPUARMState* env, const TranslateDesc& desc, void** buffer, size_
         patchDirect,
         patchIndirect,
     };
-    link(*g_state, linkDesc);
-    const void* codeBuffer = g_state->m_codeSectionList.front().data();
-    size_t codeSize = g_state->m_codeSectionList.front().size();
+    link(*ctx.state(), linkDesc);
+    const void* codeBuffer = ctx.state()->m_codeSectionList.front().data();
+    size_t codeSize = ctx.state()->m_codeSectionList.front().size();
     *buffer = malloc(codeSize);
     *s = codeSize;
     memcpy(*buffer, codeBuffer, codeSize);
-    llvm_tcg_deinit();
 }
 }
-
-using namespace jit;
 
 template <typename Type>
 static Type allocateTcg(DisasContext* s)
 {
-    if (g_currentBufferPointer >= g_currentBufferEnd) {
-        g_currentBufferPointer = static_cast<uint8_t*>(malloc(allocate_unit));
-        g_currentBufferEnd = g_currentBufferPointer + allocate_unit;
-        g_bufferList.push_back(g_currentBufferPointer);
-    }
-    Type r = reinterpret_cast<Type>(g_currentBufferPointer);
-    g_currentBufferPointer += sizeof(*r);
-    r->m_value = nullptr;
-    r->m_size = TcgSizeTrait<Type>::m_size;
-    r->m_isMem = false;
-    return r;
+    static_cast<MyDisCtx*>(s)->allocateTcg<Type>();
 }
 
 template <typename TCGType>
-static TCGType wrap(DisasContext* s,LValue v)
+static TCGType wrap(DisasContext* s, LValue v)
 {
     TCGType ret = allocateTcg<TCGType>(s);
     ret->m_value = v;
@@ -308,7 +332,7 @@ static TCGType wrap(DisasContext* s,LValue v)
 }
 
 template <typename TCGType>
-static TCGType wrapMem(DisasContext* s,LValue v)
+static TCGType wrapMem(DisasContext* s, LValue v)
 {
     TCGType ret = allocateTcg<TCGType>(s);
     ret->m_value = v;
@@ -317,11 +341,12 @@ static TCGType wrapMem(DisasContext* s,LValue v)
 }
 
 template <typename TCGType>
-static LValue unwrap(DisasContext* s,TCGType v)
+static LValue unwrap(DisasContext* s, TCGType v)
 {
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     EMASSERT(v->m_value != nullptr);
     if (v->m_isMem) {
-        return g_output->buildLoad(v->m_value);
+        return myctx->output()->buildLoad(v->m_value);
     }
     else {
         return v->m_value;
@@ -329,28 +354,30 @@ static LValue unwrap(DisasContext* s,TCGType v)
 }
 
 template <typename TCGType>
-static void storeToTCG(DisasContext* s,LValue v, TCGType ret)
+static void storeToTCG(DisasContext* s, LValue v, TCGType ret)
 {
     if (!ret->m_isMem) {
         ret->m_value = v;
     }
     else {
+        MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
         EMASSERT(ret->m_value != nullptr);
-        g_output->buildStore(v, ret->m_value);
+        myctx->output()->buildStore(v, ret->m_value);
     }
 }
 
-static void extract_64_32(DisasContext* s,LValue my64, TCGv_i32 rl, TCGv_i32 rh)
+static void extract_64_32(DisasContext* s, LValue my64, TCGv_i32 rl, TCGv_i32 rh)
 {
-    LValue thirtytwo = g_output->repo().int32ThirtyTwo;
-    LValue negativeOne = g_output->repo().int32NegativeOne;
-    LValue rhUnwrap = g_output->buildCast(LLVMTrunc, g_output->buildLShr(my64, thirtytwo), g_output->repo().int32);
-    LValue rlUnwrap = g_output->buildCast(LLVMTrunc, my64, g_output->repo().int32);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue thirtytwo = myctx->output()->repo().int32ThirtyTwo;
+    LValue negativeOne = myctx->output()->repo().int32NegativeOne;
+    LValue rhUnwrap = myctx->output()->buildCast(LLVMTrunc, myctx->output()->buildLShr(my64, thirtytwo), myctx->output()->repo().int32);
+    LValue rlUnwrap = myctx->output()->buildCast(LLVMTrunc, my64, myctx->output()->repo().int32);
     storeToTCG(s, rhUnwrap, rh);
     storeToTCG(s, rlUnwrap, rl);
 }
 
-static LLVMIntPredicate tcgCondToLLVM(DisasContext* s,TCGCond cond)
+static LLVMIntPredicate tcgCondToLLVM(DisasContext* s, TCGCond cond)
 {
     switch (cond) {
     case TCG_COND_EQ:
@@ -380,145 +407,148 @@ static LLVMIntPredicate tcgCondToLLVM(DisasContext* s,TCGCond cond)
     }
 }
 
-static LValue tcgPointerToLLVM(DisasContext* s,TCGMemOp op, TCGv pointer)
+static LValue tcgPointerToLLVM(DisasContext* s, TCGMemOp op, TCGv pointer)
 {
     int opInt = op;
     opInt &= ~MO_SIGN;
     LValue pointerBeforeCast = unwrap(s, pointer);
-    EMASSERT(jit::typeOf(pointerBeforeCast) != g_output->repo().ref32);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    EMASSERT(jit::typeOf(pointerBeforeCast) != myctx->output()->repo().ref32);
 
     switch (op) {
     case MO_8:
-        return g_output->buildCast(LLVMIntToPtr, pointerBeforeCast, g_output->repo().ref8);
+        return myctx->output()->buildCast(LLVMIntToPtr, pointerBeforeCast, myctx->output()->repo().ref8);
     case MO_16:
-        return g_output->buildCast(LLVMIntToPtr, pointerBeforeCast, g_output->repo().ref16);
+        return myctx->output()->buildCast(LLVMIntToPtr, pointerBeforeCast, myctx->output()->repo().ref16);
     case MO_32:
-        return g_output->buildCast(LLVMIntToPtr, pointerBeforeCast, g_output->repo().ref32);
+        return myctx->output()->buildCast(LLVMIntToPtr, pointerBeforeCast, myctx->output()->repo().ref32);
     case MO_64:
-        return g_output->buildCast(LLVMIntToPtr, pointerBeforeCast, g_output->repo().ref64);
+        return myctx->output()->buildCast(LLVMIntToPtr, pointerBeforeCast, myctx->output()->repo().ref64);
     default:
         EMASSERT("unknown pointer type." && false);
     }
 }
 
-static LValue tcgMemCastTo32(DisasContext* s,TCGMemOp op, LValue val)
+static LValue tcgMemCastTo32(DisasContext* s, TCGMemOp op, LValue val)
 {
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     switch (op) {
     case MO_8:
-        return g_output->buildCast(LLVMZExt, val, g_output->repo().int32);
+        return myctx->output()->buildCast(LLVMZExt, val, myctx->output()->repo().int32);
     case MO_SB:
-        return g_output->buildCast(LLVMSExt, val, g_output->repo().int32);
+        return myctx->output()->buildCast(LLVMSExt, val, myctx->output()->repo().int32);
     case MO_16:
-        return g_output->buildCast(LLVMZExt, val, g_output->repo().int32);
+        return myctx->output()->buildCast(LLVMZExt, val, myctx->output()->repo().int32);
     case MO_SW:
-        return g_output->buildCast(LLVMSExt, val, g_output->repo().int32);
+        return myctx->output()->buildCast(LLVMSExt, val, myctx->output()->repo().int32);
     case MO_32:
         return val;
     case MO_64:
-        return g_output->buildCast(LLVMTrunc, val, g_output->repo().int32);
+        return myctx->output()->buildCast(LLVMTrunc, val, myctx->output()->repo().int32);
     default:
         EMASSERT("unknown pointer type." && false);
     }
 }
 
-TCGv_i64 tcg_global_mem_new_i64(DisasContext* s,int, intptr_t offset, const char* name)
+TCGv_i64 tcg_global_mem_new_i64(DisasContext* s, int, intptr_t offset, const char* name)
 {
-    LValue v = g_output->buildArgGEP(offset / sizeof(target_ulong));
-    LValue v2 = g_output->buildPointerCast(v, g_output->repo().ref64);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->buildArgGEP(offset / sizeof(target_ulong));
+    LValue v2 = myctx->output()->buildPointerCast(v, myctx->output()->repo().ref64);
 
     return wrapMem<TCGv_i64>(s, v2);
 }
 
-TCGv_i32 tcg_global_mem_new_i32(DisasContext* s,int, intptr_t offset, const char* name)
+TCGv_i32 tcg_global_mem_new_i32(DisasContext* s, int, intptr_t offset, const char* name)
 {
-    LValue v = g_output->buildArgGEP(offset / sizeof(target_ulong));
-    LValue v2 = g_output->buildPointerCast(v, g_output->repo().ref32);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->buildArgGEP(offset / sizeof(target_ulong));
+    LValue v2 = myctx->output()->buildPointerCast(v, myctx->output()->repo().ref32);
 
     return wrapMem<TCGv_i32>(s, v2);
 }
 
-TCGv_ptr tcg_global_reg_new_ptr(DisasContext* s,int, const char* name)
+TCGv_ptr tcg_global_reg_new_ptr(DisasContext* s, int, const char* name)
 {
-    LValue v = g_output->buildArgGEP(0);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->buildArgGEP(0);
     return wrap<TCGv_ptr>(s, v);
 }
 
-TCGv_i32 tcg_const_i32(DisasContext* s,int32_t val)
+TCGv_i32 tcg_const_i32(DisasContext* s, int32_t val)
 {
-    LValue v = g_output->constInt32(val);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->constInt32(val);
     return wrap<TCGv_i32>(s, v);
 }
 
-TCGv_ptr tcg_const_ptr(DisasContext* s,const void* val)
+TCGv_ptr tcg_const_ptr(DisasContext* s, const void* val)
 {
-    LValue v = g_output->constIntPtr(reinterpret_cast<uintptr_t>(val));
-    v = g_output->buildCast(LLVMIntToPtr, v, g_output->repo().ref8);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->constIntPtr(reinterpret_cast<uintptr_t>(val));
+    v = myctx->output()->buildCast(LLVMIntToPtr, v, myctx->output()->repo().ref8);
     return wrap<TCGv_ptr>(s, v);
 }
 
-TCGv_i64 tcg_const_i64(DisasContext* s,int64_t val)
+TCGv_i64 tcg_const_i64(DisasContext* s, int64_t val)
 {
-    return wrap<TCGv_i64>(s, g_output->constInt64(val));
-}
-
-static LBasicBlock labelToBB(DisasContext* s,int n)
-{
-    auto found = g_labelMap.find(n);
-    EMASSERT(found != g_labelMap.end());
-    LBasicBlock bb = found->second;
-    return bb;
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    return wrap<TCGv_i64>(s, myctx->output()->constInt64(val));
 }
 
 int gen_new_label(DisasContext* s)
 {
-    static int count = 0;
-    LBasicBlock bb = g_output->appendBasicBlock("");
-    g_labelMap.insert(std::make_pair(count, bb));
-    return count++;
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    return myctx->newLabel();
 }
 
-void gen_set_label(DisasContext* s,int n)
+void gen_set_label(DisasContext* s, int n)
 {
-    LBasicBlock bb = labelToBB(s, n);
-    g_output->buildBr(bb);
-    g_output->positionToBBEnd(bb);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LBasicBlock bb = myctx->labelToBB(n);
+    myctx->output()->buildBr(bb);
+    myctx->output()->positionToBBEnd(bb);
 }
 
-void tcg_gen_add2_i32(DisasContext *s, TCGv_i32 rl, TCGv_i32 rh, TCGv_i32 al,
+void tcg_gen_add2_i32(DisasContext* s, TCGv_i32 rl, TCGv_i32 rh, TCGv_i32 al,
     TCGv_i32 ah, TCGv_i32 bl, TCGv_i32 bh)
 {
-    LValue t0 = g_output->buildCast(LLVMZExt, unwrap(s, al), g_output->repo().int64);
-    LValue t1 = g_output->buildCast(LLVMZExt, unwrap(s, ah), g_output->repo().int64);
-    LValue t2 = g_output->buildCast(LLVMZExt, unwrap(s, bl), g_output->repo().int64);
-    LValue t3 = g_output->buildCast(LLVMZExt, unwrap(s, bh), g_output->repo().int64);
-    LValue thirtytwo = g_output->repo().int32ThirtyTwo;
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue t0 = myctx->output()->buildCast(LLVMZExt, unwrap(s, al), myctx->output()->repo().int64);
+    LValue t1 = myctx->output()->buildCast(LLVMZExt, unwrap(s, ah), myctx->output()->repo().int64);
+    LValue t2 = myctx->output()->buildCast(LLVMZExt, unwrap(s, bl), myctx->output()->repo().int64);
+    LValue t3 = myctx->output()->buildCast(LLVMZExt, unwrap(s, bh), myctx->output()->repo().int64);
+    LValue thirtytwo = myctx->output()->repo().int32ThirtyTwo;
 
-    LValue t01 = g_output->buildShl(t1, thirtytwo);
-    t01 = g_output->buildOr(t01, t0);
-    LValue t23 = g_output->buildShl(t3, thirtytwo);
-    t23 = g_output->buildOr(t23, t2);
-    LValue t0123 = g_output->buildAdd(t01, t23);
+    LValue t01 = myctx->output()->buildShl(t1, thirtytwo);
+    t01 = myctx->output()->buildOr(t01, t0);
+    LValue t23 = myctx->output()->buildShl(t3, thirtytwo);
+    t23 = myctx->output()->buildOr(t23, t2);
+    LValue t0123 = myctx->output()->buildAdd(t01, t23);
 
     extract_64_32(s, t0123, rl, rh);
 }
 
-void tcg_gen_add_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_add_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue v = g_output->buildAdd(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->buildAdd(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, v, ret);
 }
 
-void tcg_gen_add_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+void tcg_gen_add_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
 {
-    LValue v = g_output->buildAdd(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->buildAdd(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, v, ret);
 }
 
-void tcg_gen_addi_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+void tcg_gen_addi_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 {
     LValue v;
     if (arg2 != 0) {
-        v = g_output->buildAdd(unwrap(s, arg1), g_output->constInt32(arg2));
+        MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+        v = myctx->output()->buildAdd(unwrap(s, arg1), myctx->output()->constInt32(arg2));
     }
     else {
         v = unwrap(s, arg1);
@@ -526,20 +556,22 @@ void tcg_gen_addi_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
     storeToTCG(s, v, ret);
 }
 
-void tcg_gen_addi_ptr(DisasContext* s,TCGv_ptr ret, TCGv_ptr arg1, int32_t arg2)
+void tcg_gen_addi_ptr(DisasContext* s, TCGv_ptr ret, TCGv_ptr arg1, int32_t arg2)
 {
-    LValue constant = g_output->constInt32(arg2);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue constant = myctx->output()->constInt32(arg2);
     LValue arg1V = unwrap(s, arg1);
-    arg1V = g_output->buildCast(LLVMPtrToInt, arg1V, g_output->repo().intPtr);
-    LValue retVal = g_output->buildAdd(arg1V, constant);
-    storeToTCG(s, g_output->buildCast(LLVMIntToPtr, retVal, g_output->repo().ref8), ret);
+    arg1V = myctx->output()->buildCast(LLVMPtrToInt, arg1V, myctx->output()->repo().intPtr);
+    LValue retVal = myctx->output()->buildAdd(arg1V, constant);
+    storeToTCG(s, myctx->output()->buildCast(LLVMIntToPtr, retVal, myctx->output()->repo().ref8), ret);
 }
 
-void tcg_gen_addi_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
+void tcg_gen_addi_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
 {
     LValue v;
     if (arg2 != 0) {
-        v = g_output->buildAdd(unwrap(s, arg1), g_output->constInt64(arg2));
+        MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+        v = myctx->output()->buildAdd(unwrap(s, arg1), myctx->output()->constInt64(arg2));
     }
     else {
         v = unwrap(s, arg1);
@@ -547,88 +579,97 @@ void tcg_gen_addi_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
     storeToTCG(s, v, ret);
 }
 
-void tcg_gen_andc_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_andc_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue t0 = g_output->buildNot(unwrap(s, arg2));
-    LValue v = g_output->buildAnd(unwrap(s, arg1), t0);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue t0 = myctx->output()->buildNot(unwrap(s, arg2));
+    LValue v = myctx->output()->buildAnd(unwrap(s, arg1), t0);
     storeToTCG(s, v, ret);
 }
 
-void tcg_gen_and_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_and_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue v = g_output->buildAnd(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->buildAnd(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, v, ret);
 }
 
-void tcg_gen_and_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+void tcg_gen_and_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
 {
-    LValue v = g_output->buildAnd(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->buildAnd(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, v, ret);
 }
 
-void tcg_gen_andi_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, uint32_t arg2)
+void tcg_gen_andi_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, uint32_t arg2)
 {
-    LValue v = g_output->buildAnd(unwrap(s, arg1), g_output->constInt32(arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->buildAnd(unwrap(s, arg1), myctx->output()->constInt32(arg2));
     storeToTCG(s, v, ret);
 }
 
-void tcg_gen_andi_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
+void tcg_gen_andi_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
 {
-    LValue v = g_output->buildAnd(unwrap(s, arg1), g_output->constInt64(arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue v = myctx->output()->buildAnd(unwrap(s, arg1), myctx->output()->constInt64(arg2));
     storeToTCG(s, v, ret);
 }
 
-void tcg_gen_brcondi_i32(DisasContext *s, TCGCond cond, TCGv_i32 arg1,
+void tcg_gen_brcondi_i32(DisasContext* s, TCGCond cond, TCGv_i32 arg1,
     int32_t arg2, int label_index)
 {
-    LBasicBlock taken = labelToBB(s, label_index);
-    LBasicBlock nottaken = g_output->appendBasicBlock("notTaken");
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LBasicBlock taken = myctx->labelToBB(label_index);
+    LBasicBlock nottaken = myctx->output()->appendBasicBlock("notTaken");
     LValue v1 = unwrap(s, arg1);
-    LValue v2 = g_output->constInt32(arg2);
-    LValue condVal = g_output->buildICmp(tcgCondToLLVM(s, cond), v1, v2);
-    g_output->buildCondBr(condVal, taken, nottaken);
-    g_output->positionToBBEnd(nottaken);
+    LValue v2 = myctx->output()->constInt32(arg2);
+    LValue condVal = myctx->output()->buildICmp(tcgCondToLLVM(s, cond), v1, v2);
+    myctx->output()->buildCondBr(condVal, taken, nottaken);
+    myctx->output()->positionToBBEnd(nottaken);
 }
 
-void tcg_gen_bswap16_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_bswap16_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
 {
     LValue v = unwrap(s, arg);
-    LValue lower = g_output->buildAnd(v, g_output->repo().int32TwoFiveFive);
-    LValue higher = g_output->buildShl(v, g_output->repo().int32Eight);
-    LValue valret = g_output->buildOr(higher, lower);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue lower = myctx->output()->buildAnd(v, myctx->output()->repo().int32TwoFiveFive);
+    LValue higher = myctx->output()->buildShl(v, myctx->output()->repo().int32Eight);
+    LValue valret = myctx->output()->buildOr(higher, lower);
     storeToTCG(s, valret, ret);
 }
 
-void tcg_gen_bswap32_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_bswap32_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
 {
     LValue v = unwrap(s, arg);
-    LValue twentyFour = g_output->constInt32(24);
-    LValue hi24 = g_output->buildShl(v, twentyFour);
-    LValue hi16 = g_output->buildAnd(v, g_output->constInt32(0xff00));
-    hi16 = g_output->buildShl(hi16, g_output->repo().int32Eight);
-    LValue lo8 = g_output->buildAnd(v, g_output->constInt32(0xff0000));
-    lo8 = g_output->buildLShr(lo8, g_output->repo().int32Eight);
-    LValue lo0 = g_output->buildAnd(v, g_output->constInt32(0xff000000));
-    lo0 = g_output->buildLShr(lo0, twentyFour);
-    LValue ret1 = g_output->buildOr(hi24, hi16);
-    LValue ret2 = g_output->buildOr(lo0, lo8);
-    LValue retVal = g_output->buildOr(ret1, ret2);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue twentyFour = myctx->output()->constInt32(24);
+    LValue hi24 = myctx->output()->buildShl(v, twentyFour);
+    LValue hi16 = myctx->output()->buildAnd(v, myctx->output()->constInt32(0xff00));
+    hi16 = myctx->output()->buildShl(hi16, myctx->output()->repo().int32Eight);
+    LValue lo8 = myctx->output()->buildAnd(v, myctx->output()->constInt32(0xff0000));
+    lo8 = myctx->output()->buildLShr(lo8, myctx->output()->repo().int32Eight);
+    LValue lo0 = myctx->output()->buildAnd(v, myctx->output()->constInt32(0xff000000));
+    lo0 = myctx->output()->buildLShr(lo0, twentyFour);
+    LValue ret1 = myctx->output()->buildOr(hi24, hi16);
+    LValue ret2 = myctx->output()->buildOr(lo0, lo8);
+    LValue retVal = myctx->output()->buildOr(ret1, ret2);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_concat_i32_i64(DisasContext *s, TCGv_i64 dest, TCGv_i32 low,
+void tcg_gen_concat_i32_i64(DisasContext* s, TCGv_i64 dest, TCGv_i32 low,
     TCGv_i32 high)
 {
     LValue lo = unwrap(s, low);
     LValue hi = unwrap(s, high);
-    LValue low64 = g_output->buildCast(LLVMZExt, lo, g_output->repo().int64);
-    LValue hi64 = g_output->buildCast(LLVMZExt, hi64, g_output->repo().int64);
-    hi64 = g_output->buildShl(hi64, g_output->repo().int32ThirtyTwo);
-    LValue ret = g_output->buildOr(hi64, low64);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue low64 = myctx->output()->buildCast(LLVMZExt, lo, myctx->output()->repo().int64);
+    LValue hi64 = myctx->output()->buildCast(LLVMZExt, hi64, myctx->output()->repo().int64);
+    hi64 = myctx->output()->buildShl(hi64, myctx->output()->repo().int32ThirtyTwo);
+    LValue ret = myctx->output()->buildOr(hi64, low64);
     storeToTCG(s, ret, dest);
 }
 
-void tcg_gen_deposit_i32(DisasContext *s, TCGv_i32 ret, TCGv_i32 arg1,
+void tcg_gen_deposit_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1,
     TCGv_i32 arg2, unsigned int ofs,
     unsigned int len)
 {
@@ -638,287 +679,314 @@ void tcg_gen_deposit_i32(DisasContext *s, TCGv_i32 ret, TCGv_i32 arg1,
     }
     LValue v;
     unsigned mask = (1u << len) - 1;
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     if (ofs + len < 32) {
-        v = g_output->buildAnd(unwrap(s, arg2), g_output->constInt32(mask));
-        v = g_output->buildShl(v, g_output->constInt32(ofs));
+        v = myctx->output()->buildAnd(unwrap(s, arg2), myctx->output()->constInt32(mask));
+        v = myctx->output()->buildShl(v, myctx->output()->constInt32(ofs));
     }
     else {
-        v = g_output->buildShl(unwrap(s, arg2), g_output->constInt32(ofs));
+        v = myctx->output()->buildShl(unwrap(s, arg2), myctx->output()->constInt32(ofs));
     }
-    LValue retVal = g_output->buildAnd(unwrap(s, arg1), g_output->constInt32(~(mask << ofs)));
-    retVal = g_output->buildOr(retVal, v);
+    LValue retVal = myctx->output()->buildAnd(unwrap(s, arg1), myctx->output()->constInt32(~(mask << ofs)));
+    retVal = myctx->output()->buildOr(retVal, v);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_mov_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_mov_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
 {
     if (arg == ret)
         return;
     storeToTCG(s, unwrap(s, arg), ret);
 }
 
-void tcg_gen_mov_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg)
+void tcg_gen_mov_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg)
 {
     if (ret == arg)
         return;
     storeToTCG(s, unwrap(s, arg), ret);
 }
 
-void tcg_gen_exit_tb(DisasContext* s,int direct)
+void tcg_gen_exit_tb(DisasContext* s, int direct)
 {
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     if (direct)
-        g_output->buildTcgDirectPatch();
+        myctx->output()->buildTcgDirectPatch();
     else
-        g_output->buildTcgIndirectPatch();
+        myctx->output()->buildTcgIndirectPatch();
 }
 
-void tcg_gen_ext16s_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_ext16s_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
 {
-    LValue retVal = g_output->buildShl(unwrap(s, arg), g_output->repo().int32Sixteen);
-    retVal = g_output->buildAShr(retVal, g_output->repo().int32Sixteen);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildShl(unwrap(s, arg), myctx->output()->repo().int32Sixteen);
+    retVal = myctx->output()->buildAShr(retVal, myctx->output()->repo().int32Sixteen);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_ext16u_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_ext16u_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
 {
-    LValue retVal = g_output->buildAnd(unwrap(s, arg), g_output->constInt32(0xffff));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildAnd(unwrap(s, arg), myctx->output()->constInt32(0xffff));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_ext32u_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg)
+void tcg_gen_ext32u_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg)
 {
-    LValue retVal = g_output->buildAnd(unwrap(s, arg), g_output->constInt64(0xffffffffu));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildAnd(unwrap(s, arg), myctx->output()->constInt64(0xffffffffu));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_ext8s_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_ext8s_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
 {
-    LValue constant = g_output->constInt32(24);
-    LValue retVal = g_output->buildShl(unwrap(s, arg), constant);
-    retVal = g_output->buildAShr(retVal, constant);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue constant = myctx->output()->constInt32(24);
+    LValue retVal = myctx->output()->buildShl(unwrap(s, arg), constant);
+    retVal = myctx->output()->buildAShr(retVal, constant);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_ext8u_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_ext8u_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
 {
-    LValue retVal = g_output->buildAnd(unwrap(s, arg), g_output->constInt32(0xff));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildAnd(unwrap(s, arg), myctx->output()->constInt32(0xff));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_ext_i32_i64(DisasContext* s,TCGv_i64 ret, TCGv_i32 arg)
+void tcg_gen_ext_i32_i64(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg)
 {
-    LValue retVal = g_output->buildCast(LLVMSExt, unwrap(s, arg), g_output->repo().int64);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildCast(LLVMSExt, unwrap(s, arg), myctx->output()->repo().int64);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_extu_i32_i64(DisasContext* s,TCGv_i64 ret, TCGv_i32 arg)
+void tcg_gen_extu_i32_i64(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg)
 {
-    LValue retVal = g_output->buildCast(LLVMZExt, unwrap(s, arg), g_output->repo().int64);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildCast(LLVMZExt, unwrap(s, arg), myctx->output()->repo().int64);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_ld_i32(DisasContext* s,TCGv_i32 ret, TCGv_ptr arg2, tcg_target_long offset)
+void tcg_gen_ld_i32(DisasContext* s, TCGv_i32 ret, TCGv_ptr arg2, tcg_target_long offset)
 {
     LValue pointer = unwrap(s, arg2);
-    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref8);
-    pointer = g_output->buildGEP(pointer, offset);
-    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref32);
-    LValue retVal = g_output->buildLoad(pointer);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    pointer = myctx->output()->buildPointerCast(pointer, myctx->output()->repo().ref8);
+    pointer = myctx->output()->buildGEP(pointer, offset);
+    pointer = myctx->output()->buildPointerCast(pointer, myctx->output()->repo().ref32);
+    LValue retVal = myctx->output()->buildLoad(pointer);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_ld_i64(DisasContext *s, TCGv_i64 ret, TCGv_ptr arg2,
+void tcg_gen_ld_i64(DisasContext* s, TCGv_i64 ret, TCGv_ptr arg2,
     tcg_target_long offset)
 {
     LValue pointer = unwrap(s, arg2);
-    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref8);
-    pointer = g_output->buildGEP(pointer, offset);
-    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref64);
-    LValue retVal = g_output->buildLoad(pointer);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    pointer = myctx->output()->buildPointerCast(pointer, myctx->output()->repo().ref8);
+    pointer = myctx->output()->buildGEP(pointer, offset);
+    pointer = myctx->output()->buildPointerCast(pointer, myctx->output()->repo().ref64);
+    LValue retVal = myctx->output()->buildLoad(pointer);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_movcond_i32(DisasContext *s, TCGCond cond, TCGv_i32 ret,
+void tcg_gen_movcond_i32(DisasContext* s, TCGCond cond, TCGv_i32 ret,
     TCGv_i32 c1, TCGv_i32 c2,
     TCGv_i32 v1, TCGv_i32 v2)
 {
     LValue t0;
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     switch (cond) {
     case TCG_COND_ALWAYS:
-        t0 = g_output->repo().int32One;
+        t0 = myctx->output()->repo().int32One;
         break;
     case TCG_COND_NEVER:
-        t0 = g_output->repo().int32Zero;
+        t0 = myctx->output()->repo().int32Zero;
         break;
     default:
-        t0 = g_output->buildICmp(tcgCondToLLVM(s, cond), unwrap(s, c1), unwrap(s, c2));
+        t0 = myctx->output()->buildICmp(tcgCondToLLVM(s, cond), unwrap(s, c1), unwrap(s, c2));
     }
 
-    LValue retVal = g_output->buildSelect(t0, unwrap(s, v1), unwrap(s, v2));
+    LValue retVal = myctx->output()->buildSelect(t0, unwrap(s, v1), unwrap(s, v2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_movcond_i64(DisasContext *s, TCGCond cond, TCGv_i64 ret,
+void tcg_gen_movcond_i64(DisasContext* s, TCGCond cond, TCGv_i64 ret,
     TCGv_i64 c1, TCGv_i64 c2,
     TCGv_i64 v1, TCGv_i64 v2)
 {
     LValue t0;
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     switch (cond) {
     case TCG_COND_ALWAYS:
-        t0 = g_output->repo().int32One;
+        t0 = myctx->output()->repo().int32One;
         break;
     case TCG_COND_NEVER:
-        t0 = g_output->repo().int32Zero;
+        t0 = myctx->output()->repo().int32Zero;
         break;
     default:
-        t0 = g_output->buildICmp(tcgCondToLLVM(s, cond), unwrap(s, c1), unwrap(s, c2));
+        t0 = myctx->output()->buildICmp(tcgCondToLLVM(s, cond), unwrap(s, c1), unwrap(s, c2));
     }
 
-    LValue retVal = g_output->buildSelect(t0, unwrap(s, v1), unwrap(s, v2));
+    LValue retVal = myctx->output()->buildSelect(t0, unwrap(s, v1), unwrap(s, v2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_movi_i32(DisasContext* s,TCGv_i32 ret, int32_t arg)
+void tcg_gen_movi_i32(DisasContext* s, TCGv_i32 ret, int32_t arg)
 {
-    LValue retVal = g_output->constInt32(arg);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->constInt32(arg);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_movi_i64(DisasContext* s,TCGv_i64 ret, int64_t arg)
+void tcg_gen_movi_i64(DisasContext* s, TCGv_i64 ret, int64_t arg)
 {
-    LValue retVal = g_output->constInt64(arg);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->constInt64(arg);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_mul_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_mul_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue retVal = g_output->buildMul(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildMul(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_muls2_i32(DisasContext *s, TCGv_i32 rl, TCGv_i32 rh,
+void tcg_gen_muls2_i32(DisasContext* s, TCGv_i32 rl, TCGv_i32 rh,
     TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue t0 = g_output->buildCast(LLVMSExt, unwrap(s, arg1), g_output->repo().int64);
-    LValue t1 = g_output->buildCast(LLVMSExt, unwrap(s, arg2), g_output->repo().int64);
-    LValue t3 = g_output->buildMul(t0, t1);
-    LValue low = g_output->buildCast(LLVMTrunc, t3, g_output->repo().int32);
-    LValue high = g_output->buildAShr(t3, g_output->repo().int32ThirtyTwo);
-    high = g_output->buildCast(LLVMTrunc, high, g_output->repo().int32);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue t0 = myctx->output()->buildCast(LLVMSExt, unwrap(s, arg1), myctx->output()->repo().int64);
+    LValue t1 = myctx->output()->buildCast(LLVMSExt, unwrap(s, arg2), myctx->output()->repo().int64);
+    LValue t3 = myctx->output()->buildMul(t0, t1);
+    LValue low = myctx->output()->buildCast(LLVMTrunc, t3, myctx->output()->repo().int32);
+    LValue high = myctx->output()->buildAShr(t3, myctx->output()->repo().int32ThirtyTwo);
+    high = myctx->output()->buildCast(LLVMTrunc, high, myctx->output()->repo().int32);
     storeToTCG(s, low, rl);
     storeToTCG(s, high, rh);
 }
 
-void tcg_gen_mulu2_i32(DisasContext *s, TCGv_i32 rl, TCGv_i32 rh,
+void tcg_gen_mulu2_i32(DisasContext* s, TCGv_i32 rl, TCGv_i32 rh,
     TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue t0 = g_output->buildCast(LLVMZExt, unwrap(s, arg1), g_output->repo().int64);
-    LValue t1 = g_output->buildCast(LLVMZExt, unwrap(s, arg2), g_output->repo().int64);
-    LValue t3 = g_output->buildMul(t0, t1);
-    LValue low = g_output->buildCast(LLVMTrunc, t3, g_output->repo().int32);
-    LValue high = g_output->buildLShr(t3, g_output->repo().int32ThirtyTwo);
-    high = g_output->buildCast(LLVMTrunc, high, g_output->repo().int32);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue t0 = myctx->output()->buildCast(LLVMZExt, unwrap(s, arg1), myctx->output()->repo().int64);
+    LValue t1 = myctx->output()->buildCast(LLVMZExt, unwrap(s, arg2), myctx->output()->repo().int64);
+    LValue t3 = myctx->output()->buildMul(t0, t1);
+    LValue low = myctx->output()->buildCast(LLVMTrunc, t3, myctx->output()->repo().int32);
+    LValue high = myctx->output()->buildLShr(t3, myctx->output()->repo().int32ThirtyTwo);
+    high = myctx->output()->buildCast(LLVMTrunc, high, myctx->output()->repo().int32);
     storeToTCG(s, low, rl);
     storeToTCG(s, high, rh);
 }
 
-void tcg_gen_neg_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_neg_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
 {
-    LValue retVal = g_output->buildNeg(unwrap(s, arg));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildNeg(unwrap(s, arg));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_neg_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg)
+void tcg_gen_neg_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg)
 {
-    LValue retVal = g_output->buildNeg(unwrap(s, arg));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildNeg(unwrap(s, arg));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_not_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_not_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
 {
-    LValue retVal = g_output->buildNot(unwrap(s, arg));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildNot(unwrap(s, arg));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_orc_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_orc_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue t0 = g_output->buildNot(unwrap(s, arg2));
-    LValue retVal = g_output->buildOr(unwrap(s, arg1), t0);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue t0 = myctx->output()->buildNot(unwrap(s, arg2));
+    LValue retVal = myctx->output()->buildOr(unwrap(s, arg1), t0);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_or_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_or_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue retVal = g_output->buildOr(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildOr(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_or_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+void tcg_gen_or_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
 {
-    LValue retVal = g_output->buildOr(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildOr(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_ori_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+void tcg_gen_ori_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 {
-    LValue retVal = g_output->buildOr(unwrap(s, arg1), g_output->constInt32(arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildOr(unwrap(s, arg1), myctx->output()->constInt32(arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_qemu_ld_i32(DisasContext* s,TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
+void tcg_gen_qemu_ld_i32(DisasContext* s, TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
     EMASSERT(idx == 0);
     LValue pointer = tcgPointerToLLVM(s, memop, addr);
-    LValue retVal = g_output->buildLoad(pointer);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildLoad(pointer);
     retVal = tcgMemCastTo32(s, memop, retVal);
     switch (memop) {
     case MO_UB:
-        retVal = g_output->buildCast(LLVMZExt, retVal, g_output->repo().int32);
+        retVal = myctx->output()->buildCast(LLVMZExt, retVal, myctx->output()->repo().int32);
         break;
     case MO_SB:
-        retVal = g_output->buildCast(LLVMSExt, retVal, g_output->repo().int32);
+        retVal = myctx->output()->buildCast(LLVMSExt, retVal, myctx->output()->repo().int32);
         break;
     case MO_UW:
-        retVal = g_output->buildCast(LLVMZExt, retVal, g_output->repo().int32);
+        retVal = myctx->output()->buildCast(LLVMZExt, retVal, myctx->output()->repo().int32);
         break;
     case MO_SW:
-        retVal = g_output->buildCast(LLVMSExt, retVal, g_output->repo().int32);
+        retVal = myctx->output()->buildCast(LLVMSExt, retVal, myctx->output()->repo().int32);
         break;
     case MO_SL:
     case MO_UL:
         break;
     case MO_Q:
     case (MO_Q | MO_SIGN):
-        retVal = g_output->buildCast(LLVMTrunc, retVal, g_output->repo().int32);
+        retVal = myctx->output()->buildCast(LLVMTrunc, retVal, myctx->output()->repo().int32);
     default:
         EMASSERT("unknown pointer type." && false);
     }
     storeToTCG(s, retVal, val);
 }
 
-void tcg_gen_qemu_ld_i64(DisasContext* s,TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
+void tcg_gen_qemu_ld_i64(DisasContext* s, TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
     EMASSERT(idx == 0);
     LValue pointer = tcgPointerToLLVM(s, memop, addr);
-    LValue retVal = g_output->buildLoad(pointer);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildLoad(pointer);
     switch (memop) {
     case MO_UB:
-        retVal = g_output->buildCast(LLVMZExt, retVal, g_output->repo().int64);
+        retVal = myctx->output()->buildCast(LLVMZExt, retVal, myctx->output()->repo().int64);
         break;
     case MO_SB:
-        retVal = g_output->buildCast(LLVMSExt, retVal, g_output->repo().int64);
+        retVal = myctx->output()->buildCast(LLVMSExt, retVal, myctx->output()->repo().int64);
         break;
     case MO_UW:
-        retVal = g_output->buildCast(LLVMZExt, retVal, g_output->repo().int64);
+        retVal = myctx->output()->buildCast(LLVMZExt, retVal, myctx->output()->repo().int64);
         break;
     case MO_SW:
-        retVal = g_output->buildCast(LLVMSExt, retVal, g_output->repo().int64);
+        retVal = myctx->output()->buildCast(LLVMSExt, retVal, myctx->output()->repo().int64);
         break;
     case MO_SL:
-        retVal = g_output->buildCast(LLVMSExt, retVal, g_output->repo().int64);
+        retVal = myctx->output()->buildCast(LLVMSExt, retVal, myctx->output()->repo().int64);
         break;
     case MO_UL:
-        retVal = g_output->buildCast(LLVMZExt, retVal, g_output->repo().int64);
+        retVal = myctx->output()->buildCast(LLVMZExt, retVal, myctx->output()->repo().int64);
         break;
     case MO_Q:
     case (MO_Q | MO_SIGN):
@@ -929,52 +997,54 @@ void tcg_gen_qemu_ld_i64(DisasContext* s,TCGv_i64 val, TCGv addr, TCGArg idx, TC
     storeToTCG(s, retVal, val);
 }
 
-void tcg_gen_qemu_st_i32(DisasContext* s,TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
+void tcg_gen_qemu_st_i32(DisasContext* s, TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
     EMASSERT(idx == 0);
     LValue pointer = tcgPointerToLLVM(s, memop, addr);
     LValue valToStore = unwrap(s, val);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     switch (memop) {
     case MO_UB:
     case MO_SB:
-        valToStore = g_output->buildCast(LLVMTrunc, valToStore, g_output->repo().int8);
+        valToStore = myctx->output()->buildCast(LLVMTrunc, valToStore, myctx->output()->repo().int8);
         break;
     case MO_UW:
     case MO_SW:
-        valToStore = g_output->buildCast(LLVMTrunc, valToStore, g_output->repo().int16);
+        valToStore = myctx->output()->buildCast(LLVMTrunc, valToStore, myctx->output()->repo().int16);
         break;
     case MO_UL:
     case MO_SL:
         break;
     case MO_Q:
-        valToStore = g_output->buildCast(LLVMZExt, valToStore, g_output->repo().int32);
+        valToStore = myctx->output()->buildCast(LLVMZExt, valToStore, myctx->output()->repo().int32);
         break;
     case (MO_Q | MO_SIGN):
-        valToStore = g_output->buildCast(LLVMSExt, valToStore, g_output->repo().int32);
+        valToStore = myctx->output()->buildCast(LLVMSExt, valToStore, myctx->output()->repo().int32);
         break;
     default:
         EMASSERT("unknown memop" && false);
     }
-    g_output->buildStore(valToStore, pointer);
+    myctx->output()->buildStore(valToStore, pointer);
 }
 
-void tcg_gen_qemu_st_i64(DisasContext* s,TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
+void tcg_gen_qemu_st_i64(DisasContext* s, TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
     EMASSERT(idx == 0);
     LValue pointer = tcgPointerToLLVM(s, memop, addr);
     LValue valToStore = unwrap(s, val);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     switch (memop) {
     case MO_UB:
     case MO_SB:
-        valToStore = g_output->buildCast(LLVMTrunc, valToStore, g_output->repo().int8);
+        valToStore = myctx->output()->buildCast(LLVMTrunc, valToStore, myctx->output()->repo().int8);
         break;
     case MO_UW:
     case MO_SW:
-        valToStore = g_output->buildCast(LLVMTrunc, valToStore, g_output->repo().int16);
+        valToStore = myctx->output()->buildCast(LLVMTrunc, valToStore, myctx->output()->repo().int16);
         break;
     case MO_UL:
     case MO_SL:
-        valToStore = g_output->buildCast(LLVMTrunc, valToStore, g_output->repo().int32);
+        valToStore = myctx->output()->buildCast(LLVMTrunc, valToStore, myctx->output()->repo().int32);
         break;
     case MO_Q:
     case (MO_Q | MO_SIGN):
@@ -982,157 +1052,177 @@ void tcg_gen_qemu_st_i64(DisasContext* s,TCGv_i64 val, TCGv addr, TCGArg idx, TC
     default:
         EMASSERT("unknown memop" && false);
     }
-    g_output->buildStore(valToStore, pointer);
+    myctx->output()->buildStore(valToStore, pointer);
 }
 
-void tcg_gen_rotr_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_rotr_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
     LValue arg1U = unwrap(s, arg1);
     LValue arg2U = unwrap(s, arg2);
-    LValue t0 = g_output->buildLShr(arg1U, arg2U);
-    LValue t1 = g_output->buildSub(g_output->repo().int32ThirtyTwo, arg2U);
-    t1 = g_output->buildShl(arg1U, t1);
-    LValue retVal = g_output->buildOr(t0, t1);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue t0 = myctx->output()->buildLShr(arg1U, arg2U);
+    LValue t1 = myctx->output()->buildSub(myctx->output()->repo().int32ThirtyTwo, arg2U);
+    t1 = myctx->output()->buildShl(arg1U, t1);
+    LValue retVal = myctx->output()->buildOr(t0, t1);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_rotri_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+void tcg_gen_rotri_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 {
     if (arg2 == 0) {
         storeToTCG(s, unwrap(s, arg1), ret);
     }
     else {
         LValue arg1U = unwrap(s, arg1);
-        LValue arg2U = g_output->constInt32(arg2);
-        LValue t0 = g_output->buildLShr(arg1U, arg2U);
-        LValue t1 = g_output->buildSub(g_output->repo().int32ThirtyTwo, arg2U);
-        t1 = g_output->buildShl(arg1U, t1);
-        LValue retVal = g_output->buildOr(t0, t1);
+        MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+        LValue arg2U = myctx->output()->constInt32(arg2);
+        LValue t0 = myctx->output()->buildLShr(arg1U, arg2U);
+        LValue t1 = myctx->output()->buildSub(myctx->output()->repo().int32ThirtyTwo, arg2U);
+        t1 = myctx->output()->buildShl(arg1U, t1);
+        LValue retVal = myctx->output()->buildOr(t0, t1);
         storeToTCG(s, retVal, ret);
     }
 }
 
-void tcg_gen_sar_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_sar_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue retVal = g_output->buildAShr(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildAShr(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_sari_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+void tcg_gen_sari_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 {
-    LValue retVal = g_output->buildAShr(unwrap(s, arg1), g_output->constInt32(arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildAShr(unwrap(s, arg1), myctx->output()->constInt32(arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_setcond_i32(DisasContext *s, TCGCond cond, TCGv_i32 ret,
+void tcg_gen_setcond_i32(DisasContext* s, TCGCond cond, TCGv_i32 ret,
     TCGv_i32 arg1, TCGv_i32 arg2)
 {
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     if (cond == TCG_COND_ALWAYS) {
-        storeToTCG(s, g_output->repo().int32One, ret);
+        storeToTCG(s, myctx->output()->repo().int32One, ret);
     }
     else if (cond == TCG_COND_NEVER) {
-        storeToTCG(s, g_output->repo().int32Zero, ret);
+        storeToTCG(s, myctx->output()->repo().int32Zero, ret);
     }
     else {
         LLVMIntPredicate condLLVM = tcgCondToLLVM(s, cond);
-        LValue comp = g_output->buildICmp(condLLVM, unwrap(s, arg1), unwrap(s, arg2));
-        LValue retVal = g_output->buildCast(LLVMZExt, comp, g_output->repo().int32);
+        LValue comp = myctx->output()->buildICmp(condLLVM, unwrap(s, arg1), unwrap(s, arg2));
+        LValue retVal = myctx->output()->buildCast(LLVMZExt, comp, myctx->output()->repo().int32);
         storeToTCG(s, retVal, ret);
     }
 }
 
-void tcg_gen_shl_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_shl_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue retVal = g_output->buildShl(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildShl(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_shli_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+void tcg_gen_shli_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 {
-    LValue retVal = g_output->buildShl(unwrap(s, arg1), g_output->constInt32(arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildShl(unwrap(s, arg1), myctx->output()->constInt32(arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_shli_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
+void tcg_gen_shli_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
 {
-    LValue retVal = g_output->buildShl(unwrap(s, arg1), g_output->constInt64(arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildShl(unwrap(s, arg1), myctx->output()->constInt64(arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_shr_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_shr_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue retVal = g_output->buildLShr(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildLShr(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_shri_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+void tcg_gen_shri_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 {
-    LValue retVal = g_output->buildLShr(unwrap(s, arg1), g_output->constInt32(arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildLShr(unwrap(s, arg1), myctx->output()->constInt32(arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_shri_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
+void tcg_gen_shri_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
 {
-    LValue retVal = g_output->buildLShr(unwrap(s, arg1), g_output->constInt64(arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildLShr(unwrap(s, arg1), myctx->output()->constInt64(arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_st_i32(DisasContext* s,TCGv_i32 arg1, TCGv_ptr arg2, tcg_target_long offset)
+void tcg_gen_st_i32(DisasContext* s, TCGv_i32 arg1, TCGv_ptr arg2, tcg_target_long offset)
 {
-    LValue pointer = g_output->buildPointerCast(unwrap(s, arg2), g_output->repo().ref8);
-    pointer = g_output->buildGEP(pointer, offset);
-    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref32);
-    g_output->buildStore(unwrap(s, arg1), pointer);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue pointer = myctx->output()->buildPointerCast(unwrap(s, arg2), myctx->output()->repo().ref8);
+    pointer = myctx->output()->buildGEP(pointer, offset);
+    pointer = myctx->output()->buildPointerCast(pointer, myctx->output()->repo().ref32);
+    myctx->output()->buildStore(unwrap(s, arg1), pointer);
 }
 
-void tcg_gen_st_i64(DisasContext *s, TCGv_i64 arg1, TCGv_ptr arg2,
+void tcg_gen_st_i64(DisasContext* s, TCGv_i64 arg1, TCGv_ptr arg2,
     tcg_target_long offset)
 {
-    LValue pointer = g_output->buildPointerCast(unwrap(s, arg2), g_output->repo().ref8);
-    pointer = g_output->buildGEP(pointer, offset);
-    pointer = g_output->buildPointerCast(pointer, g_output->repo().ref64);
-    g_output->buildStore(unwrap(s, arg1), pointer);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue pointer = myctx->output()->buildPointerCast(unwrap(s, arg2), myctx->output()->repo().ref8);
+    pointer = myctx->output()->buildGEP(pointer, offset);
+    pointer = myctx->output()->buildPointerCast(pointer, myctx->output()->repo().ref64);
+    myctx->output()->buildStore(unwrap(s, arg1), pointer);
 }
 
-void tcg_gen_sub_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_sub_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue retVal = g_output->buildSub(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildSub(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_sub_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+void tcg_gen_sub_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
 {
-    LValue retVal = g_output->buildSub(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildSub(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_subi_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+void tcg_gen_subi_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 {
-    LValue retVal = g_output->buildSub(unwrap(s, arg1), g_output->constInt32(arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildSub(unwrap(s, arg1), myctx->output()->constInt32(arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_trunc_i64_i32(DisasContext* s,TCGv_i32 ret, TCGv_i64 arg)
+void tcg_gen_trunc_i64_i32(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg)
 {
-    LValue retVal = g_output->buildCast(LLVMTrunc, unwrap(s, arg), g_output->repo().int32);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildCast(LLVMTrunc, unwrap(s, arg), myctx->output()->repo().int32);
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_xor_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_xor_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    LValue retVal = g_output->buildXor(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildXor(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_xor_i64(DisasContext* s,TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+void tcg_gen_xor_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
 {
-    LValue retVal = g_output->buildXor(unwrap(s, arg1), unwrap(s, arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildXor(unwrap(s, arg1), unwrap(s, arg2));
     storeToTCG(s, retVal, ret);
 }
 
-void tcg_gen_xori_i32(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
+void tcg_gen_xori_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 {
-    LValue retVal = g_output->buildXor(unwrap(s, arg1), g_output->constInt32(arg2));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildXor(unwrap(s, arg1), myctx->output()->constInt32(arg2));
     storeToTCG(s, retVal, ret);
 }
 
@@ -1156,7 +1246,7 @@ TCGv_i64 tcg_temp_new_i64(DisasContext* s)
     return allocateTcg<TCGv_i64>(s);
 }
 
-static void myhandleCallRet64(DisasContext *s, void* func, TCGArg ret,
+static void myhandleCallRet64(DisasContext* s, void* func, TCGArg ret,
     int nargs, TCGArg* args)
 {
     // function retval other parameters
@@ -1164,14 +1254,15 @@ static void myhandleCallRet64(DisasContext *s, void* func, TCGArg ret,
     for (int i = 2; i < 2 + nargs; ++i) {
         argsV[i] = unwrap(s, reinterpret_cast<TCGCommonStruct*>(args[i - 2]));
     }
-    LValue retVal = g_output->buildAlloca(g_output->repo().int64);
-    argsV[0] = g_output->constIntPtr(reinterpret_cast<uintptr_t>(func));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildAlloca(myctx->output()->repo().int64);
+    argsV[0] = myctx->output()->constIntPtr(reinterpret_cast<uintptr_t>(func));
     argsV[1] = retVal;
-    g_output->buildTcgHelperCall(nargs + 2, argsV, true);
-    storeToTCG(s, g_output->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
+    myctx->output()->buildTcgHelperCall(nargs + 2, argsV, true);
+    storeToTCG(s, myctx->output()->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
 }
 
-static void myhandleCallRet32(DisasContext *s, void* func, TCGArg ret,
+static void myhandleCallRet32(DisasContext* s, void* func, TCGArg ret,
     int nargs, TCGArg* args)
 {
     // function retval other parameters
@@ -1179,23 +1270,25 @@ static void myhandleCallRet32(DisasContext *s, void* func, TCGArg ret,
     for (int i = 2; i < 2 + nargs; ++i) {
         argsV[i] = unwrap(s, reinterpret_cast<TCGCommonStruct*>(args[i - 2]));
     }
-    LValue retVal = g_output->buildAlloca(g_output->repo().int32);
-    argsV[0] = g_output->constIntPtr(reinterpret_cast<uintptr_t>(func));
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LValue retVal = myctx->output()->buildAlloca(myctx->output()->repo().int32);
+    argsV[0] = myctx->output()->constIntPtr(reinterpret_cast<uintptr_t>(func));
     argsV[1] = retVal;
-    g_output->buildTcgHelperCall(nargs + 2, argsV, false);
-    storeToTCG(s, g_output->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
+    myctx->output()->buildTcgHelperCall(nargs + 2, argsV, false);
+    storeToTCG(s, myctx->output()->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
 }
 
-static void myhandleCallRetNone(DisasContext* s,void* func, int nargs, TCGArg* args)
+static void myhandleCallRetNone(DisasContext* s, void* func, int nargs, TCGArg* args)
 {
     LValue argsV[nargs];
     for (int i = 0; i < nargs; ++i) {
         argsV[i] = unwrap(s, reinterpret_cast<TCGCommonStruct*>(args[i]));
     }
-    g_output->buildTcgHelperCallNotRet(func, nargs, argsV);
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    myctx->output()->buildTcgHelperCallNotRet(func, nargs, argsV);
 }
 
-void tcg_gen_callN(DisasContext *s, void* func, TCGArg ret,
+void tcg_gen_callN(DisasContext* s, void* func, TCGArg ret,
     int nargs, TCGArg* args)
 {
     if (ret != TCG_CALL_DUMMY_ARG) {
@@ -1214,60 +1307,62 @@ void tcg_gen_callN(DisasContext *s, void* func, TCGArg ret,
     }
 }
 
-void tcg_gen_sdiv(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_sdiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
     LValue num = unwrap(s, arg1);
     LValue den = unwrap(s, arg2);
-    LBasicBlock denZeroTaken = g_output->appendBasicBlock("denZeroTaken");
-    LBasicBlock denZeroNotTaken = g_output->appendBasicBlock("denZeroNotTaken");
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LBasicBlock denZeroTaken = myctx->output()->appendBasicBlock("denZeroTaken");
+    LBasicBlock denZeroNotTaken = myctx->output()->appendBasicBlock("denZeroNotTaken");
 
-    LBasicBlock minTaken = g_output->appendBasicBlock("minTaken");
-    LBasicBlock minNotTaken = g_output->appendBasicBlock("minNotTaken");
-    LBasicBlock merge = g_output->appendBasicBlock("merge");
-    LValue denCompZero = g_output->buildICmp(LLVMIntEQ, den, g_output->repo().int32Zero);
-    g_output->buildCondBr(denCompZero, denZeroTaken, denZeroNotTaken);
-    g_output->positionToBBEnd(denZeroNotTaken);
-    LValue intMin = g_output->constInt32(INT_MIN);
-    LValue intMinCmp = g_output->buildICmp(LLVMIntEQ, num, intMin);
-    LValue denCompNegOne = g_output->buildICmp(LLVMIntEQ, den, g_output->repo().int32NegativeOne);
-    LValue andBoth = g_output->buildAnd(intMinCmp, denCompNegOne);
+    LBasicBlock minTaken = myctx->output()->appendBasicBlock("minTaken");
+    LBasicBlock minNotTaken = myctx->output()->appendBasicBlock("minNotTaken");
+    LBasicBlock merge = myctx->output()->appendBasicBlock("merge");
+    LValue denCompZero = myctx->output()->buildICmp(LLVMIntEQ, den, myctx->output()->repo().int32Zero);
+    myctx->output()->buildCondBr(denCompZero, denZeroTaken, denZeroNotTaken);
+    myctx->output()->positionToBBEnd(denZeroNotTaken);
+    LValue intMin = myctx->output()->constInt32(INT_MIN);
+    LValue intMinCmp = myctx->output()->buildICmp(LLVMIntEQ, num, intMin);
+    LValue denCompNegOne = myctx->output()->buildICmp(LLVMIntEQ, den, myctx->output()->repo().int32NegativeOne);
+    LValue andBoth = myctx->output()->buildAnd(intMinCmp, denCompNegOne);
 
-    g_output->buildCondBr(andBoth, minTaken, minNotTaken);
-    g_output->positionToBBEnd(minNotTaken);
-    LValue signDiv = g_output->buildDiv(num, den);
-    g_output->buildBr(merge);
-    g_output->positionToBBEnd(denZeroTaken);
-    g_output->buildBr(merge);
-    g_output->positionToBBEnd(minTaken);
-    g_output->buildBr(merge);
-    g_output->positionToBBEnd(merge);
-    LValue phi = g_output->buildPhi(g_output->repo().int32);
-    LValue zero = g_output->repo().int32Zero;
+    myctx->output()->buildCondBr(andBoth, minTaken, minNotTaken);
+    myctx->output()->positionToBBEnd(minNotTaken);
+    LValue signDiv = myctx->output()->buildDiv(num, den);
+    myctx->output()->buildBr(merge);
+    myctx->output()->positionToBBEnd(denZeroTaken);
+    myctx->output()->buildBr(merge);
+    myctx->output()->positionToBBEnd(minTaken);
+    myctx->output()->buildBr(merge);
+    myctx->output()->positionToBBEnd(merge);
+    LValue phi = myctx->output()->buildPhi(myctx->output()->repo().int32);
+    LValue zero = myctx->output()->repo().int32Zero;
     jit::addIncoming(phi, &signDiv, &minNotTaken, 1);
     jit::addIncoming(phi, &zero, &denZeroTaken, 1);
     jit::addIncoming(phi, &intMin, &minTaken, 1);
     storeToTCG(s, phi, ret);
 }
 
-void tcg_gen_udiv(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_udiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
     LValue num = unwrap(s, arg1);
     LValue den = unwrap(s, arg2);
-    LBasicBlock denZeroTaken = g_output->appendBasicBlock("denZeroTaken");
-    LBasicBlock denZeroNotTaken = g_output->appendBasicBlock("denZeroNotTaken");
+    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+    LBasicBlock denZeroTaken = myctx->output()->appendBasicBlock("denZeroTaken");
+    LBasicBlock denZeroNotTaken = myctx->output()->appendBasicBlock("denZeroNotTaken");
 
-    LBasicBlock merge = g_output->appendBasicBlock("merge");
-    LValue denCompZero = g_output->buildICmp(LLVMIntEQ, den, g_output->repo().int32Zero);
-    g_output->buildCondBr(denCompZero, denZeroTaken, denZeroNotTaken);
-    g_output->positionToBBEnd(denZeroNotTaken);
+    LBasicBlock merge = myctx->output()->appendBasicBlock("merge");
+    LValue denCompZero = myctx->output()->buildICmp(LLVMIntEQ, den, myctx->output()->repo().int32Zero);
+    myctx->output()->buildCondBr(denCompZero, denZeroTaken, denZeroNotTaken);
+    myctx->output()->positionToBBEnd(denZeroNotTaken);
 
-    LValue signDiv = g_output->buildDiv(num, den);
-    g_output->buildBr(merge);
-    g_output->positionToBBEnd(denZeroTaken);
-    g_output->buildBr(merge);
-    g_output->positionToBBEnd(merge);
-    LValue phi = g_output->buildPhi(g_output->repo().int32);
-    LValue zero = g_output->repo().int32Zero;
+    LValue signDiv = myctx->output()->buildDiv(num, den);
+    myctx->output()->buildBr(merge);
+    myctx->output()->positionToBBEnd(denZeroTaken);
+    myctx->output()->buildBr(merge);
+    myctx->output()->positionToBBEnd(merge);
+    LValue phi = myctx->output()->buildPhi(myctx->output()->repo().int32);
+    LValue zero = myctx->output()->repo().int32Zero;
     jit::addIncoming(phi, &signDiv, &denZeroNotTaken, 1);
     jit::addIncoming(phi, &zero, &denZeroTaken, 1);
     storeToTCG(s, phi, ret);

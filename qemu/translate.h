@@ -108,7 +108,7 @@ typedef struct {
     uint16_t gen_opc_icount[OPC_BUF_SIZE];
 } TCGContext;
 
-void gen_intermediate_code_internal(ARMCPU* cpu, TranslationBlock *tb);
+void gen_intermediate_code_internal(ARMCPU* cpu, TranslationBlock *tb, DisasContext* dc);
                                                   
 
 #ifdef __cplusplus
