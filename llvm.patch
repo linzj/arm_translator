@@ -1,6 +1,6 @@
 Index: lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp
 ===================================================================
---- lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp	(revision 239983)
+--- lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp	(revision 240022)
 +++ lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp	(working copy)
 @@ -6591,7 +6591,7 @@
                        LandingPad, true);
@@ -11,9 +11,23 @@ Index: lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp
      CallEnd = CallEnd->getOperand(0).getNode();
  
    /// Get a call instruction from the call sequence chain.
+Index: lib/ExecutionEngine/ExecutionEngineBindings.cpp
+===================================================================
+--- lib/ExecutionEngine/ExecutionEngineBindings.cpp	(revision 240022)
++++ lib/ExecutionEngine/ExecutionEngineBindings.cpp	(working copy)
+@@ -198,7 +198,8 @@
+          .setErrorStr(&Error)
+          .setOptLevel((CodeGenOpt::Level)options.OptLevel)
+          .setCodeModel(unwrap(options.CodeModel))
+-         .setTargetOptions(targetOptions);
++         .setTargetOptions(targetOptions)
++         .setMCPU(sys::getHostCPUName());
+   if (options.MCJMM)
+     builder.setMCJITMemoryManager(
+       std::unique_ptr<RTDyldMemoryManager>(unwrap(options.MCJMM)));
 Index: lib/Target/X86/MCTargetDesc/X86ELFObjectWriter.cpp
 ===================================================================
---- lib/Target/X86/MCTargetDesc/X86ELFObjectWriter.cpp	(revision 239983)
+--- lib/Target/X86/MCTargetDesc/X86ELFObjectWriter.cpp	(revision 240022)
 +++ lib/Target/X86/MCTargetDesc/X86ELFObjectWriter.cpp	(working copy)
 @@ -167,7 +167,6 @@
  static X86_32RelType getType32(X86_64RelType T) {
@@ -25,7 +39,7 @@ Index: lib/Target/X86/MCTargetDesc/X86ELFObjectWriter.cpp
      return RT32_32;
 Index: lib/Target/X86/X86MCInstLower.cpp
 ===================================================================
---- lib/Target/X86/X86MCInstLower.cpp	(revision 239983)
+--- lib/Target/X86/X86MCInstLower.cpp	(revision 240022)
 +++ lib/Target/X86/X86MCInstLower.cpp	(working copy)
 @@ -760,11 +760,8 @@
                              .addExpr(tlsRef));
