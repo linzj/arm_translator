@@ -1216,13 +1216,11 @@ static inline void gen_vfp_F1_ld0(DisasContext *s, int dp)
 #define VFP_GEN_ITOF(name) \
 static inline void gen_vfp_##name(DisasContext *s, int dp, int neon) \
 { \
-    TCGv_ptr statusptr = get_fpstatus_ptr(s, neon); \
     if (dp) { \
-        gen_helper_vfp_##name##d(s, cpu_F0d, cpu_F0s, statusptr); \
+        tcg_gen_vfp_##name##d(s, cpu_F0d, cpu_F0s); \
     } else { \
-        gen_helper_vfp_##name##s(s, cpu_F0s, cpu_F0s, statusptr); \
+        tcg_gen_vfp_##name##s(s, cpu_F0s, cpu_F0s); \
     } \
-    tcg_temp_free_ptr(statusptr); \
 }
 
 VFP_GEN_ITOF(uito)
@@ -1232,13 +1230,11 @@ VFP_GEN_ITOF(sito)
 #define VFP_GEN_FTOI(name) \
 static inline void gen_vfp_##name(DisasContext *s, int dp, int neon) \
 { \
-    TCGv_ptr statusptr = get_fpstatus_ptr(s, neon); \
     if (dp) { \
-        gen_helper_vfp_##name##d(s, cpu_F0s, cpu_F0d, statusptr); \
+        tcg_gen_vfp_##name##d(s, cpu_F0s, cpu_F0d); \
     } else { \
-        gen_helper_vfp_##name##s(s, cpu_F0s, cpu_F0s, statusptr); \
+        tcg_gen_vfp_##name##s(s, cpu_F0s, cpu_F0s); \
     } \
-    tcg_temp_free_ptr(statusptr); \
 }
 
 VFP_GEN_FTOI(toui)
@@ -11286,4 +11282,3 @@ void restore_state_to_opc(CPUARMState *env, TranslationBlock *tb, int pc_pos)
     }
 }
 */
-

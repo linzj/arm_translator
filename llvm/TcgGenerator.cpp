@@ -1330,7 +1330,7 @@ void tcg_gen_sdiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 
     myctx->output()->buildCondBr(andBoth, minTaken, minNotTaken);
     myctx->output()->positionToBBEnd(minNotTaken);
-    LValue signDiv = myctx->output()->buildDiv(num, den);
+    LValue signDiv = myctx->output()->buildSDiv(num, den);
     myctx->output()->buildBr(merge);
     myctx->output()->positionToBBEnd(denZeroTaken);
     myctx->output()->buildBr(merge);
@@ -1358,7 +1358,7 @@ void tcg_gen_udiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
     myctx->output()->buildCondBr(denCompZero, denZeroTaken, denZeroNotTaken);
     myctx->output()->positionToBBEnd(denZeroNotTaken);
 
-    LValue signDiv = myctx->output()->buildDiv(num, den);
+    LValue signDiv = myctx->output()->buildUDiv(num, den);
     myctx->output()->buildBr(merge);
     myctx->output()->positionToBBEnd(denZeroTaken);
     myctx->output()->buildBr(merge);
@@ -1393,4 +1393,41 @@ DEFINE_VFP_OP(addd, FAdd, doubleType, 64)
 DEFINE_VFP_OP(subd, FSub, doubleType, 64)
 DEFINE_VFP_OP(muld, FMul, doubleType, 64)
 DEFINE_VFP_OP(divd, FDiv, doubleType, 64)
+#undef DEFINE_VFP_OP
+
+#define DEFINE_VFP_OP(name, op, type, size)                                                      \
+    void tcg_gen_vfp_##name(DisasContext* s, TCGv_i32 ret, TCGv_i##size arg)                     \
+    {                                                                                            \
+        MyDisCtx* myctx = static_cast<MyDisCtx*>(s);                                             \
+        LValue argV = unwrap(s, arg);                                                            \
+        argV = myctx->output()->buildBitCast(argV, myctx->output()->repo().type);                \
+        LValue retVal = myctx->output()->buildCast(op, argV, myctx->output()->repo().int##size); \
+        storeToTCG(s, retVal, ret);                                                              \
+    }
+
+DEFINE_VFP_OP(touis, LLVMFPToUI, floatType, 32)
+DEFINE_VFP_OP(touizs, LLVMFPToUI, floatType, 32)
+DEFINE_VFP_OP(tosis, LLVMFPToSI, floatType, 32)
+DEFINE_VFP_OP(tosizs, LLVMFPToSI, floatType, 32)
+
+DEFINE_VFP_OP(touid, LLVMFPToUI, doubleType, 64)
+DEFINE_VFP_OP(touizd, LLVMFPToUI, doubleType, 64)
+DEFINE_VFP_OP(tosid, LLVMFPToSI, doubleType, 64)
+DEFINE_VFP_OP(tosizd, LLVMFPToSI, doubleType, 64)
+#undef DEFINE_VFP_OP
+
+#define DEFINE_VFP_OP(name, op, type, size)                                                 \
+    void tcg_gen_vfp_##name(DisasContext* s, TCGv_i##size ret, TCGv_i32 arg)                \
+    {                                                                                       \
+        MyDisCtx* myctx = static_cast<MyDisCtx*>(s);                                        \
+        LValue argV = unwrap(s, arg);                                                       \
+        LValue retVal = myctx->output()->buildCast(op, argV, myctx->output()->repo().type); \
+        retVal = myctx->output()->buildBitCast(retVal, myctx->output()->repo().int##size);  \
+        storeToTCG(s, retVal, ret);                                                         \
+    }
+
+DEFINE_VFP_OP(sitos, LLVMSIToFP, floatType, 32)
+DEFINE_VFP_OP(uitos, LLVMUIToFP, floatType, 32)
+DEFINE_VFP_OP(sitod, LLVMSIToFP, doubleType, 64)
+DEFINE_VFP_OP(uitod, LLVMUIToFP, doubleType, 64)
 #undef DEFINE_VFP_OP

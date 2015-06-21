@@ -31,6 +31,7 @@ foo:
 	ftosizs	s15, s15
 	ftosizs	s12, s12
 	ftosizs	s13, s13
+    fsitos  s14, s11
 	fsts	s11, [sp]	@ int
     ldr     r0, [sp]
 	fsts	s15, [sp]	@ int
@@ -39,6 +40,7 @@ foo:
     ldr     r2, [sp]
 	fsts	s13, [sp]	@ int
     ldr     r4, [sp]
+    fmrs    r5, s14
     add sp, sp, #8
 	bx	lr
 
