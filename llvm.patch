@@ -15,13 +15,52 @@ Index: lib/ExecutionEngine/ExecutionEngineBindings.cpp
 ===================================================================
 --- lib/ExecutionEngine/ExecutionEngineBindings.cpp	(revision 240022)
 +++ lib/ExecutionEngine/ExecutionEngineBindings.cpp	(working copy)
-@@ -198,7 +198,8 @@
+@@ -18,6 +18,7 @@
+ #include "llvm/IR/DerivedTypes.h"
+ #include "llvm/IR/Module.h"
+ #include "llvm/Support/ErrorHandling.h"
++#include "llvm/Support/Mutex.h"
+ #include "llvm/Target/TargetOptions.h"
+ #include <cstring>
+ 
+@@ -25,6 +26,10 @@
+ 
+ #define DEBUG_TYPE "jit"
+ 
++static llvm::sys::Mutex InitCPUMutex;
++static bool CPUInit = false;
++static std::string CPUName;
++static std::vector<std::string> CPUAttr;
+ // Wrapping the C bindings types.
+ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(GenericValue, LLVMGenericValueRef)
+ 
+@@ -194,11 +199,28 @@
+ 
+   std::string Error;
+   EngineBuilder builder(std::move(Mod));
++  {
++    llvm::sys::ScopedLock lock(InitCPUMutex);
++    if (!CPUInit) {
++      CPUInit = true;
++      CPUName = sys::getHostCPUName();
++      StringMap<bool> HostFeatures;
++      if (sys::getHostCPUFeatures(HostFeatures)) {
++        for (auto& p : HostFeatures) {
++          if (p.second) {
++            CPUAttr.push_back(p.first());
++          }
++        }
++      }
++    }
++  }
+   builder.setEngineKind(EngineKind::JIT)
           .setErrorStr(&Error)
           .setOptLevel((CodeGenOpt::Level)options.OptLevel)
           .setCodeModel(unwrap(options.CodeModel))
 -         .setTargetOptions(targetOptions);
 +         .setTargetOptions(targetOptions)
-+         .setMCPU(sys::getHostCPUName());
++         .setMCPU(CPUName)
++         .setMAttrs(CPUAttr);
    if (options.MCJMM)
      builder.setMCJITMemoryManager(
        std::unique_ptr<RTDyldMemoryManager>(unwrap(options.MCJMM)));
