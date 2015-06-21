@@ -1,3 +1,4 @@
+#include <bitset>
 #include "X86Assembler.h"
 #include "StackMaps.h"
 #include "CompilerState.h"
@@ -6,6 +7,10 @@
 #include "log.h"
 
 namespace jit {
+#define CALL_USED_REGISTERS					\
+/*ax,dx,cx,bx,si,di,bp,sp,st,st1,st2,st3,st4,st5,st6,st7*/	\
+{  1, 1, 1, 0, 4, 4, 0, 1, 1,  1,  1,  1,  1,  1,  1,  1,	\
+
 
 static void pushOnStack(JSC::X86Assembler& assembler, const StackMaps::Location& location)
 {
@@ -28,6 +33,31 @@ static void pushOnStack(JSC::X86Assembler& assembler, const StackMaps::Location&
     }
 }
 
+// this function return a filtered liveouts, with all not CALL USED
+// registers filtered out.
+// This is because the CALL USED registers will not be saved by
+// the helper functions, but the not CALL USED will.
+static std::bitset<8> filterOutputLiveouts(const std::vector<StackMaps::LiveOut>& liveouts)
+{
+    std::bitset<8> bs;
+    for (auto& liveout : liveouts) {
+        int num = liveout.dwarfReg.dwarfRegNum();
+        if (num >= 8) {
+            EMASSERT("not supported register" && false);
+        }
+        switch (num) {
+            case JSC::X86Registers::ebp:
+            case JSC::X86Registers::ebx:
+            case JSC::X86Registers::esi:
+            case JSC::X86Registers::edi:
+                continue;
+            default:
+                bs.set(num);
+        }
+    }
+    return bs;
+}
+
 static void handleTcgHelper(const LinkDesc& desc, const StackMaps::Record& record, uint8_t* body, bool is64Ret)
 {
     uint8_t* p = body + record.instructionOffset;
@@ -35,7 +65,8 @@ static void handleTcgHelper(const LinkDesc& desc, const StackMaps::Record& recor
     // calculate align values
     // argumentCount = argument
     int argumentCount = record.locations.size() - 2;
-    int liveOutCount = record.liveOuts.size();
+    auto liveoutsBitset = filterOutputLiveouts(record.liveOuts);
+    int liveOutCount = liveoutsBitset.count();
     // add one more for return address.
     int saveStackSize = (liveOutCount + argumentCount + 1) * sizeof(intptr_t);
     const int alignment = 16;
@@ -45,9 +76,10 @@ static void handleTcgHelper(const LinkDesc& desc, const StackMaps::Record& recor
         assembler.subl_ir(subtraction, JSC::X86Registers::esp);
     }
     // push the live outs
-    for (int i = static_cast<int>(record.liveOuts.size()) - 1; i >= 0; --i) {
-        auto& liveout = record.liveOuts[i];
-        assembler.push_r(static_cast<JSC::X86Registers::RegisterID>(liveout.dwarfReg.dwarfRegNum()));
+    for (int i = static_cast<int>(liveoutsBitset.size()) - 1; i >= 0; --i) {
+        if (liveoutsBitset.test(i)) {
+            assembler.push_r(static_cast<JSC::X86Registers::RegisterID>(i));
+        }
     }
     // push the return value pointer
     pushOnStack(assembler, record.locations[1]);
@@ -77,9 +109,10 @@ static void handleTcgHelper(const LinkDesc& desc, const StackMaps::Record& recor
         assembler.movl_rm(JSC::X86Registers::edx, sizeof(intptr_t), JSC::X86Registers::ecx);
     }
     // pop the live outs
-    for (size_t i = 0; i < record.liveOuts.size(); ++i) {
-        auto& liveout = record.liveOuts[i];
-        assembler.pop_r(static_cast<JSC::X86Registers::RegisterID>(liveout.dwarfReg.dwarfRegNum()));
+    for (int i = 0; i < static_cast<int>(liveoutsBitset.size()); ++i) {
+        if (liveoutsBitset.test(i)) {
+            assembler.pop_r(static_cast<JSC::X86Registers::RegisterID>(i));
+        }
     }
     if (subtraction) {
         assembler.addl_ir(subtraction, JSC::X86Registers::esp);

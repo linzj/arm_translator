@@ -32,6 +32,8 @@ foo:
 	ftosizs	s12, s12
 	ftosizs	s13, s13
     fsitos  s14, s11
+    vsqrt.f32 s14, s14
+    ftosizs s14, s14
 	fsts	s11, [sp]	@ int
     ldr     r0, [sp]
 	fsts	s15, [sp]	@ int
