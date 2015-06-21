@@ -136,9 +136,19 @@ LValue Output::buildAdd(LValue lhs, LValue rhs)
     return jit::buildAdd(m_builder, lhs, rhs);
 }
 
+LValue Output::buildFAdd(LValue lhs, LValue rhs)
+{
+    return llvmAPI->BuildFAdd(m_builder, lhs, rhs, "");
+}
+
 LValue Output::buildSub(LValue lhs, LValue rhs)
 {
     return jit::buildSub(m_builder, lhs, rhs);
+}
+
+LValue Output::buildFSub(LValue lhs, LValue rhs)
+{
+    return llvmAPI->BuildFSub(m_builder, lhs, rhs, "");
 }
 
 LValue Output::buildOr(LValue left, LValue right)
@@ -176,9 +186,29 @@ LValue Output::buildMul(LValue lhs, LValue rhs)
     return jit::buildMul(m_builder, lhs, rhs);
 }
 
+LValue Output::buildFMul(LValue lhs, LValue rhs)
+{
+    return llvmAPI->BuildFMul(m_builder, lhs, rhs, "");
+}
+
 LValue Output::buildDiv(LValue lhs, LValue rhs)
 {
     return jit::buildDiv(m_builder, lhs, rhs);
+}
+
+LValue Output::buildSDiv(LValue lhs, LValue rhs)
+{
+    return llvmAPI->BuildSDiv(m_builder, lhs, rhs, "");
+}
+
+LValue Output::buildUDiv(LValue lhs, LValue rhs)
+{
+    return llvmAPI->BuildUDiv(m_builder, lhs, rhs, "");
+}
+
+LValue Output::buildFDiv(LValue lhs, LValue rhs)
+{
+    return llvmAPI->BuildFDiv(m_builder, lhs, rhs, "");
 }
 
 LValue Output::buildNot(LValue value)
@@ -219,6 +249,11 @@ LValue Output::buildCast(LLVMOpcode Op, LLVMValueRef Val, LLVMTypeRef DestTy)
 LValue Output::buildPointerCast(LLVMValueRef Val, LLVMTypeRef DestTy)
 {
     return llvmAPI->BuildPointerCast(m_builder, Val, DestTy, "");
+}
+
+LValue Output::buildBitCast(LLVMValueRef Val, LLVMTypeRef DestTy)
+{
+    return llvmAPI->BuildBitCast(m_builder, Val, DestTy, "");
 }
 
 LValue Output::buildPhi(LType type) { return llvmAPI->BuildPhi(m_builder, type, ""); }

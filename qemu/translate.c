@@ -1129,15 +1129,13 @@ static TCGv_ptr get_fpstatus_ptr(DisasContext *s, int neon)
 #define VFP_OP2(name)                                                 \
 static inline void gen_vfp_##name(DisasContext *s, int dp)            \
 {                                                                     \
-    TCGv_ptr fpst = get_fpstatus_ptr(s, 0);                           \
     if (dp) {                                                         \
-        gen_helper_vfp_##name##d(s, cpu_F0d, cpu_F0d,                 \
-         cpu_F1d, fpst);                                              \
+        tcg_gen_vfp_##name##d(s, cpu_F0d, cpu_F0d,                    \
+         cpu_F1d);                                                    \
     } else {                                                          \
-        gen_helper_vfp_##name##s(s, cpu_F0s,                          \
-                cpu_F0s, cpu_F1s, fpst);                              \
+        tcg_gen_vfp_##name##s(s, cpu_F0s,                             \
+                cpu_F0s, cpu_F1s);                                    \
     }                                                                 \
-    tcg_temp_free_ptr(fpst);                                          \
 }
 
 VFP_OP2(add)
@@ -1150,13 +1148,11 @@ VFP_OP2(div)
 static inline void gen_vfp_F1_mul(DisasContext *s, int dp)
 {
     /* Like gen_vfp_mul() but put result in F1 */
-    TCGv_ptr fpst = get_fpstatus_ptr(s, 0);
     if (dp) {
-        gen_helper_vfp_muld(s, cpu_F1d, cpu_F0d, cpu_F1d, fpst);
+        tcg_gen_vfp_muld(s, cpu_F1d, cpu_F0d, cpu_F1d);
     } else {
-        gen_helper_vfp_muls(s, cpu_F1s, cpu_F0s, cpu_F1s, fpst);
+        tcg_gen_vfp_muls(s, cpu_F1s, cpu_F0s, cpu_F1s);
     }
-    tcg_temp_free_ptr(fpst);
 }
 
 static inline void gen_vfp_F1_neg(DisasContext *s, int dp)
@@ -5521,10 +5517,10 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
             switch ((u << 2) | size) {
             case 0: /* VADD */
             case 4: /* VPADD */
-                gen_helper_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
+                tcg_gen_vfp_adds(s, tmp, tmp, tmp2);
                 break;
             case 2: /* VSUB */
-                gen_helper_vfp_subs(s, tmp, tmp, tmp2, fpstatus);
+                tcg_gen_vfp_subs(s, tmp, tmp, tmp2);
                 break;
             case 6: /* VABD */
                 gen_helper_neon_abd_f32(s, tmp, tmp, tmp2, fpstatus);
@@ -5538,14 +5534,14 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
         case NEON_3R_FLOAT_MULTIPLY:
         {
             TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
-            gen_helper_vfp_muls(s, tmp, tmp, tmp2, fpstatus);
+            tcg_gen_vfp_muls(s, tmp, tmp, tmp2);
             if (!u) {
                 tcg_temp_free_i32(tmp2);
                 tmp2 = neon_load_reg(s, rd, pass);
                 if (size == 0) {
-                    gen_helper_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
+                    tcg_gen_vfp_adds(s, tmp, tmp, tmp2);
                 } else {
-                    gen_helper_vfp_subs(s, tmp, tmp2, tmp, fpstatus);
+                    tcg_gen_vfp_subs(s, tmp, tmp2, tmp);
                 }
             }
             tcg_temp_free_ptr(fpstatus);
@@ -6341,7 +6337,7 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                             }
                         } else if (op & 1) {
                             TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
-                            gen_helper_vfp_muls(s, tmp, tmp, tmp2, fpstatus);
+                            tcg_gen_vfp_muls(s, tmp, tmp, tmp2);
                             tcg_temp_free_ptr(fpstatus);
                         } else {
                             switch (size) {
@@ -6362,7 +6358,7 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                             case 1:
                             {
                                 TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
-                                gen_helper_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
+                                tcg_gen_vfp_adds(s, tmp, tmp, tmp2);
                                 tcg_temp_free_ptr(fpstatus);
                                 break;
                             }
@@ -6372,7 +6368,7 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                             case 5:
                             {
                                 TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
-                                gen_helper_vfp_subs(s, tmp, tmp2, tmp, fpstatus);
+                                tcg_gen_vfp_subs(s, tmp, tmp2, tmp);
                                 tcg_temp_free_ptr(fpstatus);
                                 break;
                             }

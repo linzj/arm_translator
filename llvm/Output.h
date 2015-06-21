@@ -26,12 +26,19 @@ public:
     LValue buildArgGEP(int idx);
     LValue buildLoad(LValue toLoad);
     LValue buildStore(LValue val, LValue pointer);
-    LValue buildAdd(LValue lhs, LValue rhs);
-    LValue buildSub(LValue lhs, LValue rhs);
     LValue buildAnd(LValue lhs, LValue rhs);
     LValue buildXor(LValue lhs, LValue rhs);
+
+    LValue buildAdd(LValue lhs, LValue rhs);
+    LValue buildFAdd(LValue lhs, LValue rhs);
+    LValue buildSub(LValue lhs, LValue rhs);
+    LValue buildFSub(LValue lhs, LValue rhs);
     LValue buildMul(LValue lhs, LValue rhs);
+    LValue buildFMul(LValue lhs, LValue rhs);
     LValue buildDiv(LValue lhs, LValue rhs);
+    LValue buildFDiv(LValue lhs, LValue rhs);
+    LValue buildUDiv(LValue lhs, LValue rhs);
+    LValue buildSDiv(LValue lhs, LValue rhs);
     LValue buildNot(LValue value);
     LValue buildNeg(LValue value);
     LValue buildOr(LValue left, LValue right);
@@ -76,6 +83,7 @@ public:
 
     LValue buildCast(LLVMOpcode Op, LLVMValueRef Val, LLVMTypeRef DestTy);
     LValue buildPointerCast(LLVMValueRef Val, LLVMTypeRef DestTy);
+    LValue buildBitCast(LLVMValueRef Val, LLVMTypeRef DestTy);
     LValue buildPhi(LType type);
 
     void buildAssistPatch(LValue where);

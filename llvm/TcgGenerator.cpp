@@ -1369,3 +1369,28 @@ void tcg_gen_udiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
     jit::addIncoming(phi, &zero, &denZeroTaken, 1);
     storeToTCG(s, phi, ret);
 }
+
+#define DEFINE_VFP_OP(name1, name2, type, size)                                                        \
+    void tcg_gen_vfp_##name1(DisasContext* s, TCGv_i##size ret, TCGv_i##size arg1, TCGv_i##size arg2)  \
+    {                                                                                                  \
+        MyDisCtx* myctx = static_cast<MyDisCtx*>(s);                                                   \
+        EMASSERT(ret->m_size == arg1->m_size && arg1->m_size == arg2->m_size && arg2->m_size == size); \
+        LValue arg1V = unwrap(s, arg1);                                                                \
+        LValue arg2V = unwrap(s, arg2);                                                                \
+        arg1V = myctx->output()->buildBitCast(arg1V, myctx->output()->repo().type);                    \
+        arg2V = myctx->output()->buildBitCast(arg2V, myctx->output()->repo().type);                    \
+        LValue retVal = myctx->output()->build##name2(arg1V, arg2V);                                   \
+        retVal = myctx->output()->buildBitCast(retVal, myctx->output()->repo().int##size);             \
+        storeToTCG(s, retVal, ret);                                                                    \
+    }
+
+DEFINE_VFP_OP(adds, FAdd, floatType, 32)
+DEFINE_VFP_OP(subs, FSub, floatType, 32)
+DEFINE_VFP_OP(muls, FMul, floatType, 32)
+DEFINE_VFP_OP(divs, FDiv, floatType, 32)
+
+DEFINE_VFP_OP(addd, FAdd, doubleType, 64)
+DEFINE_VFP_OP(subd, FSub, doubleType, 64)
+DEFINE_VFP_OP(muld, FMul, doubleType, 64)
+DEFINE_VFP_OP(divd, FDiv, doubleType, 64)
+#undef DEFINE_VFP_OP

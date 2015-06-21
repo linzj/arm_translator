@@ -116,6 +116,16 @@ void tcg_gen_callN(DisasContext* s, void* func, TCGArg ret,
 void tcg_gen_sdiv(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
 void tcg_gen_udiv(DisasContext* s,TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
 
+void tcg_gen_vfp_adds(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
+void tcg_gen_vfp_subs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
+void tcg_gen_vfp_muls(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
+void tcg_gen_vfp_divs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
+
+void tcg_gen_vfp_addd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2);
+void tcg_gen_vfp_subd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2);
+void tcg_gen_vfp_muld(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2);
+void tcg_gen_vfp_divd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2);
+
 static inline TCGv_i32 MAKE_TCGV_I32(intptr_t i)
 {
     return (TCGv_i32)i;
