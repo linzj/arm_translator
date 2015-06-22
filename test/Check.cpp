@@ -14,7 +14,6 @@ TyDst bitCast(TySrc src)
     return dst;
 }
 
-
 class CheckRegisterEqConst : public Check {
 public:
     CheckRegisterEqConst(const char* name, unsigned long long val)
@@ -29,12 +28,12 @@ private:
         RegisterOperation& op = RegisterOperation::getDefault();
         const intptr_t* p = reinterpret_cast<const intptr_t*>(op.getRegisterPointer(state, m_regName));
         std::ostringstream oss;
-        oss << "CheckRegisterEqConst " << ((*p == static_cast<long long>(m_val)) ? "PASSED" : "FAILED")
+        oss << "CheckRegisterEqConst " << ((*p == static_cast<long>(m_val)) ? "PASSED" : "FAILED")
             << "; m_regName = " << m_regName
             << "; m_val = " << std::hex
             << m_val;
         info = oss.str();
-        return *p == m_val;
+        return *p == static_cast<long>(m_val);
     }
     std::string m_regName;
     unsigned long long m_val;

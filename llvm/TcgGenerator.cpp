@@ -368,11 +368,9 @@ static void storeToTCG(DisasContext* s, LValue v, TCGType ret)
     }
 }
 
-static void extract_64_32(DisasContext* s, LValue my64, TCGv_i32 rl, TCGv_i32 rh)
+static void extract_64_32(DisasContext* s, LValue my64, LValue thirtytwo, TCGv_i32 rl, TCGv_i32 rh)
 {
     MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
-    LValue thirtytwo = myctx->output()->repo().int32ThirtyTwo;
-    LValue negativeOne = myctx->output()->repo().int32NegativeOne;
     LValue rhUnwrap = myctx->output()->buildCast(LLVMTrunc, myctx->output()->buildLShr(my64, thirtytwo), myctx->output()->repo().int32);
     LValue rlUnwrap = myctx->output()->buildCast(LLVMTrunc, my64, myctx->output()->repo().int32);
     storeToTCG(s, rhUnwrap, rh);
@@ -520,7 +518,7 @@ void tcg_gen_add2_i32(DisasContext* s, TCGv_i32 rl, TCGv_i32 rh, TCGv_i32 al,
     LValue t1 = myctx->output()->buildCast(LLVMZExt, unwrap(s, ah), myctx->output()->repo().int64);
     LValue t2 = myctx->output()->buildCast(LLVMZExt, unwrap(s, bl), myctx->output()->repo().int64);
     LValue t3 = myctx->output()->buildCast(LLVMZExt, unwrap(s, bh), myctx->output()->repo().int64);
-    LValue thirtytwo = myctx->output()->repo().int32ThirtyTwo;
+    LValue thirtytwo = myctx->output()->constInt64(32);
 
     LValue t01 = myctx->output()->buildShl(t1, thirtytwo);
     t01 = myctx->output()->buildOr(t01, t0);
@@ -528,7 +526,7 @@ void tcg_gen_add2_i32(DisasContext* s, TCGv_i32 rl, TCGv_i32 rh, TCGv_i32 al,
     t23 = myctx->output()->buildOr(t23, t2);
     LValue t0123 = myctx->output()->buildAdd(t01, t23);
 
-    extract_64_32(s, t0123, rl, rh);
+    extract_64_32(s, t0123, thirtytwo, rl, rh);
 }
 
 void tcg_gen_add_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
