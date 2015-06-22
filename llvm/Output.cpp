@@ -10,6 +10,7 @@ Output::Output(CompilerState& state)
     , m_repo(state.m_context, state.m_module)
     , m_builder(nullptr)
     , m_stackMapsId(1)
+    , m_currentBlockTerminated(false)
 {
     m_argType = pointerType(arrayType(repo().intPtr, state.m_platformDesc.m_contextSize / sizeof(intptr_t)));
     state.m_function = addFunction(
@@ -35,6 +36,7 @@ LBasicBlock Output::appendBasicBlock(const char* name)
 void Output::positionToBBEnd(LBasicBlock bb)
 {
     m_current = bb;
+    m_currentBlockTerminated = false;
     llvmAPI->PositionBuilderAtEnd(m_builder, bb);
 }
 
@@ -278,6 +280,7 @@ void Output::buildPatchCommon(LValue where, const PatchDesc& desc, size_t patchS
     buildUnreachable(m_builder);
     // record the stack map info
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+    m_currentBlockTerminated = true;
 }
 
 void Output::buildTcgDirectPatch(void)
@@ -288,6 +291,7 @@ void Output::buildTcgDirectPatch(void)
     buildUnreachable(m_builder);
     // record the stack map info
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+    m_currentBlockTerminated = true;
 }
 
 void Output::buildTcgIndirectPatch(void)
@@ -298,6 +302,7 @@ void Output::buildTcgIndirectPatch(void)
     buildUnreachable(m_builder);
     // record the stack map info
     m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+    m_currentBlockTerminated = true;
 }
 
 LValue Output::buildTcgHelperCallNotRet(void* func, int num, LValue* param)

@@ -98,6 +98,7 @@ public:
     inline LBasicBlock current() const { return m_current; }
     inline LValue arg() const { return m_arg; }
     LType typeOf(LValue val) __attribute__((pure));
+    inline bool currentBlockTerminated() const { return m_currentBlockTerminated; }
 
 private:
     void buildGetArg();
@@ -111,6 +112,7 @@ private:
     LBasicBlock m_current;
     LValue m_arg;
     uint32_t m_stackMapsId;
+    bool m_currentBlockTerminated;
 };
 }
 #endif /* OUTPUT_H */

@@ -13,7 +13,7 @@ struct IRContextInternal : IRContext {
     typedef std::vector<std::unique_ptr<class Check> > CheckVector;
     RegisterInitVector m_registerInit;
     CheckVector m_checks;
-
+    bool m_thumb;
     IRContextInternal();
 };
 

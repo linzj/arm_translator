@@ -47,6 +47,10 @@ static void initGuestState(CPUARMState& state, const IRContextInternal& context)
     // init sp
     state.regs[13] = reinterpret_cast<intptr_t>(malloc(1024));
     state.regs[13] += 1024;
+    // init lr
+    state.regs[14] = 0xffffffff;
+    // set thumb bit
+    state.thumb = context.m_thumb;
 }
 
 static void checkRun(const char* who, const IRContextInternal& context, const uintptr_t* twoWords, const CPUARMState& guestState)
@@ -181,16 +185,19 @@ static void* worker(void* p)
     void* codeBuffer;
     size_t codeSize;
     jit::TranslateDesc tdesc = { reinterpret_cast<void*>(vex_disp_cp_chain_me_to_fastEP), reinterpret_cast<void*>(vex_disp_cp_xindir), reinterpret_cast<void*>(vex_disp_cp_xassisted) };
-    struct timespec t2, t1;
-    clock_gettime(CLOCK_MONOTONIC, &t1);
-    jit::translate(&cpu.env, tdesc, &codeBuffer, &codeSize);
-    clock_gettime(CLOCK_MONOTONIC, &t2);
-    double t = t2.tv_sec - t1.tv_sec;
-    t += static_cast<double>(t2.tv_nsec - t1.tv_nsec) / 1e9;
-    LOGE("using %lf seconds to translate.\n", t);
-    memcpy(execMem, codeBuffer, codeSize);
-    free(codeBuffer);
-    vex_disp_run_translations(twoWords, &cpu.env, execMem);
+    while (cpu.env.regs[15] != 0xfffffffe) {
+        struct timespec t2, t1;
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        jit::translate(&cpu.env, tdesc, &codeBuffer, &codeSize);
+        clock_gettime(CLOCK_MONOTONIC, &t2);
+        double t = t2.tv_sec - t1.tv_sec;
+        t += static_cast<double>(t2.tv_nsec - t1.tv_nsec) / 1e9;
+        LOGE("using %lf seconds to translate.\n", t);
+        memcpy(execMem, codeBuffer, codeSize);
+        free(codeBuffer);
+        vex_disp_run_translations(twoWords, &cpu.env, execMem);
+        LOGE("status is %d.\n", twoWords[0]);
+    }
     checkRun("llvm", context, twoWords, cpu.env);
 }
 

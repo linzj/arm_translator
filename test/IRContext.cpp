@@ -24,7 +24,10 @@ void contextSawRegisterInit(struct IRContext* context, const char* registerName,
 void contextSawInitOption(struct IRContext* context, const char* opt)
 {
     LOGV("%s: opt = %s.\n", __FUNCTION__, opt);
-
+    if (strcmp(opt, "thumb") == 0) {
+        CONTEXT()->m_thumb = true;
+        return;
+    }
     LOGE("%s:unknow option.\n", __FUNCTION__);
 }
 

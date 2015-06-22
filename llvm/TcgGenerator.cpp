@@ -506,7 +506,9 @@ void gen_set_label(DisasContext* s, int n)
 {
     MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     LBasicBlock bb = myctx->labelToBB(n);
-    myctx->output()->buildBr(bb);
+    if (!myctx->output()->currentBlockTerminated()) {
+        myctx->output()->buildBr(bb);
+    }
     myctx->output()->positionToBBEnd(bb);
 }
 
