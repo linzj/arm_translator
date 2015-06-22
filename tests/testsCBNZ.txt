@@ -1,4 +1,6 @@
 r0 = 0
+r1 = 10
 thumb
 %%
 CheckEqual r0 13
+CheckEqual r1 13

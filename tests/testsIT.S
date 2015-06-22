@@ -1,7 +1,6 @@
+	.syntax unified
 	.cpu cortex-a15
-	.eabi_attribute 27, 3
-	.eabi_attribute 28, 1
-	.fpu vfp
+	.fpu softvfp
 	.eabi_attribute 20, 1
 	.eabi_attribute 21, 1
 	.eabi_attribute 23, 3
@@ -11,13 +10,19 @@
 	.eabi_attribute 30, 2
 	.eabi_attribute 34, 1
 	.eabi_attribute 18, 4
-	.file	"1.c"
+	.thumb
 	.text
 	.align	2
 	.global	foo
+	.thumb
+	.thumb_func
 	.type	foo, %function
 foo:
-	and r0, r0, r1
-	bx	lr
+    cmp     r0, #0
+	itet    eq
+    movweq r1, #123
+    movwne r2, #123
+    movweq r3, #123
+    bx lr
 
 

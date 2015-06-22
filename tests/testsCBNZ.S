@@ -17,12 +17,17 @@
 	.thumb_func
 	.type	foo, %function
 foo:
-    cmp r0, #0
-    cbz r0, .LZero
+    cbz r0, .LCBZZero
     mov r0, #12
-    b .LExit
-.LZero:
+    b .LExitCBZ
+.LCBZZero:
     mov r0, #13
-.LExit:
+.LExitCBZ:
+    cbnz r1, .LCBNZZero
+    mov r1, #12
+    b .LExitCBNZ
+.LCBNZZero:
+    mov r1, #13
+.LExitCBNZ:
     bx lr
 

@@ -1,0 +1,6 @@
+r0 = 0
+thumb
+%%
+CheckEqual r1 123
+CheckEqual r2 0
+CheckEqual r3 123

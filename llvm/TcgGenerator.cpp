@@ -297,7 +297,9 @@ void translate(CPUARMState* env, const TranslateDesc& desc, void** buffer, size_
     TranslationBlock tb = { pc, flags };
 
     gen_intermediate_code_internal(cpu, &tb, &ctx);
+#ifdef ENABLE_DUMP_LLVM_MODULE
     dumpModule(ctx.state()->m_module);
+#endif // ENABLE_DUMP_LLVM_MODULE
     compile(*ctx.state());
     LinkDesc linkDesc = {
         nullptr,
