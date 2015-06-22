@@ -1,0 +1,10 @@
+r0 = Memory(12, 0)
+r2 = 12
+r3 = 13
+r4 = 15
+%%
+CheckEqual r1 r2
+CheckMemory r0 12
+CheckEqual r5 12
+CheckEqual r6 13
+CheckEqual r7 15
