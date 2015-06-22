@@ -71,21 +71,6 @@ VG_(disp_run_translations):
 
         /* Get the host CPU in the state expected by generated code. */
 
-	/* set host FPU control word to the default mode expected 
-           by VEX-generated code.  See comments in libvex.h for
-           more info. */
-	finit
-	pushl	$0x027F
-	fldcw	(%esp)
-	addl	$4, %esp
-	
-	/* set host SSE control word to the default mode expected 
-	   by VEX-generated code. */
-	pushl	$0x1F80
-	ldmxcsr	(%esp)
-	addl	$4, %esp
-	/* set dir flag to known value */
-	cld
 
 	/* Set up the guest state pointer */
 	movl	28+8(%esp), %ebp
@@ -112,27 +97,6 @@ postamble:
 	/* We're leaving.  Check that nobody messed with %mxcsr
            or %fpucw.  We can't mess with %eax or %edx here as they
 	   holds the tentative return value, but any others are OK. */
-#if !defined(ENABLE_INNER)
-        /* This check fails for self-hosting, so skip in that case */
-	pushl	$0
-	fstcw	(%esp)
-	cmpl	$0x027F, (%esp)
-	popl	%esi /* get rid of the word without trashing %eflags */
-	jnz	invariant_violation
-#endif
-#	cmpl	$0, VG_(machine_x86_have_mxcsr)
-	jz	L2
-	pushl	$0
-	stmxcsr	(%esp)
-	andl	$0xFFFFFFC0, (%esp)  /* mask out status flags */
-	cmpl	$0x1F80, (%esp)
-	popl	%esi
-	jnz	invariant_violation
-L2:	/* otherwise we're OK */
-	jmp	remove_frame
-invariant_violation:
-	movl	$VG_TRC_INVARIANT_FAILED, %eax
-        movl    $0, %edx
 
 remove_frame:
         /* Stash return values */

@@ -169,9 +169,6 @@ static void* worker(void* p)
     yylex_destroy(context.m_scanner);
 
     // allocate executable memory
-    static const size_t execMemSize = 4096;
-    void* execMem = mmap(nullptr, execMemSize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    EMASSERT(execMem != MAP_FAILED);
 
     // run with llvm
     ARMCPU cpu = { 0 };
@@ -193,10 +190,14 @@ static void* worker(void* p)
         double t = t2.tv_sec - t1.tv_sec;
         t += static_cast<double>(t2.tv_nsec - t1.tv_nsec) / 1e9;
         LOGE("using %lf seconds to translate.\n", t);
+        static const size_t execMemSize = 4096;
+        void* execMem = mmap(nullptr, execMemSize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        EMASSERT(execMem != MAP_FAILED);
         memcpy(execMem, codeBuffer, codeSize);
         free(codeBuffer);
         vex_disp_run_translations(twoWords, &cpu.env, execMem);
-        LOGE("status is %d.\n", twoWords[0]);
+        LOGE("%s: status is %d r15 = %08x.\n", fileName, twoWords[0], cpu.env.regs[15]);
+        munmap(execMem, execMemSize);
     }
     checkRun("llvm", context, twoWords, cpu.env);
 }
