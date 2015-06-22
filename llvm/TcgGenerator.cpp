@@ -1248,36 +1248,17 @@ TCGv_i64 tcg_temp_new_i64(DisasContext* s)
     return allocateTcg<TCGv_i64>(s);
 }
 
-static void myhandleCallRet64(DisasContext* s, void* func, TCGArg ret,
+static LValue myhandleCallRet(DisasContext* s, void* func, TCGArg ret,
     int nargs, TCGArg* args)
 {
     // function retval other parameters
-    LValue argsV[2 + nargs];
-    for (int i = 2; i < 2 + nargs; ++i) {
-        argsV[i] = unwrap(s, reinterpret_cast<TCGCommonStruct*>(args[i - 2]));
+    LValue argsV[nargs];
+    for (int i = 0; i < nargs; ++i) {
+        argsV[i] = unwrap(s, reinterpret_cast<TCGCommonStruct*>(args[i]));
     }
     MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
-    LValue retVal = myctx->output()->buildAlloca(myctx->output()->repo().int64);
-    argsV[0] = myctx->output()->constIntPtr(reinterpret_cast<uintptr_t>(func));
-    argsV[1] = retVal;
-    myctx->output()->buildTcgHelperCall(nargs + 2, argsV, true);
-    storeToTCG(s, myctx->output()->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
-}
-
-static void myhandleCallRet32(DisasContext* s, void* func, TCGArg ret,
-    int nargs, TCGArg* args)
-{
-    // function retval other parameters
-    LValue argsV[2 + nargs];
-    for (int i = 2; i < 2 + nargs; ++i) {
-        argsV[i] = unwrap(s, reinterpret_cast<TCGCommonStruct*>(args[i - 2]));
-    }
-    MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
-    LValue retVal = myctx->output()->buildAlloca(myctx->output()->repo().int32);
-    argsV[0] = myctx->output()->constIntPtr(reinterpret_cast<uintptr_t>(func));
-    argsV[1] = retVal;
-    myctx->output()->buildTcgHelperCall(nargs + 2, argsV, false);
-    storeToTCG(s, myctx->output()->buildLoad(retVal), reinterpret_cast<TCGv_ptr>(ret));
+    LValue retVal = myctx->output()->buildTcgHelperCall(reinterpret_cast<void*>(func), nargs, argsV);
+    return retVal;
 }
 
 static void myhandleCallRetNone(DisasContext* s, void* func, int nargs, TCGArg* args)
@@ -1294,14 +1275,15 @@ void tcg_gen_callN(DisasContext* s, void* func, TCGArg ret,
     int nargs, TCGArg* args)
 {
     if (ret != TCG_CALL_DUMMY_ARG) {
-        if (reinterpret_cast<TCGv_ptr>(ret)->m_size == 64) {
-            myhandleCallRet64(s, func, ret, nargs, args);
-        }
-        else if (reinterpret_cast<TCGv_ptr>(ret)->m_size == 32) {
-            myhandleCallRet32(s, func, ret, nargs, args);
+        LValue retVal = myhandleCallRet(s, func, ret, nargs, args);
+        int size = reinterpret_cast<TCGCommonStruct*>(ret)->m_size;
+        MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
+        if (size == 64) {
+            storeToTCG(s, retVal, reinterpret_cast<TCGv_ptr>(ret));
         }
         else {
-            EMASSERT("ret can only be 32/64" && false);
+            retVal = myctx->output()->buildCast(LLVMTrunc, retVal, myctx->output()->repo().int32);
+            storeToTCG(s, retVal, reinterpret_cast<TCGv_ptr>(ret));
         }
     }
     else {

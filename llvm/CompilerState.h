@@ -12,13 +12,13 @@ enum class PatchType {
     Assist,
     TcgDirect,
     TcgIndirect,
-    TcgHelper32,
-    TcgHelper64,
+    TcgHelper,
     TcgHelperNotReturn,
 };
 
 struct PatchDesc {
     PatchType m_type;
+    void* m_function;
 };
 
 typedef std::vector<uint8_t> ByteBuffer;

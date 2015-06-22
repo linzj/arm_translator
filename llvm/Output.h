@@ -90,7 +90,7 @@ public:
     void buildTcgDirectPatch(void);
     void buildTcgIndirectPatch(void);
     LValue buildTcgHelperCallNotRet(void* func, int num, LValue* param);
-    LValue buildTcgHelperCall(int num, LValue* param, bool return64);
+    LValue buildTcgHelperCall(void* func, int num, LValue* param);
 
     inline IntrinsicRepository& repo() { return m_repo; }
     inline LType argType() const { return m_argType; }
