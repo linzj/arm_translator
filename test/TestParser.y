@@ -12,6 +12,7 @@
 %union {
     unsigned long long num;
     char* text;
+    double floatpoint;
 }
 
 %{
@@ -29,6 +30,8 @@ void yyerror(YYLTYPE* yylloc, struct IRContext* context, const char* reason)
 %token CHECKSTATE CHECKEQ CHECKMEMORY
 %token LEFT_BRACKET RIGHT_BRACKET MEMORY
 %token PLUS MINUS MULTIPLE DIVIDE
+%token CHECKEQFLOAT CHECKEQDOUBLE
+%token <floatpoint> FLOATCONST
 
 
 %token <num> INTNUM
@@ -120,6 +123,10 @@ check_statment:
     }
 | CHECKMEMORY REGISTER_NAME numberic_expression {
     contextSawCheckMemory(context, $2, $3);
+    free($2);
+}
+| CHECKEQFLOAT REGISTER_NAME FLOATCONST {
+    contextSawCheckRegisterFloatConst(context, $2, $3);
     free($2);
 }
 ;

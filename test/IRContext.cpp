@@ -17,44 +17,50 @@
 
 void contextSawRegisterInit(struct IRContext* context, const char* registerName, unsigned long long val)
 {
-    LOGE("%s: val = %llx.\n", __FUNCTION__, val);
+    LOGV("%s: val = %llx.\n", __FUNCTION__, val);
     PUSH_BACK_REGINIT(registerName, RegisterInitControl::createConstantInit(val));
 }
 
 void contextSawInitOption(struct IRContext* context, const char* opt)
 {
-    LOGE("%s: opt = %s.\n", __FUNCTION__, opt);
+    LOGV("%s: opt = %s.\n", __FUNCTION__, opt);
 
     LOGE("%s:unknow option.\n", __FUNCTION__);
 }
 
 void contextSawRegisterInitMemory(struct IRContext* context, const char* registerName, unsigned long long size, unsigned long long val)
 {
-    LOGE("%s: size = %llx, val = %llx.\n", __FUNCTION__, size, val);
+    LOGV("%s: size = %llx, val = %llx.\n", __FUNCTION__, size, val);
     PUSH_BACK_REGINIT(registerName, RegisterInitControl::createMemoryInit(size, val));
 }
 
 void contextSawCheckRegisterConst(struct IRContext* context, const char* registerName, unsigned long long val)
 {
-    LOGE("%s: registerName = %s, val = %llx.\n", __FUNCTION__, registerName, val);
+    LOGV("%s: registerName = %s, val = %llx.\n", __FUNCTION__, registerName, val);
     PUSH_BACK_CHECK(Check::createCheckRegisterEqConst(registerName, val));
+}
+
+void contextSawCheckRegisterFloatConst(struct IRContext* context, const char* registerName, double val)
+{
+    LOGV("%s: registerName = %s, val = %lf.\n", __FUNCTION__, registerName, val);
+    PUSH_BACK_CHECK(Check::createCheckRegisterEqFloatConst(registerName, val));
 }
 
 void contextSawCheckRegister(struct IRContext* context, const char* registerName1, const char* registerName2)
 {
-    LOGE("%s: registerName1 = %s, registerName2 = %s.\n", __FUNCTION__, registerName1, registerName2);
+    LOGV("%s: registerName1 = %s, registerName2 = %s.\n", __FUNCTION__, registerName1, registerName2);
     PUSH_BACK_CHECK(Check::createCheckRegisterEq(registerName1, registerName2));
 }
 
 void contextSawCheckState(struct IRContext* context, unsigned long long val)
 {
-    LOGE("%s: val = %llx.\n", __FUNCTION__, val);
+    LOGV("%s: val = %llx.\n", __FUNCTION__, val);
     PUSH_BACK_CHECK(Check::createCheckState(val));
 }
 
 void contextSawCheckMemory(struct IRContext* context, const char* registerName, unsigned long long val)
 {
-    LOGE("%s: registerName = %s, val = %llx.\n", __FUNCTION__, registerName, val);
+    LOGV("%s: registerName = %s, val = %llx.\n", __FUNCTION__, registerName, val);
     PUSH_BACK_CHECK(Check::createCheckMemory(registerName, val));
 }
 

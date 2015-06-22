@@ -5,3 +5,4 @@ CheckEqual r0 7
 CheckEqual r1 -1
 CheckEqual r2 14
 CheckEqual r3 0
+CheckEqualFloat r5 7.0

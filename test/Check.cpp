@@ -1,10 +1,20 @@
-#include "Check.h"
-#include "RegisterOperation.h"
+#include <string.h>
 #include <sstream>
 #include <iomanip>
+#include "Check.h"
+#include "RegisterOperation.h"
 Check::Check() {}
 Check::~Check() {}
 namespace {
+template <typename TyDst, typename TySrc>
+TyDst bitCast(TySrc src)
+{
+    TyDst dst;
+    memcpy(&dst, &src, sizeof(dst));
+    return dst;
+}
+
+
 class CheckRegisterEqConst : public Check {
 public:
     CheckRegisterEqConst(const char* name, unsigned long long val)
@@ -28,6 +38,32 @@ private:
     }
     std::string m_regName;
     unsigned long long m_val;
+};
+
+class CheckRegisterEqFloatConst : public Check {
+public:
+    CheckRegisterEqFloatConst(const char* name, double val)
+        : m_regName(name)
+        , m_val(val)
+    {
+    }
+
+private:
+    virtual bool check(const CPUARMState* state, const uintptr_t*, std::string& info) const override
+    {
+        RegisterOperation& op = RegisterOperation::getDefault();
+        const intptr_t* p = reinterpret_cast<const intptr_t*>(op.getRegisterPointer(state, m_regName));
+        float floatVal = bitCast<float>(*p);
+        std::ostringstream oss;
+        oss << "CheckRegisterEqFloatConst " << ((floatVal == m_val) ? "PASSED" : "FAILED")
+            << "; m_regName = " << m_regName
+            << "; m_val = " << std::hex
+            << m_val;
+        info = oss.str();
+        return floatVal == m_val;
+    }
+    std::string m_regName;
+    float m_val;
 };
 
 class CheckRegisterEq : public Check {
@@ -104,6 +140,11 @@ private:
 std::unique_ptr<Check> Check::createCheckRegisterEqConst(const char* name, unsigned long long val)
 {
     return std::unique_ptr<Check>(new CheckRegisterEqConst(name, val));
+}
+
+std::unique_ptr<Check> Check::createCheckRegisterEqFloatConst(const char* name, double val)
+{
+    return std::unique_ptr<Check>(new CheckRegisterEqFloatConst(name, val));
 }
 
 std::unique_ptr<Check> Check::createCheckRegisterEq(const char* name1, const char* name2)

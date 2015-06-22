@@ -20,13 +20,16 @@ nmchar          [_a-zA-Z0-9-]|{nonascii}|{escape}
 string1         \"([^\n\r\f\\"]|\\{nl}|{escape})*\"
 string2         \'([^\n\r\f\\']|\\{nl}|{escape})*\'
 intnum          -?(0x)?[[:xdigit:]]+
-
+D           [0-9]
+E           [Ee][+-]?{D}+
 
 ident           -?{nmstart}{nmchar}*
 
 CHECKEQ CheckEqual
 CHECKSTATE CheckState
 CHECKMEMORY CheckMemory
+CHECKEQFLOAT CheckEqualFloat
+CHECKEQDOUBLE CheckEqualDouble
 MEMORY Memory
 REGISTER_NAME r([0-9]|1[0-5])
 EQUAL =
@@ -48,6 +51,8 @@ DIVIDE \/
 {CHECKEQ}           return CHECKEQ;
 {CHECKSTATE}        return CHECKSTATE;
 {CHECKMEMORY}        return CHECKMEMORY;
+{CHECKEQFLOAT}      return CHECKEQFLOAT;
+{CHECKEQDOUBLE}      return CHECKEQDOUBLE;
 {REGISTER_NAME}     %{
                         yylval->text = strdup(yytext);
                         return REGISTER_NAME;
@@ -65,6 +70,18 @@ DIVIDE \/
 {SPACE}            %{
                    %}
 {SEPARATOR}         return SEPARATOR;
+{D}+{E}           %{
+                        yylval->floatpoint = strtod(yytext, NULL);
+                        return FLOATCONST;
+                   %}
+{D}+"."{D}*({E})? %{
+                        yylval->floatpoint = strtod(yytext, NULL);
+                        return FLOATCONST;
+                   %}
+"."{D}+({E})?     %{
+                        yylval->floatpoint = strtod(yytext, NULL);
+                        return FLOATCONST;
+                   %}
 {IDENTIFIER}        %{
                         yylval->text = strdup(yytext);
                         return IDENTIFIER;
