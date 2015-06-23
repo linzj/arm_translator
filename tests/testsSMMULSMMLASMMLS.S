@@ -20,6 +20,7 @@ foo:
     smmla r2, r0, r1, r1
     smmul r3, r0, r1
     smmls r4, r0, r1, r1
+    smlald r3, r4, r0, r1
 	bx	lr
 
 
