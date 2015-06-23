@@ -667,8 +667,8 @@ void tcg_gen_concat_i32_i64(DisasContext* s, TCGv_i64 dest, TCGv_i32 low,
     LValue hi = unwrap(s, high);
     MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     LValue low64 = myctx->output()->buildCast(LLVMZExt, lo, myctx->output()->repo().int64);
-    LValue hi64 = myctx->output()->buildCast(LLVMZExt, hi64, myctx->output()->repo().int64);
-    hi64 = myctx->output()->buildShl(hi64, myctx->output()->repo().int32ThirtyTwo);
+    LValue hi64 = myctx->output()->buildCast(LLVMZExt, hi, myctx->output()->repo().int64);
+    hi64 = myctx->output()->buildShl(hi64, myctx->output()->constInt64(32));
     LValue ret = myctx->output()->buildOr(hi64, low64);
     storeToTCG(s, ret, dest);
 }
@@ -865,7 +865,7 @@ void tcg_gen_muls2_i32(DisasContext* s, TCGv_i32 rl, TCGv_i32 rh,
     LValue t1 = myctx->output()->buildCast(LLVMSExt, unwrap(s, arg2), myctx->output()->repo().int64);
     LValue t3 = myctx->output()->buildMul(t0, t1);
     LValue low = myctx->output()->buildCast(LLVMTrunc, t3, myctx->output()->repo().int32);
-    LValue high = myctx->output()->buildAShr(t3, myctx->output()->repo().int32ThirtyTwo);
+    LValue high = myctx->output()->buildAShr(t3, myctx->output()->constInt64(32));
     high = myctx->output()->buildCast(LLVMTrunc, high, myctx->output()->repo().int32);
     storeToTCG(s, low, rl);
     storeToTCG(s, high, rh);
