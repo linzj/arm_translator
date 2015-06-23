@@ -1,0 +1,5 @@
+r0 = 0x80808080
+r1 = 0x20202020
+%%
+CheckEqual r2 0xa0a06060
+CheckEqual r3 0x6060a0a0

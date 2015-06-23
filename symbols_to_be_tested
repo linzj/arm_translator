@@ -1,5 +1,4 @@
 tcg_const_ptr
-tcg_gen_addi_ptr
 tcg_gen_addi_i64
 tcg_gen_and_i64
 tcg_gen_bswap16_i32
@@ -30,7 +29,6 @@ tcg_gen_shri_i32
 tcg_gen_subi_i32
 tcg_gen_xor_i64
 tcg_gen_xori_i32
-tcg_temp_new_ptr
 tcg_gen_vfp_addd
 tcg_gen_vfp_subd
 tcg_gen_vfp_muld
