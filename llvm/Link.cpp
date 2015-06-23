@@ -8,17 +8,6 @@
 
 namespace jit {
 
-static void handleTcgHelper(const LinkDesc& desc, const StackMaps::Record& record, uint8_t* body, void* target)
-{
-    uint8_t* p = body + record.instructionOffset;
-    *p++ = 0xb8;
-    *reinterpret_cast<uint32_t*>(p) = reinterpret_cast<uintptr_t>(target);
-    p += sizeof(uint32_t);
-
-    *p++ = 0xff;
-    *p++ = 0xd0;
-}
-
 void link(CompilerState& state, const LinkDesc& desc)
 {
     StackMaps sm;
@@ -32,7 +21,10 @@ void link(CompilerState& state, const LinkDesc& desc)
     for (auto& record : rm) {
         EMASSERT(record.second.size() == 1);
         auto found = state.m_patchMap.find(record.first);
-        EMASSERT(found != state.m_patchMap.end());
+        if (found == state.m_patchMap.end()) {
+            // should be the tcg helpers.
+            continue;
+        }
         PatchDesc& patchDesc = found->second;
         switch (patchDesc.m_type) {
         case PatchType::Assist: {
@@ -46,13 +38,8 @@ void link(CompilerState& state, const LinkDesc& desc)
             auto& recordUnit = record.second[0];
             desc.m_patchTcgIndirect(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcgIndirect);
         } break;
-        case PatchType::TcgHelperNotReturn: {
-        } break;
-        case PatchType::TcgHelper: {
-            handleTcgHelper(desc, record.second[0], body, patchDesc.m_function);
-        } break;
         default:
-            __builtin_unreachable();
+            EMUNREACHABLE();
         }
     }
 }
