@@ -636,10 +636,11 @@ void tcg_gen_bswap16_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
 {
     LValue v = unwrap(s, arg);
     MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
-    LValue lower = myctx->output()->buildAnd(v, myctx->output()->repo().int32TwoFiveFive);
-    LValue higher = myctx->output()->buildShl(v, myctx->output()->repo().int32Eight);
-    LValue valret = myctx->output()->buildOr(higher, lower);
-    storeToTCG(s, valret, ret);
+    LValue t0 = myctx->output()->buildAnd(v, myctx->output()->repo().int32TwoFiveFive);
+    t0 = myctx->output()->buildShl(t0, myctx->output()->repo().int32Eight);
+    LValue retVal = myctx->output()->buildLShr(v, myctx->output()->repo().int32Eight);
+    retVal = myctx->output()->buildOr(retVal, t0);
+    storeToTCG(s, retVal, ret);
 }
 
 void tcg_gen_bswap32_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
