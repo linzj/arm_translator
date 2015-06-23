@@ -1,5 +1,4 @@
 tcg_const_ptr
-tcg_const_i64
 tcg_gen_addi_ptr
 tcg_gen_addi_i64
 tcg_gen_and_i64

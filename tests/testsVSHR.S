@@ -26,6 +26,7 @@ foo:
 	
     vrshr.u32 q2,q0,#1
     vqshrn.u32 d8,q1,#1
+    vqshrn.u64 d9,q1,#1
 
 @ 0 "" 2
 	.arm

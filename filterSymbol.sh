@@ -1,5 +1,5 @@
 #!/bin/sh
-valgrind --tool=callgrind  --callgrind-out-file=call.out ./out/Debug/testQEMU tests/*.txt
+valgrind --tool=callgrind  --callgrind-out-file=call.out ./out/Debug/testQEMU $1
 if ! [ -f call.out ]
     then
         echo "not callgrind output" >2
