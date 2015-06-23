@@ -32,6 +32,7 @@ CHECKEQFLOAT CheckEqualFloat
 CHECKEQDOUBLE CheckEqualDouble
 MEMORY Memory
 REGISTER_NAME r([0-9]|1[0-5])
+VECTOR_REGISTER_NAME (s([0-9]|1[0-5]))|(d[0-8])|(q[0-4])
 EQUAL =
 LEFT_BRACKET \(
 RIGHT_BRACKET \)
@@ -64,6 +65,10 @@ INT64 int64
                         yylval->text = strdup(yytext);
                         return REGISTER_NAME;
                     %}
+{VECTOR_REGISTER_NAME} %{
+                            yylval->text = strdup(yytext);
+                            return VECTOR_REGISTER_NAME;
+                       %}
 
 {EQUAL}             return EQUAL;
 {LEFT_BRACKET}      return LEFT_BRACKET;

@@ -39,7 +39,7 @@ void yyerror(YYLTYPE* yylloc, struct IRContext* context, const char* reason)
 %token <inttype> INTTYPE
 
 %token <num> INTNUM
-%token <text> REGISTER_NAME IDENTIFIER
+%token <text> REGISTER_NAME IDENTIFIER VECTOR_REGISTER_NAME
 
 %type <num> numberic_expression
 %type <initVector> initialize_list_expr
@@ -76,7 +76,7 @@ register_init_statment:
         contextSawRegisterInitMemory(context, $1, $5, $7);
         free($1);
     }
-    | REGISTER_NAME EQUAL vector_expr {
+    | VECTOR_REGISTER_NAME EQUAL vector_expr {
         contextSawRegisterInitVec(context, $1, $3);
         free($1);
     }
