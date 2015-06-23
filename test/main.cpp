@@ -110,7 +110,7 @@ static void assmbleAndLoad(const char* path, std::string& output)
         // arm-linux-androideabi-as test1.S -o test.o
         commandAssemble.append("arm-linux-androideabi-as ");
         commandAssemble.append(Ssource);
-        commandAssemble.append(" -mcpu=cortex-a15 -mfloat-abi=hard -mfpu=vfp -meabi=5 --noexecstack -o ");
+        commandAssemble.append(" --noexecstack -o ");
         commandAssemble.append(Ofile);
         if (system(commandAssemble.c_str())) {
             LOGE("execute command %s fails.\n", commandAssemble.c_str());

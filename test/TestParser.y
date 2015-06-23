@@ -87,7 +87,7 @@ register_init_statment:
 ;
 
 vector_expr:
-    LEFT_BRACE initialize_list_expr RIGHT_BRACKET DOT INTTYPE {
+    LEFT_BRACE initialize_list_expr RIGHT_BRACE DOT INTTYPE {
         $$ = contextVecExpr(context, $2, $5);
         if ($$ == NULL) {
             if ($2 != NULL) {
