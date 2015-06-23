@@ -35,6 +35,8 @@ REGISTER_NAME r([0-9]|1[0-5])
 EQUAL =
 LEFT_BRACKET \(
 RIGHT_BRACKET \)
+LEFT_BRACE \{
+RIGHT_BRACE \{
 IDENTIFIER {ident}
 INTNUM {intnum}
 NEWLINE [\n\r\f]
@@ -45,6 +47,11 @@ PLUS \+
 MINUS \-
 MULTIPLE \*
 DIVIDE \/
+DOT \.
+INT8 int8
+INT16 int16
+INT32 int32
+INT64 int64
 %%
 
 {COMMA}           return COMMA;
@@ -61,6 +68,13 @@ DIVIDE \/
 {EQUAL}             return EQUAL;
 {LEFT_BRACKET}      return LEFT_BRACKET;
 {RIGHT_BRACKET}     return RIGHT_BRACKET;
+{DOT}               return DOT;
+{INT8}              yylval->inttype = 8; return INTTYPE;
+{INT16}              yylval->inttype = 16; return INTTYPE;
+{INT32}              yylval->inttype = 32; return INTTYPE;
+{INT64}              yylval->inttype = 64; return INTTYPE;
+{LEFT_BRACE}        return LEFT_BRACE;
+{RIGHT_BRACE}        return RIGHT_BRACE;
 {PLUS}              return PLUS;
 {MINUS}             return MINUS;
 {MULTIPLE}          return MULTIPLE;

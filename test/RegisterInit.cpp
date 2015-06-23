@@ -1,9 +1,20 @@
+#include <vector>
 #include <stdlib.h>
 #include "log.h"
 #include "RegisterInit.h"
+#include "RegisterOperation.h"
+#include "RegisterAssign.h"
 RegisterInitControl::~RegisterInitControl() {}
 
 namespace {
+typedef std::vector<unsigned long long> IntVec;
+struct NumberVector {
+    NumberVector() = delete;
+    NumberVector(IntVec* vec, int type);
+    std::unique_ptr<IntVec> m_intVec;
+    int m_type;
+};
+
 class RegisterInitConstant : public RegisterInitControl {
 public:
     RegisterInitConstant(uintptr_t val)
@@ -12,7 +23,7 @@ public:
     }
 
 private:
-    uintptr_t init() override;
+    void init(CPUARMState& env, const std::string& name) override;
     void reset() override;
     uintptr_t m_val;
 };
@@ -28,16 +39,31 @@ public:
     ~RegisterInitMemory();
 
 private:
-    uintptr_t init() override;
+    void init(CPUARMState& env, const std::string& name) override;
+    uintptr_t getVal();
     void reset() override;
     unsigned long long m_size;
     unsigned long long m_val;
     void* m_buffer;
 };
 
-uintptr_t RegisterInitConstant::init()
+class RegisterInitNumVec : public RegisterInitControl {
+public:
+    RegisterInitNumVec(NumberVector* val)
+        : m_val(val)
+    {
+    }
+
+private:
+    void init(CPUARMState& env, const std::string& name) override;
+    void reset() override;
+    std::unique_ptr<NumberVector> m_val;
+};
+
+void RegisterInitConstant::init(CPUARMState& env, const std::string& name)
 {
-    return m_val;
+    RegisterAssign assign;
+    assign.assign(&env, name, m_val);
 }
 
 void RegisterInitConstant::reset()
@@ -51,7 +77,7 @@ RegisterInitMemory::~RegisterInitMemory()
     }
 }
 
-uintptr_t RegisterInitMemory::init()
+uintptr_t RegisterInitMemory::getVal()
 {
     if (m_size <= 0) {
         return 0;
@@ -67,7 +93,13 @@ uintptr_t RegisterInitMemory::init()
     else {
         *static_cast<uint32_t*>(m_buffer) = static_cast<uint32_t>(m_val);
     }
-    return reinterpret_cast<uintptr_t>(m_buffer);
+    uintptr_t val = reinterpret_cast<uintptr_t>(m_buffer);
+}
+
+void RegisterInitMemory::init(CPUARMState& env, const std::string& name)
+{
+    RegisterAssign assign;
+    assign.assign(&env, name, getVal());
 }
 
 void RegisterInitMemory::reset()
@@ -76,6 +108,54 @@ void RegisterInitMemory::reset()
         free(m_buffer);
         m_buffer = nullptr;
     }
+}
+
+void RegisterInitNumVec::init(CPUARMState& env, const std::string& name)
+{
+    RegisterOperation& op = RegisterOperation::getDefault();
+    uintptr_t* pointer = op.getRegisterPointer(&env, name);
+    switch (m_val->m_type) {
+    case 64: {
+        EMASSERT(m_val->m_intVec->size() <= 2);
+        uint64_t* p = reinterpret_cast<uint64_t*>(pointer);
+        for (auto v : *m_val->m_intVec) {
+            *p++ = v;
+        }
+    } break;
+    case 32: {
+        EMASSERT(m_val->m_intVec->size() <= 4);
+        uint32_t* p = reinterpret_cast<uint32_t*>(pointer);
+        for (auto v : *m_val->m_intVec) {
+            *p++ = v;
+        }
+    } break;
+    case 16: {
+        EMASSERT(m_val->m_intVec->size() <= 8);
+        uint16_t* p = reinterpret_cast<uint16_t*>(pointer);
+        for (auto v : *m_val->m_intVec) {
+            *p++ = v;
+        }
+    } break;
+    case 8: {
+        EMASSERT(m_val->m_intVec->size() <= 16);
+        uint8_t* p = reinterpret_cast<uint8_t*>(pointer);
+        for (auto v : *m_val->m_intVec) {
+            *p++ = v;
+        }
+    } break;
+    default:
+        EMUNREACHABLE();
+    }
+}
+
+void RegisterInitNumVec::reset()
+{
+}
+
+NumberVector::NumberVector(IntVec* vec, int type)
+    : m_intVec(vec)
+    , m_type(type)
+{
 }
 }
 
@@ -87,4 +167,32 @@ std::unique_ptr<RegisterInitControl> RegisterInitControl::createConstantInit(uin
 std::unique_ptr<RegisterInitControl> RegisterInitControl::createMemoryInit(unsigned long long size, unsigned long long val)
 {
     return std::unique_ptr<RegisterInitControl>(new RegisterInitMemory(size, val));
+}
+
+std::unique_ptr<RegisterInitControl> RegisterInitControl::createVecInit(void* vec)
+{
+    return std::unique_ptr<RegisterInitControl>(new RegisterInitNumVec(static_cast<NumberVector*>(vec)));
+}
+
+void* RegisterInitControl::createIntVec(unsigned long long val)
+{
+    IntVec* vec = new IntVec;
+    vec->push_back(val);
+    return vec;
+}
+
+void* RegisterInitControl::appendIntVec(void* intVec, unsigned long long val)
+{
+    static_cast<IntVec*>(intVec)->push_back(val);
+    return intVec;
+}
+
+void* RegisterInitControl::createVec(void* intVec, int type)
+{
+    return new NumberVector(static_cast<IntVec*>(intVec), type);
+}
+
+void RegisterInitControl::destroyNumVec(void* intVec)
+{
+    delete static_cast<IntVec*>(intVec);
 }

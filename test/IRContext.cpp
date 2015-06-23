@@ -37,6 +37,12 @@ void contextSawRegisterInitMemory(struct IRContext* context, const char* registe
     PUSH_BACK_REGINIT(registerName, RegisterInitControl::createMemoryInit(size, val));
 }
 
+void contextSawRegisterInitVec(struct IRContext* context, const char* registerName, void* vec)
+{
+    LOGV("%s:.\n", __FUNCTION__);
+    PUSH_BACK_REGINIT(registerName, RegisterInitControl::createVecInit(vec));
+}
+
 void contextSawCheckRegisterConst(struct IRContext* context, const char* registerName, unsigned long long val)
 {
     LOGV("%s: registerName = %s, val = %llx.\n", __FUNCTION__, registerName, val);
@@ -70,4 +76,24 @@ void contextSawCheckMemory(struct IRContext* context, const char* registerName, 
 void contextYYError(int line, int column, struct IRContext* context, const char* reason, const char* text)
 {
     printf("line %d column %d: error:%s; text: %s.\n", line, column, reason, text);
+}
+
+void* contextNumVecAppendInt(struct IRContext* context, void* initList, unsigned long long val)
+{
+    return RegisterInitControl::appendIntVec(initList, val);
+}
+
+void* contextNumVecNew(struct IRContext* context, unsigned long long val)
+{
+    return RegisterInitControl::createIntVec(val);
+}
+
+void* contextVecExpr(struct IRContext* context, void* numvec, int type)
+{
+    return RegisterInitControl::createVec(numvec, type);
+}
+
+void contextDestoryNumVec(void* initList)
+{
+    return RegisterInitControl::destroyNumVec(initList);
 }

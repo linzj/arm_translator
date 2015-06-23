@@ -13,6 +13,9 @@
     unsigned long long num;
     char* text;
     double floatpoint;
+    int inttype;
+    void* initVector;
+    void* vectorExpr;
 }
 
 %{
@@ -32,12 +35,15 @@ void yyerror(YYLTYPE* yylloc, struct IRContext* context, const char* reason)
 %token PLUS MINUS MULTIPLE DIVIDE
 %token CHECKEQFLOAT CHECKEQDOUBLE
 %token <floatpoint> FLOATCONST
-
+%token DOT LEFT_BRACE RIGHT_BRACE
+%token <inttype> INTTYPE
 
 %token <num> INTNUM
 %token <text> REGISTER_NAME IDENTIFIER
 
 %type <num> numberic_expression
+%type <initVector> initialize_list_expr
+%type <vectorExpr> vector_expr
 
 %left PLUS MINUS
 %left MULTIPLE DIVIDE
@@ -70,12 +76,46 @@ register_init_statment:
         contextSawRegisterInitMemory(context, $1, $5, $7);
         free($1);
     }
+    | REGISTER_NAME EQUAL vector_expr {
+        contextSawRegisterInitVec(context, $1, $3);
+        free($1);
+    }
     | IDENTIFIER {
         contextSawInitOption(context, $1);
         free($1);
     }
 ;
 
+vector_expr:
+    LEFT_BRACE initialize_list_expr RIGHT_BRACKET DOT INTTYPE {
+        $$ = contextVecExpr(context, $2, $5);
+        if ($$ == NULL) {
+            if ($2 != NULL) {
+                contextDestoryNumVec($2);
+            }
+            YYABORT;
+        }
+    }
+;
+
+initialize_list_expr:
+    %empty {
+        $$ = NULL;
+    }
+    | initialize_list_expr COMMA numberic_expression {
+        $$ = contextNumVecAppendInt(context, $1, $3);
+        if ($$ == NULL) {
+            contextDestoryNumVec($1);
+            YYABORT;
+        }
+    }
+    | numberic_expression {
+        $$ = contextNumVecNew(context, $1);
+        if ($$ == NULL) {
+            YYABORT;
+        }
+    }
+;
 
 numberic_expression
     : INTNUM {
