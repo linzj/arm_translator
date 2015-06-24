@@ -162,7 +162,7 @@ private:
         switch (m_val->m_type) {
         case 64: {
             EMASSERT(m_val->m_intVec->size() <= 2);
-            const uint64_t* p = reinterpret_cast<const uint64_t*>(pointer);
+            const int64_t* p = reinterpret_cast<const int64_t*>(pointer);
             for (auto v : *m_val->m_intVec) {
                 if (*p++ != v) {
                     return false;
@@ -171,7 +171,7 @@ private:
         } break;
         case 32: {
             EMASSERT(m_val->m_intVec->size() <= 4);
-            const uint32_t* p = reinterpret_cast<const uint32_t*>(pointer);
+            const int32_t* p = reinterpret_cast<const int32_t*>(pointer);
             for (auto v : *m_val->m_intVec) {
                 if (*p++ != v) {
                     return false;
@@ -180,7 +180,7 @@ private:
         } break;
         case 16: {
             EMASSERT(m_val->m_intVec->size() <= 8);
-            const uint16_t* p = reinterpret_cast<const uint16_t*>(pointer);
+            const int16_t* p = reinterpret_cast<const int16_t*>(pointer);
             for (auto v : *m_val->m_intVec) {
                 if (*p++ != v) {
                     return false;
@@ -189,7 +189,7 @@ private:
         } break;
         case 8: {
             EMASSERT(m_val->m_intVec->size() <= 16);
-            const uint8_t* p = reinterpret_cast<const uint8_t*>(pointer);
+            const int8_t* p = reinterpret_cast<const int8_t*>(pointer);
             for (auto v : *m_val->m_intVec) {
                 if (*p++ != v) {
                     return false;

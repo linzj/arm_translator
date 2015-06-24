@@ -3,3 +3,4 @@ d1 = { 2, 4 }.int32
 %%
 CheckEqual q1 { 200, 800 }.int64
 CheckEqual q2 { 200, 800 }.int64
+CheckEqual q3 { -200, -800 }.int64
