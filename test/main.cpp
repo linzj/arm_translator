@@ -15,6 +15,34 @@
 #include "log.h"
 #include "cpuinit.h"
 #include "TcgGenerator.h"
+#include "ExecutableMemoryAllocator.h"
+
+class MyExecutableMemoryAllocator : public jit::ExecutableMemoryAllocator {
+public:
+    static const size_t execMemSize = 4096;
+    MyExecutableMemoryAllocator()
+        : m_buffer(nullptr)
+    {
+    }
+    ~MyExecutableMemoryAllocator()
+    {
+        if (m_buffer) {
+            munmap(m_buffer, execMemSize);
+        }
+    }
+    inline void* buffer() { return m_buffer; }
+private:
+    virtual void* allocate(int size, int align) override
+    {
+        EMASSERT(size < execMemSize);
+        EMASSERT(m_buffer == nullptr);
+        m_buffer = mmap(nullptr, execMemSize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        EMASSERT(m_buffer != MAP_FAILED);
+    }
+
+private:
+    void* m_buffer;
+};
 
 extern "C" {
 void yyparse(IRContext*);
@@ -176,25 +204,19 @@ static void* worker(void* p)
     // setup pc
     cpu.env.regs[15] = (uint32_t)(uintptr_t)binaryCode.data();
     uintptr_t twoWords[2];
-    void* codeBuffer;
-    size_t codeSize;
-    jit::TranslateDesc tdesc = { reinterpret_cast<void*>(vex_disp_cp_chain_me_to_fastEP), reinterpret_cast<void*>(vex_disp_cp_xindir), reinterpret_cast<void*>(vex_disp_cp_xassisted) };
     while (cpu.env.regs[15] != 0xfffffffe) {
+        MyExecutableMemoryAllocator allocator;
+        jit::TranslateDesc tdesc = { reinterpret_cast<void*>(vex_disp_cp_chain_me_to_fastEP), reinterpret_cast<void*>(vex_disp_cp_xindir), reinterpret_cast<void*>(vex_disp_cp_xassisted), &allocator };
         struct timespec t2, t1;
         clock_gettime(CLOCK_MONOTONIC, &t1);
-        jit::translate(&cpu.env, tdesc, &codeBuffer, &codeSize);
+        jit::translate(&cpu.env, tdesc);
         clock_gettime(CLOCK_MONOTONIC, &t2);
         double t = t2.tv_sec - t1.tv_sec;
         t += static_cast<double>(t2.tv_nsec - t1.tv_nsec) / 1e9;
         LOGE("using %lf seconds to translate.\n", t);
-        static const size_t execMemSize = 4096;
-        void* execMem = mmap(nullptr, execMemSize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        EMASSERT(execMem != MAP_FAILED);
-        memcpy(execMem, codeBuffer, codeSize);
-        free(codeBuffer);
+        void* execMem = allocator.buffer();
         vex_disp_run_translations(twoWords, &cpu.env, execMem);
         LOGE("%s: status is %d r15 = %08x.\n", fileName, twoWords[0], cpu.env.regs[15]);
-        munmap(execMem, execMemSize);
     }
     checkRun("llvm", context, twoWords, cpu.env);
 }

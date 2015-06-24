@@ -21,13 +21,13 @@ struct PatchDesc {
 
 typedef std::vector<uint8_t> ByteBuffer;
 typedef std::list<ByteBuffer> BufferList;
+typedef std::list<uint8_t*> ExecutableBufferList;
 typedef std::list<std::string> StringList;
 typedef std::unordered_map<unsigned /* stackmaps id */, PatchDesc> PatchMap;
 
 struct CompilerState {
-    BufferList m_codeSectionList;
+    ExecutableBufferList m_codeSectionList;
     BufferList m_dataSectionList;
-    StringList m_codeSectionNames;
     StringList m_dataSectionNames;
     ByteBuffer* m_stackMapsSection;
     PatchMap m_patchMap;
@@ -36,6 +36,7 @@ struct CompilerState {
     LLVMContextRef m_context;
     void* m_entryPoint;
     struct PlatformDesc m_platformDesc;
+    class ExecutableMemoryAllocator* m_executableMemAllocator;
     CompilerState(const char* moduleName, const PlatformDesc& desc);
     ~CompilerState();
     CompilerState(const CompilerState&) = delete;

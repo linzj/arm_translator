@@ -52,7 +52,7 @@ namespace {
 
 class MyDisCtx : public DisasContext {
 public:
-    MyDisCtx();
+    explicit MyDisCtx(ExecutableMemoryAllocator* allocator);
     ~MyDisCtx();
     inline Output* output() { return m_output.get(); }
     inline CompilerState* state() { return m_state.get(); }
@@ -83,7 +83,7 @@ static PlatformDesc g_desc = {
 };
 static pthread_once_t initLLVMOnce = PTHREAD_ONCE_INIT;
 
-MyDisCtx::MyDisCtx(void)
+MyDisCtx::MyDisCtx(ExecutableMemoryAllocator* executableMemAllocator)
     : m_currentBufferPointer(nullptr)
     , m_currentBufferEnd(nullptr)
     , m_labelCount(0)
@@ -91,6 +91,7 @@ MyDisCtx::MyDisCtx(void)
     pthread_once(&initLLVMOnce, initLLVM);
     m_state.reset(new CompilerState("qemu", g_desc));
     m_output.reset(new Output(*m_state));
+    m_state->m_executableMemAllocator = executableMemAllocator;
 }
 
 MyDisCtx::~MyDisCtx(void)
@@ -287,9 +288,9 @@ void patchIndirect(void*, uint8_t* p, void* entry)
 }
 namespace jit {
 
-void translate(CPUARMState* env, const TranslateDesc& desc, void** buffer, size_t* s)
+void translate(CPUARMState* env, const TranslateDesc& desc)
 {
-    MyDisCtx ctx;
+    MyDisCtx ctx(desc.m_executableMemAllocator);
     ARMCPU* cpu = arm_env_get_cpu(env);
     target_ulong pc;
     uint64_t flags;
@@ -312,11 +313,6 @@ void translate(CPUARMState* env, const TranslateDesc& desc, void** buffer, size_
         patchIndirect,
     };
     link(*ctx.state(), linkDesc);
-    const void* codeBuffer = ctx.state()->m_codeSectionList.front().data();
-    size_t codeSize = ctx.state()->m_codeSectionList.front().size();
-    *buffer = malloc(codeSize);
-    *s = codeSize;
-    memcpy(*buffer, codeBuffer, codeSize);
 }
 }
 

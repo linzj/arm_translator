@@ -15,7 +15,7 @@ void link(CompilerState& state, const LinkDesc& desc)
     sm.parse(&dv);
     auto rm = sm.computeRecordMap();
     EMASSERT(state.m_codeSectionList.size() == 1);
-    uint8_t* prologue = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(state.m_codeSectionList.front().data()));
+    uint8_t* prologue = state.m_codeSectionList.front();
     uint8_t* body = static_cast<uint8_t*>(state.m_entryPoint);
     desc.m_patchPrologue(desc.m_opaque, prologue);
     for (auto& record : rm) {

@@ -3,6 +3,7 @@
 #include "LLVMAPI.h"
 #include "CompilerState.h"
 #include "Compile.h"
+#include "ExecutableMemoryAllocator.h"
 #define SECTION_NAME_PREFIX "."
 #define SECTION_NAME(NAME) (SECTION_NAME_PREFIX NAME)
 
@@ -19,15 +20,12 @@ static uint8_t* mmAllocateCodeSection(
 {
     State& state = *static_cast<State*>(opaqueState);
 
-    state.m_codeSectionList.push_back(jit::ByteBuffer());
-    state.m_codeSectionNames.push_back(sectionName);
-
-    jit::ByteBuffer& bb(state.m_codeSectionList.back());
     size_t additionSize = state.m_platformDesc.m_prologueSize;
     size += additionSize;
-    bb.resize(size);
+    uint8_t* buffer = static_cast<uint8_t*>(state.m_executableMemAllocator->allocate(size, alignment));
+    state.m_codeSectionList.push_back(buffer);
 
-    return const_cast<uint8_t*>(bb.data() + additionSize);
+    return const_cast<uint8_t*>(buffer + additionSize);
 }
 
 static uint8_t* mmAllocateDataSection(
