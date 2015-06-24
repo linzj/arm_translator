@@ -1,6 +1,5 @@
 tcg_const_ptr
 tcg_gen_and_i64
-tcg_gen_or_i64
 tcg_gen_ori_i32
 tcg_gen_rotr_i32
 tcg_gen_rotri_i32
