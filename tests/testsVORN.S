@@ -17,6 +17,7 @@
 	.type	foo, %function
 foo:
     vorn d2, d0, d1
+    vorr.i32 d0, #1
     bx lr
 	.section	.note.GNU-stack,"",%progbits
 

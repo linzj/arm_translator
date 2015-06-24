@@ -2,3 +2,4 @@ d0 = { 0x100, 0x200}.int32
 d1 = { 1, 1 }.int32
 %%
 CheckEqual d2 { -2, -2 }.int32
+CheckEqual d0 { 0x101, 0x201 }.int32
