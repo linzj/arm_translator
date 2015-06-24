@@ -1,0 +1,295 @@
+Index: include/llvm/Target/TargetLibraryInfo.h
+===================================================================
+--- include/llvm/Target/TargetLibraryInfo.h	(revision 240544)
++++ include/llvm/Target/TargetLibraryInfo.h	(working copy)
+@@ -324,8 +324,6 @@
+       fsetpos,
+       /// int fstat(int fildes, struct stat *buf);
+       fstat,
+-      /// int fstat64(int filedes, struct stat64 *buf)
+-      fstat64,
+       /// int fstatvfs(int fildes, struct statvfs *buf);
+       fstatvfs,
+       /// int fstatvfs64(int fildes, struct statvfs64 *buf);
+@@ -415,8 +413,6 @@
+       logl,
+       /// int lstat(const char *path, struct stat *buf);
+       lstat,
+-      /// int lstat64(const char *path, struct stat64 *buf);
+-      lstat64,
+       /// void *malloc(size_t size);
+       malloc,
+       /// void *memalign(size_t boundary, size_t size);
+@@ -560,8 +556,6 @@
+       sscanf,
+       /// int stat(const char *path, struct stat *buf);
+       stat,
+-      /// int stat64(const char *path, struct stat64 *buf);
+-      stat64,
+       /// int statvfs(const char *path, struct statvfs *buf);
+       statvfs,
+       /// int statvfs64(const char *path, struct statvfs64 *buf)
+Index: lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp
+===================================================================
+--- lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp	(revision 240544)
++++ lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp	(working copy)
+@@ -7180,7 +7180,7 @@
+                       LandingPad, true);
+ 
+   SDNode *CallEnd = Result.second.getNode();
+-  if (HasDef && (CallEnd->getOpcode() == ISD::CopyFromReg))
++  while (HasDef && (CallEnd->getOpcode() == ISD::CopyFromReg))
+     CallEnd = CallEnd->getOperand(0).getNode();
+ 
+   /// Get a call instruction from the call sequence chain.
+Index: lib/ExecutionEngine/ExecutionEngineBindings.cpp
+===================================================================
+--- lib/ExecutionEngine/ExecutionEngineBindings.cpp	(revision 240544)
++++ lib/ExecutionEngine/ExecutionEngineBindings.cpp	(working copy)
+@@ -17,13 +17,18 @@
+ #include "llvm/ExecutionEngine/RTDyldMemoryManager.h"
+ #include "llvm/IR/DerivedTypes.h"
+ #include "llvm/IR/Module.h"
++#include "llvm/Support/Mutex.h"
+ #include "llvm/Support/ErrorHandling.h"
++#include "llvm/Support/Host.h"
+ #include <cstring>
+-
+ using namespace llvm;
+ 
+ #define DEBUG_TYPE "jit"
+ 
++static llvm::sys::Mutex InitCPUMutex;
++static bool CPUInit = false;
++static std::string CPUName;
++static std::vector<std::string> CPUAttr;
+ // Wrapping the C bindings types.
+ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(GenericValue, LLVMGenericValueRef)
+ 
+@@ -181,12 +186,29 @@
+   targetOptions.EnableFastISel = options.EnableFastISel;
+ 
+   std::string Error;
++  {
++    llvm::sys::ScopedLock lock(InitCPUMutex);
++    if (!CPUInit) {
++      CPUInit = true;
++      CPUName = sys::getHostCPUName();
++      StringMap<bool> HostFeatures;
++      if (sys::getHostCPUFeatures(HostFeatures)) {
++        for (auto& p : HostFeatures) {
++          if (p.second) {
++            CPUAttr.push_back(p.first());
++          }
++        }
++      }
++    }
++  }
+   EngineBuilder builder(std::unique_ptr<Module>(unwrap(M)));
+   builder.setEngineKind(EngineKind::JIT)
+          .setErrorStr(&Error)
+          .setOptLevel((CodeGenOpt::Level)options.OptLevel)
+          .setCodeModel(unwrap(options.CodeModel))
+-         .setTargetOptions(targetOptions);
++         .setTargetOptions(targetOptions)
++         .setMCPU(CPUName)
++         .setMAttrs(CPUAttr);
+   if (options.MCJMM)
+     builder.setMCJITMemoryManager(
+       std::unique_ptr<RTDyldMemoryManager>(unwrap(options.MCJMM)));
+Index: lib/ExecutionEngine/RuntimeDyld/RTDyldMemoryManager.cpp
+===================================================================
+--- lib/ExecutionEngine/RuntimeDyld/RTDyldMemoryManager.cpp	(revision 240544)
++++ lib/ExecutionEngine/RuntimeDyld/RTDyldMemoryManager.cpp	(working copy)
+@@ -234,9 +234,6 @@
+   if (Name == "stat") return (uint64_t)&stat;
+   if (Name == "fstat") return (uint64_t)&fstat;
+   if (Name == "lstat") return (uint64_t)&lstat;
+-  if (Name == "stat64") return (uint64_t)&stat64;
+-  if (Name == "fstat64") return (uint64_t)&fstat64;
+-  if (Name == "lstat64") return (uint64_t)&lstat64;
+   if (Name == "atexit") return (uint64_t)&atexit;
+   if (Name == "mknod") return (uint64_t)&mknod;
+ 
+Index: lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp
+===================================================================
+--- lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp	(revision 240544)
++++ lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp	(working copy)
+@@ -309,6 +309,16 @@
+     support::ulittle32_t::ref(Section.Address + Offset) = RealOffset;
+     break;
+   }
++  case ELF::R_X86_64_PC64: {
++    // Get the placeholder value from the generated object since
++    // a previous relocation attempt may have overwritten the loaded version
++    support::ulittle64_t::ref Placeholder(
++        (void *)(Section.ObjAddress + Offset));
++    uint64_t FinalAddress = Section.LoadAddress + Offset;
++    support::ulittle64_t::ref(Section.Address + Offset) =
++        Placeholder + Value + Addend - FinalAddress;
++    break;
++  }
+   default:
+     // There are other relocation types, but it appears these are the
+     // only ones currently used by the LLVM ELF object writer
+Index: lib/Target/TargetLibraryInfo.cpp
+===================================================================
+--- lib/Target/TargetLibraryInfo.cpp	(revision 240544)
++++ lib/Target/TargetLibraryInfo.cpp	(working copy)
+@@ -175,7 +175,6 @@
+     "fseeko64",
+     "fsetpos",
+     "fstat",
+-    "fstat64",
+     "fstatvfs",
+     "fstatvfs64",
+     "ftell",
+@@ -220,7 +219,6 @@
+     "logf",
+     "logl",
+     "lstat",
+-    "lstat64",
+     "malloc",
+     "memalign",
+     "memccpy",
+@@ -291,7 +289,6 @@
+     "sqrtl",
+     "sscanf",
+     "stat",
+-    "stat64",
+     "statvfs",
+     "statvfs64",
+     "stpcpy",
+@@ -674,12 +671,9 @@
+     TLI.setUnavailable(LibFunc::memalign);
+     TLI.setUnavailable(LibFunc::fopen64);
+     TLI.setUnavailable(LibFunc::fseeko64);
+-    TLI.setUnavailable(LibFunc::fstat64);
+     TLI.setUnavailable(LibFunc::fstatvfs64);
++    TLI.setUnavailable(LibFunc::open64);
+     TLI.setUnavailable(LibFunc::ftello64);
+-    TLI.setUnavailable(LibFunc::lstat64);
+-    TLI.setUnavailable(LibFunc::open64);
+-    TLI.setUnavailable(LibFunc::stat64);
+     TLI.setUnavailable(LibFunc::statvfs64);
+     TLI.setUnavailable(LibFunc::tmpfile64);
+   }
+Index: lib/Target/X86/MCTargetDesc/X86ELFObjectWriter.cpp
+===================================================================
+--- lib/Target/X86/MCTargetDesc/X86ELFObjectWriter.cpp	(revision 240544)
++++ lib/Target/X86/MCTargetDesc/X86ELFObjectWriter.cpp	(working copy)
+@@ -204,6 +204,9 @@
+       switch ((unsigned)Fixup.getKind()) {
+       default: llvm_unreachable("invalid fixup kind!");
+ 
++      case FK_Data_8:
++        Type = ELF::R_X86_64_PC64;
++        break;
+       case X86::reloc_global_offset_table:
+         Type = ELF::R_386_GOTPC;
+         break;
+Index: lib/Target/X86/X86MCInstLower.cpp
+===================================================================
+--- lib/Target/X86/X86MCInstLower.cpp	(revision 240544)
++++ lib/Target/X86/X86MCInstLower.cpp	(working copy)
+@@ -752,11 +752,8 @@
+                             .addExpr(tlsRef));
+ }
+ 
+-/// \brief Emit the optimal amount of multi-byte nops on X86.
+-static void EmitNops(MCStreamer &OS, unsigned NumBytes, bool Is64Bit, const MCSubtargetInfo &STI) {
+-  // This works only for 64bit. For 32bit we have to do additional checking if
+-  // the CPU supports multi-byte nops.
+-  assert(Is64Bit && "EmitNops only supports X86-64");
++static void EmitNops64(MCStreamer &OS, unsigned NumBytes, const MCSubtargetInfo &STI)
++{
+   while (NumBytes) {
+     unsigned Opc, BaseReg, ScaleVal, IndexReg, Displacement, SegmentReg;
+     Opc = IndexReg = Displacement = SegmentReg = 0;
+@@ -803,12 +800,28 @@
+   } // while (NumBytes)
+ }
+ 
++static void EmitNops32(MCStreamer &OS, unsigned NumBytes, const MCSubtargetInfo &STI)
++{
++    for (; NumBytes; --NumBytes) {
++        OS.EmitBytes("\x90");
++    }
++}
++
++/// \brief Emit the optimal amount of multi-byte nops on X86.
++static void EmitNops(MCStreamer &OS, unsigned NumBytes, bool Is64Bit, const MCSubtargetInfo &STI) {
++  if (Is64Bit) {
++      EmitNops64(OS, NumBytes, STI);
++  } else {
++      EmitNops32(OS, NumBytes, STI);
++  }
++}
++
++
+ static void LowerSTATEPOINT(MCStreamer &OS, StackMaps &SM,
+                             const MachineInstr &MI, bool Is64Bit,
+                             const TargetMachine& TM,
+                             const MCSubtargetInfo& STI,
+                             X86MCInstLower &MCInstLowering) {
+-  assert(Is64Bit && "Statepoint currently only supports X86-64");
+ 
+   // Lower call target and choose correct opcode
+   const MachineOperand &call_target = StatepointOpers(&MI).getCallTarget();
+@@ -867,7 +880,6 @@
+ // Lower a patchpoint of the form:
+ // [<def>], <id>, <numBytes>, <target>, <numArgs>, <cc>, ...
+ void X86AsmPrinter::LowerPATCHPOINT(const MachineInstr &MI) {
+-  assert(Subtarget->is64Bit() && "Patchpoint currently only supports X86-64");
+ 
+   SMShadowTracker.emitShadowPadding(OutStreamer, getSubtargetInfo());
+ 
+@@ -881,13 +893,20 @@
+     // Emit MOV to materialize the target address and the CALL to target.
+     // This is encoded with 12-13 bytes, depending on which register is used.
+     unsigned ScratchReg = MI.getOperand(ScratchIdx).getReg();
+-    if (X86II::isX86_64ExtendedReg(ScratchReg))
+-      EncodedBytes = 13;
+-    else
+-      EncodedBytes = 12;
+-    EmitAndCountInstruction(MCInstBuilder(X86::MOV64ri).addReg(ScratchReg)
+-                                                       .addImm(CallTarget));
+-    EmitAndCountInstruction(MCInstBuilder(X86::CALL64r).addReg(ScratchReg));
++    if (Subtarget->is64Bit()) {
++        if (X86II::isX86_64ExtendedReg(ScratchReg))
++            EncodedBytes = 13;
++        else
++            EncodedBytes = 12;
++        EmitAndCountInstruction(MCInstBuilder(X86::MOV64ri).addReg(ScratchReg)
++                .addImm(CallTarget));
++        EmitAndCountInstruction(MCInstBuilder(X86::CALL64r).addReg(ScratchReg));
++    } else {
++        EncodedBytes = 7;
++        EmitAndCountInstruction(MCInstBuilder(X86::MOV32ri).addReg(ScratchReg)
++                .addImm(CallTarget));
++        EmitAndCountInstruction(MCInstBuilder(X86::CALL32r).addReg(ScratchReg));
++    }
+   }
+   // Emit padding.
+   unsigned NumBytes = opers.getMetaOper(PatchPointOpers::NBytesPos).getImm();
+Index: lib/Transforms/IPO/FunctionAttrs.cpp
+===================================================================
+--- lib/Transforms/IPO/FunctionAttrs.cpp	(revision 240544)
++++ lib/Transforms/IPO/FunctionAttrs.cpp	(working copy)
+@@ -1601,8 +1601,6 @@
+     setDoesNotCapture(F, 1);
+     setOnlyReadsMemory(F, 1);
+     break;
+-  case LibFunc::stat64:
+-  case LibFunc::lstat64:
+   case LibFunc::statvfs64:
+     if (FTy->getNumParams() < 1 ||
+         !FTy->getParamType(0)->isPointerTy() ||
+@@ -1650,7 +1648,6 @@
+     setDoesNotThrow(F);
+     setDoesNotAlias(F, 0);
+     break;
+-  case LibFunc::fstat64:
+   case LibFunc::fstatvfs64:
+     if (FTy->getNumParams() != 2 || !FTy->getParamType(1)->isPointerTy())
+       return false;
