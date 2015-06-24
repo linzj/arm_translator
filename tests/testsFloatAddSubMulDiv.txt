@@ -6,3 +6,4 @@ CheckEqual r1 -1
 CheckEqual r2 14
 CheckEqual r3 0
 CheckEqualFloat r5 2.6457513110645907
+CheckEqual d0 { 0x400a000000000000 }.int64
