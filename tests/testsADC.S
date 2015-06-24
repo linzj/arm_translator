@@ -19,7 +19,8 @@
 foo:
 	adds	r0, r0, r2
 	adc	r1, r1, r3
-    ror r4, r5, r4
+    ror r6, r5, r4
+    ror r4, r5, #24
 	bx	lr
 
 

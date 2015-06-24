@@ -8,3 +8,4 @@ r5 = 0x7fffffff
 CheckEqual r0 0
 CheckEqual r1 0x80000000
 CheckEqual r4 0xffffff7f
+CheckEqual r6 0xffffff7f
