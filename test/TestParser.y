@@ -91,7 +91,7 @@ vector_expr:
         $$ = contextVecExpr(context, $2, $5);
         if ($$ == NULL) {
             if ($2 != NULL) {
-                contextDestoryNumVec($2);
+                contextDestoryIntVec($2);
             }
             YYABORT;
         }
@@ -103,14 +103,14 @@ initialize_list_expr:
         $$ = NULL;
     }
     | initialize_list_expr COMMA numberic_expression {
-        $$ = contextNumVecAppendInt(context, $1, $3);
+        $$ = contextIntVecAppendInt(context, $1, $3);
         if ($$ == NULL) {
-            contextDestoryNumVec($1);
+            contextDestoryIntVec($1);
             YYABORT;
         }
     }
     | numberic_expression {
-        $$ = contextNumVecNew(context, $1);
+        $$ = contextIntVecNew(context, $1);
         if ($$ == NULL) {
             YYABORT;
         }
@@ -167,6 +167,10 @@ check_statment:
 }
 | CHECKEQFLOAT REGISTER_NAME FLOATCONST {
     contextSawCheckRegisterFloatConst(context, $2, $3);
+    free($2);
+}
+| CHECKEQ VECTOR_REGISTER_NAME vector_expr {
+    contextSawCheckVecRegsiterConst(context, $2, $3);
     free($2);
 }
 ;

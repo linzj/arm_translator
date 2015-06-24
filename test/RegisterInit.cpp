@@ -4,17 +4,10 @@
 #include "RegisterInit.h"
 #include "RegisterOperation.h"
 #include "RegisterAssign.h"
+#include "Vec.h"
 RegisterInitControl::~RegisterInitControl() {}
 
 namespace {
-typedef std::vector<unsigned long long> IntVec;
-struct NumberVector {
-    NumberVector() = delete;
-    NumberVector(IntVec* vec, int type);
-    std::unique_ptr<IntVec> m_intVec;
-    int m_type;
-};
-
 class RegisterInitConstant : public RegisterInitControl {
 public:
     RegisterInitConstant(uintptr_t val)
@@ -151,12 +144,6 @@ void RegisterInitNumVec::init(CPUARMState& env, const std::string& name)
 void RegisterInitNumVec::reset()
 {
 }
-
-NumberVector::NumberVector(IntVec* vec, int type)
-    : m_intVec(vec)
-    , m_type(type)
-{
-}
 }
 
 std::unique_ptr<RegisterInitControl> RegisterInitControl::createConstantInit(uintptr_t val)
@@ -172,27 +159,4 @@ std::unique_ptr<RegisterInitControl> RegisterInitControl::createMemoryInit(unsig
 std::unique_ptr<RegisterInitControl> RegisterInitControl::createVecInit(void* vec)
 {
     return std::unique_ptr<RegisterInitControl>(new RegisterInitNumVec(static_cast<NumberVector*>(vec)));
-}
-
-void* RegisterInitControl::createIntVec(unsigned long long val)
-{
-    IntVec* vec = new IntVec;
-    vec->push_back(val);
-    return vec;
-}
-
-void* RegisterInitControl::appendIntVec(void* intVec, unsigned long long val)
-{
-    static_cast<IntVec*>(intVec)->push_back(val);
-    return intVec;
-}
-
-void* RegisterInitControl::createVec(void* intVec, int type)
-{
-    return new NumberVector(static_cast<IntVec*>(intVec), type);
-}
-
-void RegisterInitControl::destroyNumVec(void* intVec)
-{
-    delete static_cast<IntVec*>(intVec);
 }

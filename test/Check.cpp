@@ -1,6 +1,7 @@
 #include <string.h>
 #include <sstream>
 #include <iomanip>
+#include "Vec.h"
 #include "Check.h"
 #include "RegisterOperation.h"
 Check::Check() {}
@@ -134,6 +135,75 @@ private:
     std::string m_regName;
     unsigned long long m_val;
 };
+
+class CheckVecRegisterEqConst : public Check {
+public:
+    CheckVecRegisterEqConst(const char* regName, void* val)
+        : m_regName(regName)
+        , m_val(static_cast<NumberVector*>(val))
+    {
+    }
+
+private:
+    virtual bool check(const CPUARMState* state, const uintptr_t*, std::string& info) const override
+    {
+        std::ostringstream oss;
+        bool check = checkPrivate(*state);
+        oss << "CheckVecRegisterEqConst " << (check ? "PASSED" : "FAILED");
+        oss << "; m_val = " << *m_val;
+        info = oss.str();
+        return check;
+    }
+
+    bool checkPrivate(const CPUARMState& env) const
+    {
+        RegisterOperation& op = RegisterOperation::getDefault();
+        const uintptr_t* pointer = op.getRegisterPointer(&env, m_regName);
+        switch (m_val->m_type) {
+        case 64: {
+            EMASSERT(m_val->m_intVec->size() <= 2);
+            const uint64_t* p = reinterpret_cast<const uint64_t*>(pointer);
+            for (auto v : *m_val->m_intVec) {
+                if (*p++ != v) {
+                    return false;
+                }
+            }
+        } break;
+        case 32: {
+            EMASSERT(m_val->m_intVec->size() <= 4);
+            const uint32_t* p = reinterpret_cast<const uint32_t*>(pointer);
+            for (auto v : *m_val->m_intVec) {
+                if (*p++ != v) {
+                    return false;
+                }
+            }
+        } break;
+        case 16: {
+            EMASSERT(m_val->m_intVec->size() <= 8);
+            const uint16_t* p = reinterpret_cast<const uint16_t*>(pointer);
+            for (auto v : *m_val->m_intVec) {
+                if (*p++ != v) {
+                    return false;
+                }
+            }
+        } break;
+        case 8: {
+            EMASSERT(m_val->m_intVec->size() <= 16);
+            const uint8_t* p = reinterpret_cast<const uint8_t*>(pointer);
+            for (auto v : *m_val->m_intVec) {
+                if (*p++ != v) {
+                    return false;
+                }
+            }
+        } break;
+        default:
+            EMUNREACHABLE();
+        }
+        return true;
+    }
+    std::string m_regName;
+    std::unique_ptr<NumberVector> m_val;
+};
 }
 
 std::unique_ptr<Check> Check::createCheckRegisterEqConst(const char* name, unsigned long long val)
@@ -159,4 +229,9 @@ std::unique_ptr<Check> Check::createCheckState(unsigned long long val)
 std::unique_ptr<Check> Check::createCheckMemory(const char* registerName, unsigned long long val)
 {
     return std::unique_ptr<Check>(new CheckMemory(registerName, val));
+}
+
+std::unique_ptr<Check> Check::createCheckVecRegisterEqConst(const char* name, NumberVector* num)
+{
+    return std::unique_ptr<Check>(new CheckVecRegisterEqConst(name, num));
 }

@@ -1,9 +1,10 @@
+#include <stdio.h>
+#include <string.h>
 #include "IRContextInternal.h"
 #include "log.h"
 #include "Check.h"
 #include "RegisterOperation.h"
-#include <stdio.h>
-#include <string.h>
+#include "Vec.h"
 #define CONTEXT() \
     static_cast<struct IRContextInternal*>(context)
 
@@ -55,6 +56,12 @@ void contextSawCheckRegisterFloatConst(struct IRContext* context, const char* re
     PUSH_BACK_CHECK(Check::createCheckRegisterEqFloatConst(registerName, val));
 }
 
+void contextSawCheckVecRegsiterConst(struct IRContext* context, const char* registerName, void* vec)
+{
+    LOGV("%s: registerName = %s.\n", __FUNCTION__, registerName);
+    PUSH_BACK_CHECK(Check::createCheckVecRegisterEqConst(registerName, static_cast<NumberVector*>(vec)));
+}
+
 void contextSawCheckRegister(struct IRContext* context, const char* registerName1, const char* registerName2)
 {
     LOGV("%s: registerName1 = %s, registerName2 = %s.\n", __FUNCTION__, registerName1, registerName2);
@@ -78,22 +85,22 @@ void contextYYError(int line, int column, struct IRContext* context, const char*
     printf("line %d column %d: error:%s; text: %s.\n", line, column, reason, text);
 }
 
-void* contextNumVecAppendInt(struct IRContext* context, void* initList, unsigned long long val)
+void* contextIntVecAppendInt(struct IRContext* context, void* initList, unsigned long long val)
 {
-    return RegisterInitControl::appendIntVec(initList, val);
+    return appendIntVec(static_cast<IntVec*>(initList), val);
 }
 
-void* contextNumVecNew(struct IRContext* context, unsigned long long val)
+void* contextIntVecNew(struct IRContext* context, unsigned long long val)
 {
-    return RegisterInitControl::createIntVec(val);
+    return createIntVec(val);
 }
 
 void* contextVecExpr(struct IRContext* context, void* numvec, int type)
 {
-    return RegisterInitControl::createVec(numvec, type);
+    return createNumberVec(static_cast<IntVec*>(numvec), type);
 }
 
-void contextDestoryNumVec(void* initList)
+void contextDestoryIntVec(void* initList)
 {
-    return RegisterInitControl::destroyNumVec(initList);
+    delete static_cast<IntVec*>(initList);
 }

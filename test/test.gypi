@@ -11,6 +11,7 @@
             'RegisterAssign.cpp',
             'RegisterInit.cpp',
             'RegisterOperation.cpp',
+            'Vec.cpp',
             'dispatch_vex.S',
             '<(bison_gen_source)',
             '<(flex_gen_source)',

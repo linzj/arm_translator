@@ -17,11 +17,6 @@ public:
     static std::unique_ptr<RegisterInitControl> createConstantInit(uintptr_t val);
     static std::unique_ptr<RegisterInitControl> createMemoryInit(unsigned long long size, unsigned long long val);
     static std::unique_ptr<RegisterInitControl> createVecInit(void* vec);
-
-    static void* createIntVec(unsigned long long val);
-    static void* appendIntVec(void* intVec, unsigned long long val);
-    static void* createVec(void* intVec, int type);
-    static void destroyNumVec(void* intVec);
 };
 struct RegisterInit {
     std::string m_name;
