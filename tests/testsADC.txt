@@ -2,6 +2,9 @@ r0 = 0xffffffff
 r1 = 0x7fffffff
 r2 = 0x1
 r3 = 0x0
+r4 = 24
+r5 = 0x7fffffff
 %%
 CheckEqual r0 0
 CheckEqual r1 0x80000000
+CheckEqual r4 0xffffff7f
