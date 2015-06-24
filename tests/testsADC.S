@@ -21,6 +21,7 @@ foo:
 	adc	r1, r1, r3
     ror r6, r5, r4
     ror r4, r5, #24
+    lsl r7, r5, #8
 	bx	lr
 
 

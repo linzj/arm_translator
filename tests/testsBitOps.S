@@ -19,6 +19,7 @@
 foo:
 	and r0, r0, r1
     eor r1, r1, r2
+    sbfx r3, r1, #0, #12
 	bx	lr
 
 
