@@ -1,6 +1,5 @@
 tcg_const_ptr
 tcg_gen_and_i64
-tcg_gen_mov_i64
 tcg_gen_movi_i64
 tcg_gen_mulu2_i32
 tcg_gen_neg_i32
