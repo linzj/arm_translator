@@ -17,5 +17,6 @@
 	.type	foo, %function
 foo:
     vmull.s32  q1, d0, d1
+    vmull.u32  q2, d0, d1
     bx lr
 	.section	.note.GNU-stack,"",%progbits

@@ -880,7 +880,7 @@ void tcg_gen_mulu2_i32(DisasContext* s, TCGv_i32 rl, TCGv_i32 rh,
     LValue t1 = myctx->output()->buildCast(LLVMZExt, unwrap(s, arg2), myctx->output()->repo().int64);
     LValue t3 = myctx->output()->buildMul(t0, t1);
     LValue low = myctx->output()->buildCast(LLVMTrunc, t3, myctx->output()->repo().int32);
-    LValue high = myctx->output()->buildLShr(t3, myctx->output()->repo().int32ThirtyTwo);
+    LValue high = myctx->output()->buildLShr(t3, myctx->output()->constInt64(32));
     high = myctx->output()->buildCast(LLVMTrunc, high, myctx->output()->repo().int32);
     storeToTCG(s, low, rl);
     storeToTCG(s, high, rh);
