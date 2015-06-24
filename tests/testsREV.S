@@ -19,4 +19,5 @@
 foo:
     rev r1, r0
     revsh r2, r0
+    rev16 r3, r0
 	bx	lr

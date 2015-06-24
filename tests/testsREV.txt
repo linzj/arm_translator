@@ -2,3 +2,4 @@ r0 = 0x12345678
 %%
 CheckEqual r1 0x78563412
 CheckEqual r2 0x7856
+CheckEqual r3 0x34127856
