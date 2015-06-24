@@ -1,0 +1,6 @@
+r0 = 2
+r1 = 1
+d0 = { 0x40091eb851eb851f }.int64
+d1 = { 0x4008f5c28f5c28f6 }.int64
+%%
+CheckEqual d2 { 0x40091eb851eb851f }.int64

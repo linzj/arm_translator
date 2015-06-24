@@ -38,6 +38,7 @@ void cortex_a15_initfn(ARMCPU* cpu)
     set_feature(&cpu->env, ARM_FEATURE_DUMMY_C15_REGS);
     set_feature(&cpu->env, ARM_FEATURE_CBAR_RO);
     set_feature(&cpu->env, ARM_FEATURE_LPAE);
+    set_feature(&cpu->env, ARM_FEATURE_V8);
     cpu->midr = 0x412fc0f1;
     cpu->reset_fpsid = 0x410430f0;
     cpu->mvfr0 = 0x10110222;
