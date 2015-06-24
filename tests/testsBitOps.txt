@@ -5,3 +5,5 @@ r2 = 0xff00
 CheckEqual r0 0x34
 CheckEqual r1 0xed34
 CheckEqual r3 0xfffffd34
+CheckEqual r4 0xfffd3400
+CheckEqual r5 0x00fffffd

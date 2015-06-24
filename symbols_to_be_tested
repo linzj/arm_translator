@@ -1,7 +1,5 @@
 tcg_const_ptr
 tcg_gen_and_i64
-tcg_gen_shl_i32
-tcg_gen_shr_i32
 tcg_gen_vfp_addd
 tcg_gen_vfp_subd
 tcg_gen_vfp_muld

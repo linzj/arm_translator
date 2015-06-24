@@ -20,6 +20,9 @@ foo:
 	and r0, r0, r1
     eor r1, r1, r2
     sbfx r3, r1, #0, #12
+    mov r2, #8
+    lsl r4, r3, r2
+    lsr r5, r3, r2
 	bx	lr
 
 
