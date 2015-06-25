@@ -9,6 +9,7 @@
 #include "CompilerState.h"
 #include "IntrinsicRepository.h"
 #include "InitializeLLVM.h"
+#include "X86Assembler.h"
 #include "Output.h"
 #include "cpu.h"
 #include "tb.h"
@@ -210,80 +211,29 @@ static inline void cpu_get_tb_cpu_state(CPUARMState* env, target_ulong* pc,
     }
 }
 
-static inline unsigned iregEnc3210(unsigned in)
-{
-    return in;
-}
-
-inline static uint8_t mkModRegRM(unsigned mod, unsigned reg, unsigned regmem)
-{
-    return (uint8_t)(((mod & 3) << 6) | ((reg & 7) << 3) | (regmem & 7));
-}
-
-inline static uint8_t* doAMode_R__wrk(uint8_t* p, unsigned gregEnc3210, unsigned eregEnc3210)
-{
-    *p++ = mkModRegRM(3, gregEnc3210 & 7, eregEnc3210 & 7);
-    return p;
-}
-
-static uint8_t* doAMode_R(uint8_t* p, unsigned greg, unsigned ereg)
-{
-    return doAMode_R__wrk(p, iregEnc3210(greg), iregEnc3210(ereg));
-}
-
-static uint8_t* emit32(uint8_t* p, uint32_t w32)
-{
-    *reinterpret_cast<uint32_t*>(p) = w32;
-    return p + sizeof(w32);
-}
-
 static void patchProloge(void*, uint8_t* start)
 {
-    uint8_t* p = start;
-    // 2 bytes
-    *p++ = 0x89;
-    p = doAMode_R(p, jit::RBP,
-        jit::RCX);
+    JSC::X86Assembler assembler(reinterpret_cast<char*>(start), 2);
+    assembler.movl_rr(JSC::X86Registers::ebp, JSC::X86Registers::ecx);
 }
 
 static void patchDirect(void*, uint8_t* p, void* entry)
 {
     // epilogue
-
-    // 2 bytes
-    *p++ = 0x89;
-    p = doAMode_R(p, jit::RBP,
-        jit::RSP);
-    // 1 bytes pop rbp
-    *p++ = 0x5d;
-
-    /* 5 bytes: mov $target, %eax */
-    *p++ = 0xB8;
-    p = emit32(p, reinterpret_cast<uintptr_t>(entry));
-
-    /* 2 bytes: call*%eax */
-    *p++ = 0xff;
-    *p++ = 0xd0;
+    JSC::X86Assembler assembler(reinterpret_cast<char*>(p), 10);
+    assembler.movl_rr(JSC::X86Registers::ebp, JSC::X86Registers::esp);
+    assembler.pop_r(JSC::X86Registers::ebp);
+    assembler.movl_i32r(reinterpret_cast<int>(entry), JSC::X86Registers::eax);
+    assembler.call(JSC::X86Registers::eax);
 }
 
 void patchIndirect(void*, uint8_t* p, void* entry)
 {
-    // epilogue
-
-    // 2 bytes
-    *p++ = 0x89;
-    p = doAMode_R(p, jit::RBP,
-        jit::RSP);
-    // 1 bytes pop rbp
-    *p++ = 0x5d;
-
-    /* 5 bytes: mov $target, %eax */
-    *p++ = 0xB8;
-    p = emit32(p, reinterpret_cast<uintptr_t>(entry));
-
-    /* 2 bytes: jmp *%eax */
-    *p++ = 0xff;
-    *p++ = 0xe0;
+    JSC::X86Assembler assembler(reinterpret_cast<char*>(p), 10);
+    assembler.movl_rr(JSC::X86Registers::ebp, JSC::X86Registers::esp);
+    assembler.pop_r(JSC::X86Registers::ebp);
+    assembler.movl_i32r(reinterpret_cast<int>(entry), JSC::X86Registers::eax);
+    assembler.jmp_r(JSC::X86Registers::eax);
 }
 }
 namespace jit {

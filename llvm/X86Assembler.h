@@ -33,7 +33,7 @@
 
 #define ASSERT EMASSERT
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
-#define CPU(a) cpu_##a
+#define WEBKITCPU(a) cpu_##a
 #ifdef __x86_64__
 #define cpu_X86_64 1
 #define cpu_X86 0
@@ -75,7 +75,7 @@ namespace X86Registers {
     V(void*, eip)                        \
     V(void*, eflags)                     \
                                          \
-        // Note: the JITs only stores double values in the FP registers.
+// Note: the JITs only stores double values in the FP registers.
 #define FOR_EACH_CPU_FPREGISTER(V) \
     V(double, xmm0)                \
     V(double, xmm1)                \
@@ -87,12 +87,12 @@ namespace X86Registers {
     V(double, xmm7)                \
     FOR_EACH_X86_64_CPU_FPREGISTER(V)
 
-#if CPU(X86)
+#if WEBKITCPU(X86)
 
 #define FOR_EACH_X86_64_CPU_GPREGISTER(V) // Nothing to add.
 #define FOR_EACH_X86_64_CPU_FPREGISTER(V) // Nothing to add.
 
-#elif CPU(X86_64)
+#elif WEBKITCPU(X86_64)
 
 #define FOR_EACH_X86_64_CPU_GPREGISTER(V) \
     V(void*, r8)                          \
@@ -114,7 +114,7 @@ namespace X86Registers {
     V(double, xmm14)                      \
     V(double, xmm15)
 
-#endif // CPU(X86_64)
+#endif // WEBKITCPU(X86_64)
 
     typedef enum {
 #define DECLARE_REGISTER(_type, _regName) _regName,
@@ -137,7 +137,7 @@ public:
     static RegisterID firstRegister() { return X86Registers::eax; }
     static RegisterID lastRegister()
     {
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
         return X86Registers::r15;
 #else
         return X86Registers::edi;
@@ -150,7 +150,7 @@ public:
     static FPRegisterID firstFPRegister() { return X86Registers::xmm0; }
     static FPRegisterID lastFPRegister()
     {
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
         return X86Registers::xmm15;
 #else
         return X86Registers::xmm7;
@@ -200,12 +200,12 @@ private:
         OP_CMP_EvGv = 0x39,
         OP_CMP_GvEv = 0x3B,
         OP_CMP_EAXIv = 0x3D,
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
         PRE_REX = 0x40,
 #endif
         OP_PUSH_EAX = 0x50,
         OP_POP_EAX = 0x58,
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
         OP_MOVSXD_GvEv = 0x63,
 #endif
         PRE_OPERAND_SIZE = 0x66,
@@ -339,9 +339,10 @@ private:
     class X86InstructionFormatter;
 
 public:
-    X86Assembler()
+    explicit X86Assembler(char* buffer, unsigned capacity)
         : m_indexOfLastWatchpoint(INT_MIN)
         , m_indexOfTailOfLastWatchpoint(INT_MIN)
+        , m_formatter(buffer, capacity)
     {
     }
 
@@ -377,7 +378,7 @@ public:
 
 // Arithmetic operations:
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
     void adcl_im(int imm, const void* addr)
     {
         if (CAN_SIGN_EXTEND_8_32(imm)) {
@@ -401,7 +402,7 @@ public:
         m_formatter.oneByteOp(OP_ADD_GvEv, dst, base, offset);
     }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
     void addl_mr(const void* addr, RegisterID dst)
     {
         m_formatter.oneByteOp(OP_ADD_GvEv, dst, addr);
@@ -440,7 +441,7 @@ public:
         }
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void addq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_ADD_EvGv, src, dst);
@@ -530,7 +531,7 @@ public:
         }
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void andq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_AND_EvGv, src, dst);
@@ -566,19 +567,19 @@ public:
         m_formatter.oneByteOp(OP_GROUP5_Ev, GROUP1_OP_OR, dst);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void decq_r(RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_GROUP5_Ev, GROUP1_OP_OR, dst);
     }
-#endif // CPU(X86_64)
+#endif // WEBKITCPU(X86_64)
 
     void inc_r(RegisterID dst)
     {
         m_formatter.oneByteOp(OP_GROUP5_Ev, GROUP1_OP_ADD, dst);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void incq_r(RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_GROUP5_Ev, GROUP1_OP_ADD, dst);
@@ -588,14 +589,14 @@ public:
     {
         m_formatter.oneByteOp64(OP_GROUP5_Ev, GROUP1_OP_ADD, base, offset);
     }
-#endif // CPU(X86_64)
+#endif // WEBKITCPU(X86_64)
 
     void negl_r(RegisterID dst)
     {
         m_formatter.oneByteOp(OP_GROUP3_Ev, GROUP3_OP_NEG, dst);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void negq_r(RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_GROUP3_Ev, GROUP3_OP_NEG, dst);
@@ -659,7 +660,7 @@ public:
         }
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void orq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_OR_EvGv, src, dst);
@@ -740,7 +741,7 @@ public:
         }
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void subq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_SUB_EvGv, src, dst);
@@ -816,7 +817,7 @@ public:
         }
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void xorq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_XOR_EvGv, src, dst);
@@ -904,7 +905,7 @@ public:
         m_formatter.oneByteOp(OP_GROUP2_EvCL, GROUP2_OP_SHL, dst);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void sarq_CLr(RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_GROUP2_EvCL, GROUP2_OP_SAR, dst);
@@ -939,19 +940,19 @@ public:
             m_formatter.immediate8(imm);
         }
     }
-#endif // CPU(X86_64)
+#endif // WEBKITCPU(X86_64)
 
     void imull_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.twoByteOp(OP2_IMUL_GvEv, dst, src);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void imulq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.twoByteOp64(OP2_IMUL_GvEv, dst, src);
     }
-#endif // CPU(X86_64)
+#endif // WEBKITCPU(X86_64)
 
     void imull_mr(int offset, RegisterID base, RegisterID dst)
     {
@@ -1031,7 +1032,7 @@ public:
         m_formatter.immediate8(imm);
     }
 
-#if CPU(X86)
+#if WEBKITCPU(X86)
     void cmpb_im(int imm, const void* addr)
     {
         m_formatter.oneByteOp(OP_GROUP1_EbIb, GROUP1_OP_CMP, addr);
@@ -1057,7 +1058,7 @@ public:
         m_formatter.immediate32(imm);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void cmpq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_CMP_EvGv, src, dst);
@@ -1206,7 +1207,7 @@ public:
         m_formatter.immediate8(imm);
     }
 
-#if CPU(X86)
+#if WEBKITCPU(X86)
     void testb_im(int imm, const void* addr)
     {
         m_formatter.oneByteOp(OP_GROUP3_EbIb, GROUP3_OP_TEST, addr);
@@ -1220,7 +1221,7 @@ public:
         m_formatter.immediate32(imm);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void testq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_TEST_EvGv, src, dst);
@@ -1315,7 +1316,7 @@ public:
             m_formatter.oneByteOp(OP_XCHG_EvGv, src, dst);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void xchgq_rr(RegisterID src, RegisterID dst)
     {
         if (src == X86Registers::eax)
@@ -1350,7 +1351,7 @@ public:
     void movl_mEAX(const void* addr)
     {
         m_formatter.oneByteOp(OP_MOV_EAXOv);
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
         m_formatter.immediate64(reinterpret_cast<int64_t>(addr));
 #else
         m_formatter.immediate32(reinterpret_cast<int>(addr));
@@ -1395,7 +1396,7 @@ public:
         m_formatter.immediate32(imm);
     }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
     void movb_i8m(int imm, const void* addr)
     {
         ASSERT(-128 <= imm && imm < 128);
@@ -1418,7 +1419,7 @@ public:
         m_formatter.immediate8(imm);
     }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
     void movb_rm(RegisterID src, const void* addr)
     {
         m_formatter.oneByteOp(OP_MOV_EbGb, src, addr);
@@ -1444,14 +1445,14 @@ public:
     void movl_EAXm(const void* addr)
     {
         m_formatter.oneByteOp(OP_MOV_OvEAX);
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
         m_formatter.immediate64(reinterpret_cast<int64_t>(addr));
 #else
         m_formatter.immediate32(reinterpret_cast<int>(addr));
 #endif
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void movq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_MOV_EvGv, src, dst);
@@ -1575,7 +1576,7 @@ public:
         m_formatter.twoByteOp(OP2_MOVZX_GvEb, dst, base, index, scale, offset);
     }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
     void movzbl_mr(const void* address, RegisterID dst)
     {
         m_formatter.twoByteOp(OP2_MOVZX_GvEb, dst, address);
@@ -1604,7 +1605,7 @@ public:
     {
         m_formatter.oneByteOp(OP_LEA, dst, base, offset);
     }
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void leaq_mr(int offset, RegisterID base, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_LEA, dst, base, offset);
@@ -1650,7 +1651,7 @@ public:
         m_formatter.oneByteOp(OP_GROUP5_Ev, GROUP5_OP_JMPN, base, offset);
     }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
     void jmp_m(const void* address)
     {
         m_formatter.oneByteOp(OP_GROUP5_Ev, GROUP5_OP_JMPN, address);
@@ -1771,7 +1772,7 @@ public:
         m_formatter.twoByteOp(OP2_ADDSD_VsdWsd, (RegisterID)dst, base, offset);
     }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
     void addsd_mr(const void* address, XMMRegisterID dst)
     {
         m_formatter.prefix(PRE_SSE_F2);
@@ -1785,7 +1786,7 @@ public:
         m_formatter.twoByteOp(OP2_CVTSI2SD_VsdEd, (RegisterID)dst, src);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void cvtsi2sdq_rr(RegisterID src, XMMRegisterID dst)
     {
         m_formatter.prefix(PRE_SSE_F2);
@@ -1799,7 +1800,7 @@ public:
         m_formatter.twoByteOp(OP2_CVTSI2SD_VsdEd, (RegisterID)dst, base, offset);
     }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
     void cvtsi2sd_mr(const void* address, XMMRegisterID dst)
     {
         m_formatter.prefix(PRE_SSE_F2);
@@ -1825,7 +1826,7 @@ public:
         m_formatter.twoByteOp(OP2_CVTSS2SD_VsdWsd, dst, (RegisterID)src);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void cvttsd2siq_rr(XMMRegisterID src, RegisterID dst)
     {
         m_formatter.prefix(PRE_SSE_F2);
@@ -1845,7 +1846,7 @@ public:
         m_formatter.twoByteOp(OP2_MOVD_VdEd, (RegisterID)dst, src);
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     void movmskpd_rr(XMMRegisterID src, RegisterID dst)
     {
         m_formatter.prefix(PRE_SSE_66);
@@ -1907,7 +1908,7 @@ public:
         m_formatter.twoByteOp(OP2_MOVSD_VsdWsd, dst, base, index, scale, offset);
     }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
     void movsd_mr(const void* address, XMMRegisterID dst)
     {
         m_formatter.prefix(PRE_SSE_F2);
@@ -2160,7 +2161,7 @@ public:
         return 5;
     }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
     static void revertJumpTo_movq_i64r(void* instructionStart, int64_t imm, RegisterID dst)
     {
         const unsigned instructionSize = 10; // REX.W MOV IMM64
@@ -2239,7 +2240,7 @@ public:
     static void replaceWithLoad(void* instructionStart)
     {
         uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
         if ((*ptr & ~15) == PRE_REX)
             ptr++;
 #endif
@@ -2257,7 +2258,7 @@ public:
     static void replaceWithAddressComputation(void* instructionStart)
     {
         uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
         if ((*ptr & ~15) == PRE_REX)
             ptr++;
 #endif
@@ -2366,9 +2367,11 @@ private:
 
     class X86InstructionFormatter {
 
-        static const int maxInstructionSize = 16;
-
     public:
+        X86InstructionFormatter(char* buffer, unsigned capacity)
+            : m_buffer(buffer, capacity)
+        {
+        }
         enum ModRmMode {
             ModRmMemoryNoDisp,
             ModRmMemoryDisp8,
@@ -2401,20 +2404,17 @@ private:
 
         void oneByteOp(OneByteOpcodeID opcode)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             m_buffer.putByteUnchecked(opcode);
         }
 
         void oneByteOp(OneByteOpcodeID opcode, RegisterID reg)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIfNeeded(0, 0, reg);
             m_buffer.putByteUnchecked(opcode + (reg & 7));
         }
 
         void oneByteOp(OneByteOpcodeID opcode, int reg, RegisterID rm)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIfNeeded(reg, 0, rm);
             m_buffer.putByteUnchecked(opcode);
             registerModRM(reg, rm);
@@ -2422,7 +2422,6 @@ private:
 
         void oneByteOp(OneByteOpcodeID opcode, int reg, RegisterID base, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIfNeeded(reg, 0, base);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM(reg, base, offset);
@@ -2430,7 +2429,6 @@ private:
 
         void oneByteOp_disp32(OneByteOpcodeID opcode, int reg, RegisterID base, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIfNeeded(reg, 0, base);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM_disp32(reg, base, offset);
@@ -2438,7 +2436,6 @@ private:
 
         void oneByteOp_disp8(OneByteOpcodeID opcode, int reg, RegisterID base, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIfNeeded(reg, 0, base);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM_disp8(reg, base, offset);
@@ -2446,16 +2443,14 @@ private:
 
         void oneByteOp(OneByteOpcodeID opcode, int reg, RegisterID base, RegisterID index, int scale, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIfNeeded(reg, index, base);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM(reg, base, index, scale, offset);
         }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
         void oneByteOp(OneByteOpcodeID opcode, int reg, const void* address)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM(reg, address);
         }
@@ -2463,14 +2458,12 @@ private:
 
         void twoByteOp(TwoByteOpcodeID opcode)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             m_buffer.putByteUnchecked(OP_2BYTE_ESCAPE);
             m_buffer.putByteUnchecked(opcode);
         }
 
         void twoByteOp(TwoByteOpcodeID opcode, int reg, RegisterID rm)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIfNeeded(reg, 0, rm);
             m_buffer.putByteUnchecked(OP_2BYTE_ESCAPE);
             m_buffer.putByteUnchecked(opcode);
@@ -2479,7 +2472,6 @@ private:
 
         void twoByteOp(TwoByteOpcodeID opcode, int reg, RegisterID base, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIfNeeded(reg, 0, base);
             m_buffer.putByteUnchecked(OP_2BYTE_ESCAPE);
             m_buffer.putByteUnchecked(opcode);
@@ -2488,17 +2480,15 @@ private:
 
         void twoByteOp(TwoByteOpcodeID opcode, int reg, RegisterID base, RegisterID index, int scale, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIfNeeded(reg, index, base);
             m_buffer.putByteUnchecked(OP_2BYTE_ESCAPE);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM(reg, base, index, scale, offset);
         }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
         void twoByteOp(TwoByteOpcodeID opcode, int reg, const void* address)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             m_buffer.putByteUnchecked(OP_2BYTE_ESCAPE);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM(reg, address);
@@ -2507,13 +2497,12 @@ private:
 
         void threeByteOp(ThreeByteOpcodeID opcode)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             m_buffer.putByteUnchecked(OP_2BYTE_ESCAPE);
             m_buffer.putByteUnchecked(OP2_3BYTE_ESCAPE);
             m_buffer.putByteUnchecked(opcode);
         }
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
         // Quad-word-sized operands:
         //
         // Used to format 64-bit operantions, planting a REX.w prefix.
@@ -2522,21 +2511,18 @@ private:
 
         void oneByteOp64(OneByteOpcodeID opcode)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexW(0, 0, 0);
             m_buffer.putByteUnchecked(opcode);
         }
 
         void oneByteOp64(OneByteOpcodeID opcode, RegisterID reg)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexW(0, 0, reg);
             m_buffer.putByteUnchecked(opcode + (reg & 7));
         }
 
         void oneByteOp64(OneByteOpcodeID opcode, int reg, RegisterID rm)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexW(reg, 0, rm);
             m_buffer.putByteUnchecked(opcode);
             registerModRM(reg, rm);
@@ -2544,7 +2530,6 @@ private:
 
         void oneByteOp64(OneByteOpcodeID opcode, int reg, RegisterID base, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexW(reg, 0, base);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM(reg, base, offset);
@@ -2552,7 +2537,6 @@ private:
 
         void oneByteOp64_disp32(OneByteOpcodeID opcode, int reg, RegisterID base, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexW(reg, 0, base);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM_disp32(reg, base, offset);
@@ -2560,7 +2544,6 @@ private:
 
         void oneByteOp64_disp8(OneByteOpcodeID opcode, int reg, RegisterID base, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexW(reg, 0, base);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM_disp8(reg, base, offset);
@@ -2568,7 +2551,6 @@ private:
 
         void oneByteOp64(OneByteOpcodeID opcode, int reg, RegisterID base, RegisterID index, int scale, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexW(reg, index, base);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM(reg, base, index, scale, offset);
@@ -2576,7 +2558,6 @@ private:
 
         void twoByteOp64(TwoByteOpcodeID opcode, int reg, RegisterID rm)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexW(reg, 0, rm);
             m_buffer.putByteUnchecked(OP_2BYTE_ESCAPE);
             m_buffer.putByteUnchecked(opcode);
@@ -2611,7 +2592,6 @@ private:
 
         void oneByteOp8(OneByteOpcodeID opcode, GroupOpcodeID groupOp, RegisterID rm)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIf(byteRegRequiresRex(rm), 0, 0, rm);
             m_buffer.putByteUnchecked(opcode);
             registerModRM(groupOp, rm);
@@ -2619,7 +2599,6 @@ private:
 
         void oneByteOp8(OneByteOpcodeID opcode, int reg, RegisterID rm)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIf(byteRegRequiresRex(reg) || byteRegRequiresRex(rm), reg, 0, rm);
             m_buffer.putByteUnchecked(opcode);
             registerModRM(reg, rm);
@@ -2627,7 +2606,6 @@ private:
 
         void oneByteOp8(OneByteOpcodeID opcode, int reg, RegisterID base, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIf(byteRegRequiresRex(reg) || byteRegRequiresRex(base), reg, 0, base);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM(reg, base, offset);
@@ -2635,7 +2613,6 @@ private:
 
         void oneByteOp8(OneByteOpcodeID opcode, int reg, RegisterID base, RegisterID index, int scale, int offset)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIf(byteRegRequiresRex(reg) || regRequiresRex(index) || regRequiresRex(base), reg, index, base);
             m_buffer.putByteUnchecked(opcode);
             memoryModRM(reg, base, index, scale, offset);
@@ -2643,7 +2620,6 @@ private:
 
         void twoByteOp8(TwoByteOpcodeID opcode, RegisterID reg, RegisterID rm)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIf(byteRegRequiresRex(reg) | byteRegRequiresRex(rm), reg, 0, rm);
             m_buffer.putByteUnchecked(OP_2BYTE_ESCAPE);
             m_buffer.putByteUnchecked(opcode);
@@ -2652,7 +2628,6 @@ private:
 
         void twoByteOp8(TwoByteOpcodeID opcode, GroupOpcodeID groupOp, RegisterID rm)
         {
-            m_buffer.ensureSpace(maxInstructionSize);
             emitRexIf(byteRegRequiresRex(rm), 0, 0, rm);
             m_buffer.putByteUnchecked(OP_2BYTE_ESCAPE);
             m_buffer.putByteUnchecked(opcode);
@@ -2705,7 +2680,7 @@ private:
         static const RegisterID noBase = X86Registers::ebp;
         static const RegisterID hasSib = X86Registers::esp;
         static const RegisterID noIndex = X86Registers::esp;
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
         static const RegisterID noBase2 = X86Registers::r13;
         static const RegisterID hasSib2 = X86Registers::r12;
 
@@ -2778,7 +2753,7 @@ private:
         void memoryModRM(int reg, RegisterID base, int offset)
         {
 // A base of esp or r12 would be interpreted as a sib, so force a sib with no index & put the base in there.
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
             if ((base == hasSib) || (base == hasSib2)) {
 #else
             if (base == hasSib) {
@@ -2795,7 +2770,7 @@ private:
                 }
             }
             else {
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
                 if (!offset && (base != noBase) && (base != noBase2))
 #else
                 if (!offset && (base != noBase))
@@ -2816,7 +2791,7 @@ private:
         {
             // A base of esp or r12 would be interpreted as a sib, so force a sib with no index & put the base in there.
             ASSERT(CAN_SIGN_EXTEND_8_32(offset));
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
             if ((base == hasSib) || (base == hasSib2)) {
 #else
             if (base == hasSib) {
@@ -2833,7 +2808,7 @@ private:
         void memoryModRM_disp32(int reg, RegisterID base, int offset)
         {
 // A base of esp or r12 would be interpreted as a sib, so force a sib with no index & put the base in there.
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
             if ((base == hasSib) || (base == hasSib2)) {
 #else
             if (base == hasSib) {
@@ -2851,7 +2826,7 @@ private:
         {
             ASSERT(index != noIndex);
 
-#if CPU(X86_64)
+#if WEBKITCPU(X86_64)
             if (!offset && (base != noBase) && (base != noBase2))
 #else
             if (!offset && (base != noBase))
@@ -2867,7 +2842,7 @@ private:
             }
         }
 
-#if !CPU(X86_64)
+#if !WEBKITCPU(X86_64)
         void memoryModRM(int reg, const void* address)
         {
             // noBase + ModRmMemoryNoDisp means noBase + ModRmMemoryDisp32!

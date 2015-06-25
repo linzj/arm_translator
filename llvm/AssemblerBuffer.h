@@ -56,16 +56,10 @@ struct AssemblerLabel {
 
 class AssemblerData {
 public:
-    AssemblerData()
-        : m_buffer(nullptr)
-        , m_capacity(0)
+    explicit AssemblerData(char* buffer, unsigned capacity)
+        : m_buffer(buffer)
+        , m_capacity(capacity)
     {
-    }
-
-    AssemblerData(unsigned initialCapacity)
-    {
-        m_capacity = initialCapacity;
-        m_buffer = static_cast<char*>(malloc(m_capacity));
     }
 
     AssemblerData(AssemblerData&& other)
@@ -87,7 +81,6 @@ public:
 
     ~AssemblerData()
     {
-        free(m_buffer);
     }
 
     char* buffer() const { return m_buffer; }
@@ -96,8 +89,7 @@ public:
 
     void grow(unsigned extraCapacity = 0)
     {
-        m_capacity = m_capacity + m_capacity / 2 + extraCapacity;
-        m_buffer = static_cast<char*>(realloc(m_buffer, m_capacity));
+        EMUNREACHABLE();
     }
 
 private:
@@ -106,11 +98,9 @@ private:
 };
 
 class AssemblerBuffer {
-    static const int initialCapacity = 128;
-
 public:
-    AssemblerBuffer()
-        : m_storage(initialCapacity)
+    explicit AssemblerBuffer(char* buffer, unsigned capacity)
+        : m_storage(buffer, capacity)
         , m_index(0)
     {
     }
