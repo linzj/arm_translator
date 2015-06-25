@@ -28,5 +28,11 @@ foo:
     bx lr
     .thumb
 .Lfoo2:
+    push {lr}
+    add r0, r0, r1
+    blx .Lfoo3
+    pop {pc}
+    .arm
+.Lfoo3:
     add r0, r0, r1
     bx lr
