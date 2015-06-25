@@ -238,7 +238,7 @@ void patchIndirect(void*, uint8_t* p, void* entry)
 }
 namespace jit {
 
-void translate(CPUARMState* env, const TranslateDesc& desc)
+void translate(CPUARMState* env, TranslateDesc& desc)
 {
     MyDisCtx ctx(desc.m_executableMemAllocator);
     ARMCPU* cpu = arm_env_get_cpu(env);
@@ -254,7 +254,6 @@ void translate(CPUARMState* env, const TranslateDesc& desc)
     compile(*ctx.state());
     LinkDesc linkDesc = {
         nullptr,
-        desc.m_dispAssist,
         desc.m_dispDirect,
         desc.m_dispIndirect,
         patchProloge,
@@ -263,6 +262,21 @@ void translate(CPUARMState* env, const TranslateDesc& desc)
         patchIndirect,
     };
     link(*ctx.state(), linkDesc);
+    desc.m_guestExtents = tb.size;
+}
+
+void patchDirectJump(uintptr_t from, uintptr_t to)
+{
+    JSC::X86Assembler assembler(reinterpret_cast<char*>(from), 7);
+    assembler.movl_i32r(to, JSC::X86Registers::eax);
+    assembler.jmp_r(JSC::X86Registers::eax);
+}
+
+void unpatchDirectJump(uintptr_t from, uintptr_t to)
+{
+    JSC::X86Assembler assembler(reinterpret_cast<char*>(from), 7);
+    assembler.movl_i32r(to, JSC::X86Registers::eax);
+    assembler.call(JSC::X86Registers::eax);
 }
 }
 

@@ -7,9 +7,11 @@ class ExecutableMemoryAllocator;
 struct TranslateDesc {
     void* m_dispDirect;
     void* m_dispIndirect;
-    void* m_dispAssist;
     ExecutableMemoryAllocator* m_executableMemAllocator;
+    size_t m_guestExtents;
 };
-void translate(CPUARMState* env, const TranslateDesc& desc);
+void translate(CPUARMState* env, TranslateDesc& desc);
+void patchDirectJump(uintptr_t from, uintptr_t to);
+void unpatchDirectJump(uintptr_t from, uintptr_t to);
 }
 #endif /* TCGGENERATOR_H */

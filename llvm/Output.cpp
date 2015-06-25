@@ -265,24 +265,6 @@ void Output::buildGetArg()
     m_arg = llvmAPI->GetParam(m_state.m_function, 0);
 }
 
-void Output::buildAssistPatch(LValue where)
-{
-    PatchDesc desc = { PatchType::Assist };
-    buildPatchCommon(where, desc, m_state.m_platformDesc.m_assistSize);
-}
-
-void Output::buildPatchCommon(LValue where, const PatchDesc& desc, size_t patchSize)
-{
-    LValue constIndex[] = { constInt32(0), constInt32(m_state.m_platformDesc.m_pcFieldOffset / sizeof(intptr_t)) };
-    buildStore(where, llvmAPI->BuildInBoundsGEP(m_builder, m_arg, constIndex, 2, ""));
-    LValue call = buildCall(repo().patchpointVoidIntrinsic(), constInt64(m_stackMapsId), constInt32(patchSize), constNull(repo().ref8), constInt32(0));
-    llvmAPI->SetInstructionCallConv(call, LLVMAnyRegCallConv);
-    buildUnreachable(m_builder);
-    // record the stack map info
-    m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
-    m_currentBlockTerminated = true;
-}
-
 void Output::buildTcgDirectPatch(void)
 {
     PatchDesc desc = { PatchType::TcgDirect };

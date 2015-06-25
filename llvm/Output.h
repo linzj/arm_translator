@@ -86,7 +86,6 @@ public:
     LValue buildBitCast(LLVMValueRef Val, LLVMTypeRef DestTy);
     LValue buildPhi(LType type);
 
-    void buildAssistPatch(LValue where);
     void buildTcgDirectPatch(void);
     void buildTcgIndirectPatch(void);
     LValue buildTcgHelperCallNotRet(void* func, int num, LValue* param);

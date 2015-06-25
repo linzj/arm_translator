@@ -27,9 +27,6 @@ void link(CompilerState& state, const LinkDesc& desc)
         }
         PatchDesc& patchDesc = found->second;
         switch (patchDesc.m_type) {
-        case PatchType::Assist: {
-            desc.m_patchAssist(desc.m_opaque, body + record.second[0].instructionOffset, desc.m_dispAssist);
-        } break;
         case PatchType::TcgDirect: {
             auto& recordUnit = record.second[0];
             desc.m_patchTcgDirect(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcgDirect);
