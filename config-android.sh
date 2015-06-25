@@ -14,3 +14,6 @@ mkdir $ANDROID_BUILD_DIR
  -DCMAKE_TOOLCHAIN_FILE=$LLVM_CHECKOUT/cmake/platforms/Android_x86.cmake \
 -DLLVM_ENABLE_PIC=off -DLLVM_ENABLE_RTTI=off -DLLVM_ENABLE_TERMINFO=off -DLLVM_ENABLE_TIMESTAMPS=off -DLLVM_ENABLE_ZLIB=off -DLLVM_TARGETS_TO_BUILD="X86" \
  $LLVM_CHECKOUT)
+# We should remove native to force
+# cmake reconfigure it again.
+rm -rf native
