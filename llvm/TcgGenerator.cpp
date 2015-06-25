@@ -379,7 +379,7 @@ static LValue tcgPointerToLLVM(DisasContext* s, TCGMemOp op, TCGv pointer)
     MyDisCtx* myctx = static_cast<MyDisCtx*>(s);
     EMASSERT(jit::typeOf(pointerBeforeCast) != myctx->output()->repo().ref32);
 
-    switch (op) {
+    switch (opInt) {
     case MO_8:
         return myctx->output()->buildCast(LLVMIntToPtr, pointerBeforeCast, myctx->output()->repo().ref8);
     case MO_16:
