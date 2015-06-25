@@ -1,5 +1,6 @@
 #include <string.h>
 #include "cpuinit.h"
+#include "compatglib.h"
 
 #define REGINFO_SENTINEL        \
     {                           \

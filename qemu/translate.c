@@ -50,8 +50,6 @@ TCGContext tcg_ctx;
 #define ARCH(x) do { if (!ENABLE_ARCH_##x) goto illegal_op; } while(0)
 #define tcg_check_temp_count() 0
 
-#define OPC_BUF_SIZE 640
-static uint32_t gen_opc_condexec_bits[OPC_BUF_SIZE];
 
 #define IS_USER(s) 1
 
@@ -5522,7 +5520,6 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
         }
         case NEON_3R_FLOAT_MULTIPLY:
         {
-            TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
             tcg_gen_vfp_muls(s, tmp, tmp, tmp2);
             if (!u) {
                 tcg_temp_free_i32(tmp2);
@@ -6325,9 +6322,7 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                                 gen_helper_neon_qrdmulh_s32(s, tmp, cpu_env, tmp, tmp2);
                             }
                         } else if (op & 1) {
-                            TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
                             tcg_gen_vfp_muls(s, tmp, tmp, tmp2);
-                            tcg_temp_free_ptr(fpstatus);
                         } else {
                             switch (size) {
                             case 0: gen_helper_neon_mul_u8(s, tmp, tmp, tmp2); break;
@@ -6346,9 +6341,7 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                                 break;
                             case 1:
                             {
-                                TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
                                 tcg_gen_vfp_adds(s, tmp, tmp, tmp2);
-                                tcg_temp_free_ptr(fpstatus);
                                 break;
                             }
                             case 4:
@@ -6356,9 +6349,7 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                                 break;
                             case 5:
                             {
-                                TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
                                 tcg_gen_vfp_subs(s, tmp, tmp2, tmp);
-                                tcg_temp_free_ptr(fpstatus);
                                 break;
                             }
                             default:
@@ -10929,7 +10920,6 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
     CPUARMState *env = &cpu->env;
     CPUState* cs = CPU(cpu);
     /* disable for llvm uint16_t *gen_opc_end; */
-    int j, lj;
     target_ulong pc_start;
     target_ulong next_page_start;
     int num_insns;
@@ -10999,7 +10989,6 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
     /* FIXME: cpu_M0 can probably be the same as cpu_V0.  */
     dc->__cpu_M0 = tcg_temp_new_i64(dc);
     next_page_start = (pc_start & TARGET_PAGE_MASK) + TARGET_PAGE_SIZE;
-    lj = -1;
     num_insns = 0;
     max_insns = CF_COUNT_MASK;
 
@@ -11261,17 +11250,3 @@ void arm_cpu_dump_state(ARMCPU *cpu, FILE *f, fprintf_function cpu_fprintf,
         cpu_fprintf(f, "FPSCR: %08x\n", (int)env->vfp.xregs[ARM_VFP_FPSCR]);
     }
 }
-
-/*
- * disable for llvm
-void restore_state_to_opc(CPUARMState *env, TranslationBlock *tb, int pc_pos)
-{
-    if (is_a64(env)) {
-        env->pc = tcg_ctx.gen_opc_pc[pc_pos];
-        env->condexec_bits = 0;
-    } else {
-        env->regs[15] = tcg_ctx.gen_opc_pc[pc_pos];
-        env->condexec_bits = gen_opc_condexec_bits[pc_pos];
-    }
-}
-*/

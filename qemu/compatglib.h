@@ -35,6 +35,10 @@ extern
 gboolean g_hash_table_insert (GHashTable *hash_table,
                                             gpointer key,
                                             gpointer value);
+extern void
+g_hash_table_foreach (GHashTable *hash_table,
+                      GHFunc      func,
+                      gpointer    user_data);
 extern
 GHashTable* g_hash_table_new_full (GHashFunc hash_func,
                                             GEqualFunc key_equal_func,

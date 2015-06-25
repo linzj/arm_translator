@@ -340,9 +340,9 @@ private:
 
 public:
     explicit X86Assembler(char* buffer, unsigned capacity)
-        : m_indexOfLastWatchpoint(INT_MIN)
+        : m_formatter(buffer, capacity)
+        , m_indexOfLastWatchpoint(INT_MIN)
         , m_indexOfTailOfLastWatchpoint(INT_MIN)
-        , m_formatter(buffer, capacity)
     {
     }
 

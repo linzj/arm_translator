@@ -2,6 +2,7 @@
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
+#include <zlib.h>
 #include "softfloat.h"
 #include "helper-proto.h"
 #include "bitops.h"
