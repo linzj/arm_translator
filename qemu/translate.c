@@ -860,14 +860,22 @@ static inline void gen_bx_im(DisasContext *s, uint32_t addr)
     TCGv_i32 tmp;
 
     s->is_jmp = DISAS_UPDATE;
-    tcg_gen_movi_i32(s, cpu_R[15], addr);
+    if (s->thumb != (addr & 1)) {
+        tmp = tcg_temp_new_i32(s);
+        tcg_gen_movi_i32(s, tmp, addr & 1);
+        tcg_gen_st_i32(s, tmp, cpu_env, offsetof(CPUARMState, thumb));
+        tcg_temp_free_i32(tmp);
+    }
+    tcg_gen_movi_i32(s, cpu_R[15], addr & ~1);
 }
 
 /* Set PC and Thumb state from var.  var is marked as dead.  */
 static inline void gen_bx(DisasContext *s, TCGv_i32 var)
 {
     s->is_jmp = DISAS_UPDATE;
-    tcg_gen_mov_i32(s, cpu_R[15], var);
+    tcg_gen_andi_i32(s, cpu_R[15], var, ~1);
+    tcg_gen_andi_i32(s, var, var, 1);
+    store_cpu_field(s, var, thumb);
 }
 
 /* Variant of store_reg which uses branch&exchange logic when storing
@@ -3956,7 +3964,6 @@ static int disas_vfp_insn(DisasContext *s, uint32_t insn)
 
 static inline void gen_goto_tb(DisasContext *s, target_ulong dest)
 {
-    dest |= s->thumb;
     gen_set_pc_im(s, dest);
     tcg_gen_exit_tb(s, 1);
 }

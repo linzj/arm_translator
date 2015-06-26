@@ -78,7 +78,7 @@ uint32_t cpsr_read(CPUARMState *env)
     ZF = (env->ZF == 0);
     return env->uncached_cpsr | (env->NF & 0x80000000) | (ZF << 30) |
         (env->CF << 29) | ((env->VF & 0x80000000) >> 3) | (env->QF << 27)
-        | ((env->regs[15] & 1) << 5) | ((env->condexec_bits & 3) << 25)
+        | (env->thumb << 5) | ((env->condexec_bits & 3) << 25)
         | ((env->condexec_bits & 0xfc) << 8)
         | (env->GE << 16) | (env->daif & CPSR_AIF);
 }
@@ -114,13 +114,8 @@ void cpsr_write(CPUARMState *env, uint32_t val, uint32_t mask)
     }
     if (mask & CPSR_Q)
         env->QF = ((val & CPSR_Q) != 0);
-    if (mask & CPSR_T) {
-        // set bit
-        int bit = ((val & CPSR_T) != 0);
-        intptr_t pc = env->regs[15];
-        pc = ((pc & 1) ^ bit) ^ pc;
-        env->regs[15] = pc;
-    }
+    if (mask & CPSR_T)
+        env->thumb = ((val & CPSR_T) != 0);
     if (mask & CPSR_IT_0_1) {
         env->condexec_bits &= ~3;
         env->condexec_bits |= (val >> 25) & 3;

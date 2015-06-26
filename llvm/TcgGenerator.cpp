@@ -149,7 +149,6 @@ static inline void cpu_get_tb_cpu_state(CPUARMState* env, target_ulong* pc,
     }
 
     if (is_a64(env)) {
-        // FIXME: need to handle thumb mode here.
         *pc = env->pc;
         *flags = ARM_TBFLAG_AARCH64_STATE_MASK
             | (arm_current_el(env) << ARM_TBFLAG_AA64_EL_SHIFT);
@@ -172,9 +171,8 @@ static inline void cpu_get_tb_cpu_state(CPUARMState* env, target_ulong* pc,
     }
     else {
         int privmode;
-        target_ulong pcVal = env->regs[15];
-        *pc = pcVal & 0xfffffffe;
-        *flags = ((pcVal & 1) << ARM_TBFLAG_THUMB_SHIFT)
+        *pc = env->regs[15];
+        *flags = (env->thumb << ARM_TBFLAG_THUMB_SHIFT)
             | (env->vfp.vec_len << ARM_TBFLAG_VECLEN_SHIFT)
             | (env->vfp.vec_stride << ARM_TBFLAG_VECSTRIDE_SHIFT)
             | (env->condexec_bits << ARM_TBFLAG_CONDEXEC_SHIFT)

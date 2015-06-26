@@ -74,6 +74,8 @@ static void initGuestState(CPUARMState& state, const IRContextInternal& context)
     state.regs[13] += 1024;
     // init lr
     state.regs[14] = 0xffffffff;
+    // set thumb bit
+    state.thumb = context.m_thumb;
 }
 
 static void checkRun(const char* who, const IRContextInternal& context, const uintptr_t* twoWords, const CPUARMState& guestState)
@@ -200,14 +202,9 @@ static void* worker(void* p)
     // FIXME: translate here and copy to code to execMem
     initGuestState(cpu.env, context);
     // setup pc
-    auto& state = cpu.env;
     cpu.env.regs[15] = (uint32_t)(uintptr_t)binaryCode.data();
-    // set thumb bit
-    uintptr_t pc = state.regs[15];
-    pc ^= (pc & 1) ^ context.m_thumb;
-    state.regs[15] = pc;
     uintptr_t twoWords[2];
-    while ((cpu.env.regs[15] & (~1)) != 0xfffffffe) {
+    while (cpu.env.regs[15] != 0xfffffffe) {
         MyExecutableMemoryAllocator allocator;
         jit::TranslateDesc tdesc = { reinterpret_cast<void*>(vex_disp_cp_chain_me_to_fastEP), reinterpret_cast<void*>(vex_disp_cp_xindir), &allocator };
         struct timespec t2, t1;
