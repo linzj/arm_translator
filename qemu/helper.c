@@ -773,6 +773,22 @@ uint32_t HELPER(clz)(uint32_t x)
     return clz32(x);
 }
 
+int32_t HELPER(sdiv)(int32_t num, int32_t den)
+{
+    if (den == 0)
+      return 0;
+    if (num == INT_MIN && den == -1)
+      return INT_MIN;
+    return num / den;
+}
+
+uint32_t HELPER(udiv)(uint32_t num, uint32_t den)
+{
+    if (den == 0)
+      return 0;
+    return num / den;
+}
+
 uint32_t HELPER(rbit)(uint32_t x)
 {
     x =  ((x & 0xff000000) >> 24)
@@ -1209,6 +1225,11 @@ float64 VFP_HELPER(name, d)(float64 a, float64 b, void *fpstp) \
     float_status *fpst = fpstp; \
     return float64_ ## name(a, b, fpst); \
 }
+
+VFP_BINOP(add)
+VFP_BINOP(sub)
+VFP_BINOP(mul)
+VFP_BINOP(div)
 VFP_BINOP(min)
 VFP_BINOP(max)
 VFP_BINOP(minnum)

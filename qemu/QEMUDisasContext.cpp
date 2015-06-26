@@ -8,7 +8,9 @@
 #include "ExecutableMemoryAllocator.h"
 #include "log.h"
 
-namespace qemu {
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#endif
 
 typedef struct TCGHelperInfo {
     void* func;
@@ -17,11 +19,23 @@ typedef struct TCGHelperInfo {
     unsigned sizemask;
 } TCGHelperInfo;
 
+extern "C" {
 #include "helper-proto.h"
 
 static const TCGHelperInfo all_helpers[] = {
 #include "helper-tcg.h"
 };
+#include "helper-gen.h"
+}
+
+
+namespace qemu {
+qemu::TCGOpDef tcg_op_defs[] = {
+#define DEF(s, oargs, iargs, cargs, flags) { #s, oargs, iargs, cargs, iargs + oargs + cargs, flags },
+#include "tcg-opc.h"
+#undef DEF
+};
+const size_t tcg_op_defs_max = ARRAY_SIZE(tcg_op_defs);
 
 int gen_new_label(TCGContext* s)
 {
@@ -620,6 +634,8 @@ int QEMUDisasContext::tcg_temp_new_internal(TCGType type, int temp_local)
 
 #include "tcg-target.cpp"
 
+static pthread_once_t initQEMUOnce = PTHREAD_ONCE_INIT;
+
 static void tcg_context_init(TCGContext* s)
 {
     int op, total_args, n, i;
@@ -661,14 +677,19 @@ static void tcg_context_init(TCGContext* s)
             (gpointer)&all_helpers[i]);
     }
 
-    tcg_target_init(s);
+    pthread_once(&initQEMUOnce, tcg_target_init);
+    tcg_regset_clear(s->reserved_regs);
+    tcg_regset_set_reg(s->reserved_regs, TCG_REG_CALL_STACK);
+
 }
 
-QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator)
+QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator, void* dispDirect, void* dispIndirect)
     : m_impl(new QEMUDisasContextImpl({ allocator }))
 {
     memset(&m_impl->m_tcgCtx, sizeof(TCGContext), 0);
     tcg_func_start(&m_impl->m_tcgCtx);
+    m_impl->m_tcgCtx.dispDirect =  dispDirect;
+    m_impl->m_tcgCtx.dispIndirect =  dispIndirect;
 }
 
 QEMUDisasContext::~QEMUDisasContext()
@@ -1478,9 +1499,9 @@ void QEMUDisasContext::gen_rotri_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
             gen_mov_i32(ret, arg1);
         }
         else if (TCG_TARGET_HAS_rot_i32) {
-            TCGv_i32 t0 = tcg_const_i32(arg2);
+            TCGv_i32 t0 = const_i32(arg2);
             gen_op3_i32(INDEX_op_rotl_i32, ret, arg1, (TCGv_i32)arg2);
-            tcg_temp_free_i32(t0);
+            temp_free_i32(t0);
         }
         else {
             EMUNREACHABLE();
@@ -1499,9 +1520,9 @@ void QEMUDisasContext::gen_sari_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
         gen_mov_i32(ret, arg1);
     }
     else {
-        TCGv_i32 t0 = tcg_const_i32(arg2);
+        TCGv_i32 t0 = const_i32(arg2);
         gen_sar_i32(ret, arg1, t0);
-        tcg_temp_free_i32(t0);
+        temp_free_i32(t0);
     }
 }
 
@@ -1682,10 +1703,10 @@ void QEMUDisasContext::gen_trunc_shr_i64_i32(TCGv_i32 ret, TCGv_i64 arg,
         gen_mov_i32(ret, TCGV_LOW(arg));
     }
     else {
-        TCGv_i64 t = tcg_temp_new_i64();
+        TCGv_i64 t = temp_new_i64();
         gen_shri_i64(t, arg, count);
         gen_mov_i32(ret, TCGV_LOW(t));
-        tcg_temp_free_i64(t);
+        temp_free_i64(t);
     }
 }
 
@@ -3055,4 +3076,66 @@ void QEMUDisasContext::compile()
 void QEMUDisasContext::link()
 {
 }
+
+void QEMUDisasContext::gen_sdiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    gen_helper_sdiv(ret, arg1, arg2);
+}
+
+void QEMUDisasContext::gen_udiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+{
+    gen_helper_udiv(ret, arg1, arg2);
+}
+
+TCGv_ptr QEMUDisasContext::get_fpstatus_ptr(int neon)
+{
+    TCGv_ptr statusptr = temp_new_ptr();
+    int offset;
+    if (neon) {
+        offset = offsetof(CPUARMState, vfp.standard_fp_status);
+    } else {
+        offset = offsetof(CPUARMState, vfp.fp_status);
+    }
+    gen_addi_ptr(statusptr, cpu_env, offset);
+    return statusptr;
+}
+
+#define VFP_BINOP(name)\
+    void QEMUDisasContext::gen_vfp_##name(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon) \
+    {\
+        TCGv_ptr fpstatus = get_fpstatus_ptr(isNeon);\
+        gen_helper_vfp_##name(this, ret, arg1, arg2, fpstatus);\
+    }
+VFP_BINOP(adds)
+VFP_BINOP(subs)
+VFP_BINOP(muls)
+VFP_BINOP(divs)
+    
+VFP_BINOP(addd)
+VFP_BINOP(subd)
+VFP_BINOP(muld)
+VFP_BINOP(divd)
+#undef VFP_BINOP
+
+#define VFP_UNARY(name)\
+    void QEMUDisasContext::gen_vfp_##name(TCGv_i32 ret, TCGv_i32 arg, int isNeon)\
+    {\
+        TCGv_ptr fpstatus = get_fpstatus_ptr(isNeon);\
+        gen_helper_vfp_##name(this, ret, arg, fpstatus);\
+    }
+        
+VFP_UNARY(touis)
+VFP_UNARY(touizs)
+VFP_UNARY(tosis)
+VFP_UNARY(tosizs)
+VFP_UNARY(touid)
+VFP_UNARY(touizd)
+VFP_UNARY(tosid)
+VFP_UNARY(tosizd)
+VFP_UNARY(sitos)
+VFP_UNARY(uitos)
+VFP_UNARY(sitod)
+VFP_UNARY(uitod)
+#undef VFP_UNARY
+
 }

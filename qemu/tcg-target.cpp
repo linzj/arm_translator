@@ -2599,10 +2599,6 @@ static int tcg_target_callee_save_regs[] = {
    and tcg_register_jit.  */
 #define CPU_TEMP_BUF_NLONGS 128
 
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-#endif
-
 #define PUSH_SIZE                                  \
     ((1 + ARRAY_SIZE(tcg_target_callee_save_regs)) \
         * (TCG_TARGET_REG_BITS / 8))
@@ -2617,7 +2613,7 @@ static int tcg_target_callee_save_regs[] = {
 static TCGRegSet tcg_target_available_regs[2];
 static TCGRegSet tcg_target_call_clobber_regs;
 
-static void tcg_target_init(TCGContext* s)
+static void tcg_target_init(void)
 {
 #ifdef CONFIG_CPUID_H
     unsigned a, b, c, d;
@@ -2672,9 +2668,6 @@ static void tcg_target_init(TCGContext* s)
         tcg_regset_set_reg(tcg_target_call_clobber_regs, TCG_REG_R10);
         tcg_regset_set_reg(tcg_target_call_clobber_regs, TCG_REG_R11);
     }
-
-    tcg_regset_clear(s->reserved_regs);
-    tcg_regset_set_reg(s->reserved_regs, TCG_REG_CALL_STACK);
 
     tcg_add_target_add_op_defs(x86_op_defs);
 }

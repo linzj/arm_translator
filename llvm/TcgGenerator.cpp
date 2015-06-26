@@ -8,6 +8,7 @@
 #include "IntrinsicRepository.h"
 #include "InitializeLLVM.h"
 #include "LLVMDisasContext.h"
+#include "QEMUDisasContext.h"
 #include "X86Assembler.h"
 #include "Output.h"
 #include "cpu.h"
@@ -99,7 +100,7 @@ namespace jit {
 
 void translate(CPUARMState* env, TranslateDesc& desc)
 {
-    LLVMDisasContext ctx(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect);
+    qemu::QEMUDisasContext ctx(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect);
     ARMCPU* cpu = arm_env_get_cpu(env);
     target_ulong pc;
     uint64_t flags;
@@ -567,112 +568,112 @@ void tcg_gen_callN(DisasContext* s, void* func, TCGArg ret,
         nargs, args);
 }
 
-void tcg_gen_sdiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_sdiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_sdiv(ret, arg1, arg2);
+    static_cast<DisasContextBase*>(s)->gen_sdiv(ret, arg1, arg2, isNeon);
 }
 
-void tcg_gen_udiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_udiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_udiv(ret, arg1, arg2);
+    static_cast<DisasContextBase*>(s)->gen_udiv(ret, arg1, arg2, isNeon);
 }
 
-void tcg_gen_vfp_adds(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_vfp_adds(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_adds(ret, arg1, arg2);
+    static_cast<DisasContextBase*>(s)->gen_vfp_adds(ret, arg1, arg2, isNeon);
 }
 
-void tcg_gen_vfp_subs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_vfp_subs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_subs(ret, arg1, arg2);
+    static_cast<DisasContextBase*>(s)->gen_vfp_subs(ret, arg1, arg2, isNeon);
 }
 
-void tcg_gen_vfp_muls(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_vfp_muls(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_muls(ret, arg1, arg2);
+    static_cast<DisasContextBase*>(s)->gen_vfp_muls(ret, arg1, arg2, isNeon);
 }
 
-void tcg_gen_vfp_divs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
+void tcg_gen_vfp_divs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_divs(ret, arg1, arg2);
+    static_cast<DisasContextBase*>(s)->gen_vfp_divs(ret, arg1, arg2, isNeon);
 }
 
-void tcg_gen_vfp_addd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+void tcg_gen_vfp_addd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_addd(ret, arg1, arg2);
+    static_cast<DisasContextBase*>(s)->gen_vfp_addd(ret, arg1, arg2, isNeon);
 }
 
-void tcg_gen_vfp_subd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+void tcg_gen_vfp_subd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_subd(ret, arg1, arg2);
+    static_cast<DisasContextBase*>(s)->gen_vfp_subd(ret, arg1, arg2, isNeon);
 }
 
-void tcg_gen_vfp_muld(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+void tcg_gen_vfp_muld(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_muld(ret, arg1, arg2);
+    static_cast<DisasContextBase*>(s)->gen_vfp_muld(ret, arg1, arg2, isNeon);
 }
 
-void tcg_gen_vfp_divd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
+void tcg_gen_vfp_divd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_divd(ret, arg1, arg2);
+    static_cast<DisasContextBase*>(s)->gen_vfp_divd(ret, arg1, arg2, isNeon);
 }
 
-void tcg_gen_vfp_touis(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_vfp_touis(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_touis(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_touis(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_touizs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_vfp_touizs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_touizs(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_touizs(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_tosis(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_vfp_tosis(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_tosis(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_tosis(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_tosizs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_vfp_tosizs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_tosizs(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_tosizs(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_touid(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg)
+void tcg_gen_vfp_touid(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_touid(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_touid(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_touizd(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg)
+void tcg_gen_vfp_touizd(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_touizd(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_touizd(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_tosid(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg)
+void tcg_gen_vfp_tosid(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_tosid(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_tosid(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_tosizd(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg)
+void tcg_gen_vfp_tosizd(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_tosizd(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_tosizd(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_sitos(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_vfp_sitos(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_sitos(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_sitos(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_uitos(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg)
+void tcg_gen_vfp_uitos(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_uitos(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_uitos(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_sitod(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg)
+void tcg_gen_vfp_sitod(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_sitod(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_sitod(ret, arg, isNeon);
 }
 
-void tcg_gen_vfp_uitod(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg)
+void tcg_gen_vfp_uitod(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg, int isNeon)
 {
-    static_cast<DisasContextBase*>(s)->gen_vfp_uitod(ret, arg);
+    static_cast<DisasContextBase*>(s)->gen_vfp_uitod(ret, arg, isNeon);
 }
