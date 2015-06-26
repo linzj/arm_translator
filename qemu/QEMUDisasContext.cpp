@@ -1865,4 +1865,822 @@ void QEMUDisasContext::temp_free_ptr(TCGv_ptr a)
     temp_free_i64(TCGV_PTR_TO_NAT(a));
 #endif
 }
+// compile start
+
+static void temp_allocate_frame(TCGContext *s, int temp)
+{
+    TCGTemp *ts;
+    ts = &s->temps[temp];
+#if !(defined(__sparc__) && TCG_TARGET_REG_BITS == 64)
+    /* Sparc64 stack is accessed with offset of 2047 */
+    s->current_frame_offset = (s->current_frame_offset +
+                               (tcg_target_long)sizeof(tcg_target_long) - 1) &
+        ~(sizeof(tcg_target_long) - 1);
+#endif
+    if (s->current_frame_offset + (tcg_target_long)sizeof(tcg_target_long) >
+        s->frame_end) {
+        tcg_abort();
+    }
+    ts->mem_offset = s->current_frame_offset;
+    ts->mem_reg = s->frame_reg;
+    ts->mem_allocated = 1;
+    s->current_frame_offset += sizeof(tcg_target_long);
+}
+
+/* sync register 'reg' by saving it to the corresponding temporary */
+static inline void tcg_reg_sync(TCGContext *s, int reg)
+{
+    TCGTemp *ts;
+    int temp;
+
+    temp = s->reg_to_temp[reg];
+    ts = &s->temps[temp];
+    assert(ts->val_type == TEMP_VAL_REG);
+    if (!ts->mem_coherent && !ts->fixed_reg) {
+        if (!ts->mem_allocated) {
+            temp_allocate_frame(s, temp);
+        }
+        tcg_out_st(s, ts->type, reg, ts->mem_reg, ts->mem_offset);
+    }
+    ts->mem_coherent = 1;
+}
+
+/* free register 'reg' by spilling the corresponding temporary if necessary */
+static void tcg_reg_free(TCGContext *s, int reg)
+{
+    int temp;
+
+    temp = s->reg_to_temp[reg];
+    if (temp != -1) {
+        tcg_reg_sync(s, reg);
+        s->temps[temp].val_type = TEMP_VAL_MEM;
+        s->reg_to_temp[reg] = -1;
+    }
+}
+
+/* Allocate a register belonging to reg1 & ~reg2 */
+static int tcg_reg_alloc(TCGContext *s, TCGRegSet reg1, TCGRegSet reg2)
+{
+    int i, reg;
+    TCGRegSet reg_ct;
+
+    tcg_regset_andnot(reg_ct, reg1, reg2);
+
+    /* first try free registers */
+    for(i = 0; i < ARRAY_SIZE(tcg_target_reg_alloc_order); i++) {
+        reg = tcg_target_reg_alloc_order[i];
+        if (tcg_regset_test_reg(reg_ct, reg) && s->reg_to_temp[reg] == -1)
+            return reg;
+    }
+
+    /* XXX: do better spill choice */
+    for(i = 0; i < ARRAY_SIZE(tcg_target_reg_alloc_order); i++) {
+        reg = tcg_target_reg_alloc_order[i];
+        if (tcg_regset_test_reg(reg_ct, reg)) {
+            tcg_reg_free(s, reg);
+            return reg;
+        }
+    }
+
+    tcg_abort();
+}
+
+/* mark a temporary as dead. */
+static inline void temp_dead(TCGContext *s, int temp)
+{
+    TCGTemp *ts;
+
+    ts = &s->temps[temp];
+    if (!ts->fixed_reg) {
+        if (ts->val_type == TEMP_VAL_REG) {
+            s->reg_to_temp[ts->reg] = -1;
+        }
+        if (temp < s->nb_globals || ts->temp_local) {
+            ts->val_type = TEMP_VAL_MEM;
+        } else {
+            ts->val_type = TEMP_VAL_DEAD;
+        }
+    }
+}
+
+/* sync a temporary to memory. 'allocated_regs' is used in case a
+   temporary registers needs to be allocated to store a constant. */
+static inline void temp_sync(TCGContext *s, int temp, TCGRegSet allocated_regs)
+{
+    TCGTemp *ts;
+
+    ts = &s->temps[temp];
+    if (!ts->fixed_reg) {
+        switch(ts->val_type) {
+        case TEMP_VAL_CONST:
+            ts->reg = tcg_reg_alloc(s, tcg_target_available_regs[ts->type],
+                                    allocated_regs);
+            ts->val_type = TEMP_VAL_REG;
+            s->reg_to_temp[ts->reg] = temp;
+            ts->mem_coherent = 0;
+            tcg_out_movi(s, ts->type, ts->reg, ts->val);
+            /* fallthrough*/
+        case TEMP_VAL_REG:
+            tcg_reg_sync(s, ts->reg);
+            break;
+        case TEMP_VAL_DEAD:
+        case TEMP_VAL_MEM:
+            break;
+        default:
+            tcg_abort();
+        }
+    }
+}
+
+/* save a temporary to memory. 'allocated_regs' is used in case a
+   temporary registers needs to be allocated to store a constant. */
+static inline void temp_save(TCGContext *s, int temp, TCGRegSet allocated_regs)
+{
+#ifdef USE_LIVENESS_ANALYSIS
+    /* The liveness analysis already ensures that globals are back
+       in memory. Keep an assert for safety. */
+    assert(s->temps[temp].val_type == TEMP_VAL_MEM || s->temps[temp].fixed_reg);
+#else
+    temp_sync(s, temp, allocated_regs);
+    temp_dead(s, temp);
+#endif
+}
+
+/* save globals to their canonical location and assume they can be
+   modified be the following code. 'allocated_regs' is used in case a
+   temporary registers needs to be allocated to store a constant. */
+static void save_globals(TCGContext *s, TCGRegSet allocated_regs)
+{
+    int i;
+
+    for(i = 0; i < s->nb_globals; i++) {
+        temp_save(s, i, allocated_regs);
+    }
+}
+
+/* sync globals to their canonical location and assume they can be
+   read by the following code. 'allocated_regs' is used in case a
+   temporary registers needs to be allocated to store a constant. */
+static void sync_globals(TCGContext *s, TCGRegSet allocated_regs)
+{
+    int i;
+
+    for (i = 0; i < s->nb_globals; i++) {
+#ifdef USE_LIVENESS_ANALYSIS
+        assert(s->temps[i].val_type != TEMP_VAL_REG || s->temps[i].fixed_reg ||
+               s->temps[i].mem_coherent);
+#else
+        temp_sync(s, i, allocated_regs);
+#endif
+    }
+}
+
+/* at the end of a basic block, we assume all temporaries are dead and
+   all globals are stored at their canonical location. */
+static void tcg_reg_alloc_bb_end(TCGContext *s, TCGRegSet allocated_regs)
+{
+    TCGTemp *ts;
+    int i;
+
+    for(i = s->nb_globals; i < s->nb_temps; i++) {
+        ts = &s->temps[i];
+        if (ts->temp_local) {
+            temp_save(s, i, allocated_regs);
+        } else {
+#ifdef USE_LIVENESS_ANALYSIS
+            /* The liveness analysis already ensures that temps are dead.
+               Keep an assert for safety. */
+            assert(ts->val_type == TEMP_VAL_DEAD);
+#else
+            temp_dead(s, i);
+#endif
+        }
+    }
+
+    save_globals(s, allocated_regs);
+}
+
+#define IS_DEAD_ARG(n) ((dead_args >> (n)) & 1)
+#define NEED_SYNC_ARG(n) ((sync_args >> (n)) & 1)
+
+static void tcg_reg_alloc_movi(TCGContext *s, const TCGArg *args,
+                               uint16_t dead_args, uint8_t sync_args)
+{
+    TCGTemp *ots;
+    tcg_target_ulong val;
+
+    ots = &s->temps[args[0]];
+    val = args[1];
+
+    if (ots->fixed_reg) {
+        /* for fixed registers, we do not do any constant
+           propagation */
+        tcg_out_movi(s, ots->type, ots->reg, val);
+    } else {
+        /* The movi is not explicitly generated here */
+        if (ots->val_type == TEMP_VAL_REG)
+            s->reg_to_temp[ots->reg] = -1;
+        ots->val_type = TEMP_VAL_CONST;
+        ots->val = val;
+    }
+    if (NEED_SYNC_ARG(0)) {
+        temp_sync(s, args[0], s->reserved_regs);
+    }
+    if (IS_DEAD_ARG(0)) {
+        temp_dead(s, args[0]);
+    }
+}
+
+static void tcg_reg_alloc_mov(TCGContext *s, const TCGOpDef *def,
+                              const TCGArg *args, uint16_t dead_args,
+                              uint8_t sync_args)
+{
+    TCGRegSet allocated_regs;
+    TCGTemp *ts, *ots;
+    TCGType otype, itype;
+
+    tcg_regset_set(allocated_regs, s->reserved_regs);
+    ots = &s->temps[args[0]];
+    ts = &s->temps[args[1]];
+
+    /* Note that otype != itype for no-op truncation.  */
+    otype = ots->type;
+    itype = ts->type;
+
+    /* If the source value is not in a register, and we're going to be
+       forced to have it in a register in order to perform the copy,
+       then copy the SOURCE value into its own register first.  That way
+       we don't have to reload SOURCE the next time it is used. */
+    if (((NEED_SYNC_ARG(0) || ots->fixed_reg) && ts->val_type != TEMP_VAL_REG)
+        || ts->val_type == TEMP_VAL_MEM) {
+        ts->reg = tcg_reg_alloc(s, tcg_target_available_regs[itype],
+                                allocated_regs);
+        if (ts->val_type == TEMP_VAL_MEM) {
+            tcg_out_ld(s, itype, ts->reg, ts->mem_reg, ts->mem_offset);
+            ts->mem_coherent = 1;
+        } else if (ts->val_type == TEMP_VAL_CONST) {
+            tcg_out_movi(s, itype, ts->reg, ts->val);
+        }
+        s->reg_to_temp[ts->reg] = args[1];
+        ts->val_type = TEMP_VAL_REG;
+    }
+
+    if (IS_DEAD_ARG(0) && !ots->fixed_reg) {
+        /* mov to a non-saved dead register makes no sense (even with
+           liveness analysis disabled). */
+        assert(NEED_SYNC_ARG(0));
+        /* The code above should have moved the temp to a register. */
+        assert(ts->val_type == TEMP_VAL_REG);
+        if (!ots->mem_allocated) {
+            temp_allocate_frame(s, args[0]);
+        }
+        tcg_out_st(s, otype, ts->reg, ots->mem_reg, ots->mem_offset);
+        if (IS_DEAD_ARG(1)) {
+            temp_dead(s, args[1]);
+        }
+        temp_dead(s, args[0]);
+    } else if (ts->val_type == TEMP_VAL_CONST) {
+        /* propagate constant */
+        if (ots->val_type == TEMP_VAL_REG) {
+            s->reg_to_temp[ots->reg] = -1;
+        }
+        ots->val_type = TEMP_VAL_CONST;
+        ots->val = ts->val;
+    } else {
+        /* The code in the first if block should have moved the
+           temp to a register. */
+        assert(ts->val_type == TEMP_VAL_REG);
+        if (IS_DEAD_ARG(1) && !ts->fixed_reg && !ots->fixed_reg) {
+            /* the mov can be suppressed */
+            if (ots->val_type == TEMP_VAL_REG) {
+                s->reg_to_temp[ots->reg] = -1;
+            }
+            ots->reg = ts->reg;
+            temp_dead(s, args[1]);
+        } else {
+            if (ots->val_type != TEMP_VAL_REG) {
+                /* When allocating a new register, make sure to not spill the
+                   input one. */
+                tcg_regset_set_reg(allocated_regs, ts->reg);
+                ots->reg = tcg_reg_alloc(s, tcg_target_available_regs[otype],
+                                         allocated_regs);
+            }
+            tcg_out_mov(s, otype, ots->reg, ts->reg);
+        }
+        ots->val_type = TEMP_VAL_REG;
+        ots->mem_coherent = 0;
+        s->reg_to_temp[ots->reg] = args[0];
+        if (NEED_SYNC_ARG(0)) {
+            tcg_reg_sync(s, ots->reg);
+        }
+    }
+}
+
+static void tcg_reg_alloc_op(TCGContext *s, 
+                             const TCGOpDef *def, TCGOpcode opc,
+                             const TCGArg *args, uint16_t dead_args,
+                             uint8_t sync_args)
+{
+    TCGRegSet allocated_regs;
+    int i, k, nb_iargs, nb_oargs, reg;
+    TCGArg arg;
+    const TCGArgConstraint *arg_ct;
+    TCGTemp *ts;
+    TCGArg new_args[TCG_MAX_OP_ARGS];
+    int const_args[TCG_MAX_OP_ARGS];
+
+    nb_oargs = def->nb_oargs;
+    nb_iargs = def->nb_iargs;
+
+    /* copy constants */
+    memcpy(new_args + nb_oargs + nb_iargs, 
+           args + nb_oargs + nb_iargs, 
+           sizeof(TCGArg) * def->nb_cargs);
+
+    /* satisfy input constraints */ 
+    tcg_regset_set(allocated_regs, s->reserved_regs);
+    for(k = 0; k < nb_iargs; k++) {
+        i = def->sorted_args[nb_oargs + k];
+        arg = args[i];
+        arg_ct = &def->args_ct[i];
+        ts = &s->temps[arg];
+        if (ts->val_type == TEMP_VAL_MEM) {
+            reg = tcg_reg_alloc(s, arg_ct->u.regs, allocated_regs);
+            tcg_out_ld(s, ts->type, reg, ts->mem_reg, ts->mem_offset);
+            ts->val_type = TEMP_VAL_REG;
+            ts->reg = reg;
+            ts->mem_coherent = 1;
+            s->reg_to_temp[reg] = arg;
+        } else if (ts->val_type == TEMP_VAL_CONST) {
+            if (tcg_target_const_match(ts->val, ts->type, arg_ct)) {
+                /* constant is OK for instruction */
+                const_args[i] = 1;
+                new_args[i] = ts->val;
+                goto iarg_end;
+            } else {
+                /* need to move to a register */
+                reg = tcg_reg_alloc(s, arg_ct->u.regs, allocated_regs);
+                tcg_out_movi(s, ts->type, reg, ts->val);
+                ts->val_type = TEMP_VAL_REG;
+                ts->reg = reg;
+                ts->mem_coherent = 0;
+                s->reg_to_temp[reg] = arg;
+            }
+        }
+        assert(ts->val_type == TEMP_VAL_REG);
+        if (arg_ct->ct & TCG_CT_IALIAS) {
+            if (ts->fixed_reg) {
+                /* if fixed register, we must allocate a new register
+                   if the alias is not the same register */
+                if (arg != args[arg_ct->alias_index])
+                    goto allocate_in_reg;
+            } else {
+                /* if the input is aliased to an output and if it is
+                   not dead after the instruction, we must allocate
+                   a new register and move it */
+                if (!IS_DEAD_ARG(i)) {
+                    goto allocate_in_reg;
+                }
+            }
+        }
+        reg = ts->reg;
+        if (tcg_regset_test_reg(arg_ct->u.regs, reg)) {
+            /* nothing to do : the constraint is satisfied */
+        } else {
+        allocate_in_reg:
+            /* allocate a new register matching the constraint 
+               and move the temporary register into it */
+            reg = tcg_reg_alloc(s, arg_ct->u.regs, allocated_regs);
+            tcg_out_mov(s, ts->type, reg, ts->reg);
+        }
+        new_args[i] = reg;
+        const_args[i] = 0;
+        tcg_regset_set_reg(allocated_regs, reg);
+    iarg_end: ;
+    }
+    
+    /* mark dead temporaries and free the associated registers */
+    for (i = nb_oargs; i < nb_oargs + nb_iargs; i++) {
+        if (IS_DEAD_ARG(i)) {
+            temp_dead(s, args[i]);
+        }
+    }
+
+    if (def->flags & TCG_OPF_BB_END) {
+        tcg_reg_alloc_bb_end(s, allocated_regs);
+    } else {
+        if (def->flags & TCG_OPF_CALL_CLOBBER) {
+            /* XXX: permit generic clobber register list ? */ 
+            for(reg = 0; reg < TCG_TARGET_NB_REGS; reg++) {
+                if (tcg_regset_test_reg(tcg_target_call_clobber_regs, reg)) {
+                    tcg_reg_free(s, reg);
+                }
+            }
+        }
+        if (def->flags & TCG_OPF_SIDE_EFFECTS) {
+            /* sync globals if the op has side effects and might trigger
+               an exception. */
+            sync_globals(s, allocated_regs);
+        }
+        
+        /* satisfy the output constraints */
+        tcg_regset_set(allocated_regs, s->reserved_regs);
+        for(k = 0; k < nb_oargs; k++) {
+            i = def->sorted_args[k];
+            arg = args[i];
+            arg_ct = &def->args_ct[i];
+            ts = &s->temps[arg];
+            if (arg_ct->ct & TCG_CT_ALIAS) {
+                reg = new_args[arg_ct->alias_index];
+            } else {
+                /* if fixed register, we try to use it */
+                reg = ts->reg;
+                if (ts->fixed_reg &&
+                    tcg_regset_test_reg(arg_ct->u.regs, reg)) {
+                    goto oarg_end;
+                }
+                reg = tcg_reg_alloc(s, arg_ct->u.regs, allocated_regs);
+            }
+            tcg_regset_set_reg(allocated_regs, reg);
+            /* if a fixed register is used, then a move will be done afterwards */
+            if (!ts->fixed_reg) {
+                if (ts->val_type == TEMP_VAL_REG) {
+                    s->reg_to_temp[ts->reg] = -1;
+                }
+                ts->val_type = TEMP_VAL_REG;
+                ts->reg = reg;
+                /* temp value is modified, so the value kept in memory is
+                   potentially not the same */
+                ts->mem_coherent = 0;
+                s->reg_to_temp[reg] = arg;
+            }
+        oarg_end:
+            new_args[i] = reg;
+        }
+    }
+
+    /* emit instruction */
+    tcg_out_op(s, opc, new_args, const_args);
+    
+    /* move the outputs in the correct register if needed */
+    for(i = 0; i < nb_oargs; i++) {
+        ts = &s->temps[args[i]];
+        reg = new_args[i];
+        if (ts->fixed_reg && ts->reg != reg) {
+            tcg_out_mov(s, ts->type, ts->reg, reg);
+        }
+        if (NEED_SYNC_ARG(i)) {
+            tcg_reg_sync(s, reg);
+        }
+        if (IS_DEAD_ARG(i)) {
+            temp_dead(s, args[i]);
+        }
+    }
+}
+
+#ifdef TCG_TARGET_STACK_GROWSUP
+#define STACK_DIR(x) (-(x))
+#else
+#define STACK_DIR(x) (x)
+#endif
+
+static int tcg_reg_alloc_call(TCGContext *s, const TCGOpDef *def,
+                              TCGOpcode opc, const TCGArg *args,
+                              uint16_t dead_args, uint8_t sync_args)
+{
+    int nb_iargs, nb_oargs, flags, nb_regs, i, reg, nb_params;
+    TCGArg arg;
+    TCGTemp *ts;
+    intptr_t stack_offset;
+    size_t call_stack_size;
+    tcg_insn_unit *func_addr;
+    int allocate_args;
+    TCGRegSet allocated_regs;
+
+    arg = *args++;
+
+    nb_oargs = arg >> 16;
+    nb_iargs = arg & 0xffff;
+    nb_params = nb_iargs;
+
+    func_addr = (tcg_insn_unit *)(intptr_t)args[nb_oargs + nb_iargs];
+    flags = args[nb_oargs + nb_iargs + 1];
+
+    nb_regs = ARRAY_SIZE(tcg_target_call_iarg_regs);
+    if (nb_regs > nb_params) {
+        nb_regs = nb_params;
+    }
+
+    /* assign stack slots first */
+    call_stack_size = (nb_params - nb_regs) * sizeof(tcg_target_long);
+    call_stack_size = (call_stack_size + TCG_TARGET_STACK_ALIGN - 1) & 
+        ~(TCG_TARGET_STACK_ALIGN - 1);
+    allocate_args = (call_stack_size > TCG_STATIC_CALL_ARGS_SIZE);
+    if (allocate_args) {
+        /* XXX: if more than TCG_STATIC_CALL_ARGS_SIZE is needed,
+           preallocate call stack */
+        tcg_abort();
+    }
+
+    stack_offset = TCG_TARGET_CALL_STACK_OFFSET;
+    for(i = nb_regs; i < nb_params; i++) {
+        arg = args[nb_oargs + i];
+#ifdef TCG_TARGET_STACK_GROWSUP
+        stack_offset -= sizeof(tcg_target_long);
+#endif
+        if (arg != TCG_CALL_DUMMY_ARG) {
+            ts = &s->temps[arg];
+            if (ts->val_type == TEMP_VAL_REG) {
+                tcg_out_st(s, ts->type, ts->reg, TCG_REG_CALL_STACK, stack_offset);
+            } else if (ts->val_type == TEMP_VAL_MEM) {
+                reg = tcg_reg_alloc(s, tcg_target_available_regs[ts->type], 
+                                    s->reserved_regs);
+                /* XXX: not correct if reading values from the stack */
+                tcg_out_ld(s, ts->type, reg, ts->mem_reg, ts->mem_offset);
+                tcg_out_st(s, ts->type, reg, TCG_REG_CALL_STACK, stack_offset);
+            } else if (ts->val_type == TEMP_VAL_CONST) {
+                reg = tcg_reg_alloc(s, tcg_target_available_regs[ts->type], 
+                                    s->reserved_regs);
+                /* XXX: sign extend may be needed on some targets */
+                tcg_out_movi(s, ts->type, reg, ts->val);
+                tcg_out_st(s, ts->type, reg, TCG_REG_CALL_STACK, stack_offset);
+            } else {
+                tcg_abort();
+            }
+        }
+#ifndef TCG_TARGET_STACK_GROWSUP
+        stack_offset += sizeof(tcg_target_long);
+#endif
+    }
+    
+    /* assign input registers */
+    tcg_regset_set(allocated_regs, s->reserved_regs);
+    for(i = 0; i < nb_regs; i++) {
+        arg = args[nb_oargs + i];
+        if (arg != TCG_CALL_DUMMY_ARG) {
+            ts = &s->temps[arg];
+            reg = tcg_target_call_iarg_regs[i];
+            tcg_reg_free(s, reg);
+            if (ts->val_type == TEMP_VAL_REG) {
+                if (ts->reg != reg) {
+                    tcg_out_mov(s, ts->type, reg, ts->reg);
+                }
+            } else if (ts->val_type == TEMP_VAL_MEM) {
+                tcg_out_ld(s, ts->type, reg, ts->mem_reg, ts->mem_offset);
+            } else if (ts->val_type == TEMP_VAL_CONST) {
+                /* XXX: sign extend ? */
+                tcg_out_movi(s, ts->type, reg, ts->val);
+            } else {
+                tcg_abort();
+            }
+            tcg_regset_set_reg(allocated_regs, reg);
+        }
+    }
+    
+    /* mark dead temporaries and free the associated registers */
+    for(i = nb_oargs; i < nb_iargs + nb_oargs; i++) {
+        if (IS_DEAD_ARG(i)) {
+            temp_dead(s, args[i]);
+        }
+    }
+    
+    /* clobber call registers */
+    for(reg = 0; reg < TCG_TARGET_NB_REGS; reg++) {
+        if (tcg_regset_test_reg(tcg_target_call_clobber_regs, reg)) {
+            tcg_reg_free(s, reg);
+        }
+    }
+
+    /* Save globals if they might be written by the helper, sync them if
+       they might be read. */
+    if (flags & TCG_CALL_NO_READ_GLOBALS) {
+        /* Nothing to do */
+    } else if (flags & TCG_CALL_NO_WRITE_GLOBALS) {
+        sync_globals(s, allocated_regs);
+    } else {
+        save_globals(s, allocated_regs);
+    }
+
+    tcg_out_call(s, func_addr);
+
+    /* assign output registers and emit moves if needed */
+    for(i = 0; i < nb_oargs; i++) {
+        arg = args[i];
+        ts = &s->temps[arg];
+        reg = tcg_target_call_oarg_regs[i];
+        assert(s->reg_to_temp[reg] == -1);
+
+        if (ts->fixed_reg) {
+            if (ts->reg != reg) {
+                tcg_out_mov(s, ts->type, ts->reg, reg);
+            }
+        } else {
+            if (ts->val_type == TEMP_VAL_REG) {
+                s->reg_to_temp[ts->reg] = -1;
+            }
+            ts->val_type = TEMP_VAL_REG;
+            ts->reg = reg;
+            ts->mem_coherent = 0;
+            s->reg_to_temp[reg] = arg;
+            if (NEED_SYNC_ARG(i)) {
+                tcg_reg_sync(s, reg);
+            }
+            if (IS_DEAD_ARG(i)) {
+                temp_dead(s, args[i]);
+            }
+        }
+    }
+    
+    return nb_iargs + nb_oargs + def->nb_cargs + 1;
+}
+
+static void tcg_reg_alloc_start(TCGContext *s)
+{
+    int i;
+    TCGTemp *ts;
+    for(i = 0; i < s->nb_globals; i++) {
+        ts = &s->temps[i];
+        if (ts->fixed_reg) {
+            ts->val_type = TEMP_VAL_REG;
+        } else {
+            ts->val_type = TEMP_VAL_MEM;
+        }
+    }
+    for(i = s->nb_globals; i < s->nb_temps; i++) {
+        ts = &s->temps[i];
+        if (ts->temp_local) {
+            ts->val_type = TEMP_VAL_MEM;
+        } else {
+            ts->val_type = TEMP_VAL_DEAD;
+        }
+        ts->mem_allocated = 0;
+        ts->fixed_reg = 0;
+    }
+    for(i = 0; i < TCG_TARGET_NB_REGS; i++) {
+        s->reg_to_temp[i] = -1;
+    }
+}
+
+static inline int tcg_gen_code_common(TCGContext *s,
+                                      tcg_insn_unit *gen_code_buf,
+                                      long search_pc)
+{
+    TCGOpcode opc;
+    int op_index;
+    const TCGOpDef *def;
+    const TCGArg *args;
+
+#ifdef DEBUG_DISAS
+    if (unlikely(qemu_loglevel_mask(CPU_LOG_TB_OP))) {
+        qemu_log("OP:\n");
+        tcg_dump_ops(s);
+        qemu_log("\n");
+    }
+#endif
+
+#ifdef CONFIG_PROFILER
+    s->opt_time -= profile_getclock();
+#endif
+
+#ifdef USE_TCG_OPTIMIZATIONS
+    s->gen_opparam_ptr =
+        tcg_optimize(s, s->gen_opc_ptr, s->gen_opparam_buf, tcg_op_defs);
+#endif
+
+#ifdef CONFIG_PROFILER
+    s->opt_time += profile_getclock();
+    s->la_time -= profile_getclock();
+#endif
+
+    tcg_liveness_analysis(s);
+
+#ifdef CONFIG_PROFILER
+    s->la_time += profile_getclock();
+#endif
+
+#ifdef DEBUG_DISAS
+    if (unlikely(qemu_loglevel_mask(CPU_LOG_TB_OP_OPT))) {
+        qemu_log("OP after optimization and liveness analysis:\n");
+        tcg_dump_ops(s);
+        qemu_log("\n");
+    }
+#endif
+
+    tcg_reg_alloc_start(s);
+
+    s->code_buf = gen_code_buf;
+    s->code_ptr = gen_code_buf;
+
+    tcg_out_tb_init(s);
+
+    args = s->gen_opparam_buf;
+    op_index = 0;
+
+    for(;;) {
+        opc = s->gen_opc_buf[op_index];
+#ifdef CONFIG_PROFILER
+        tcg_table_op_count[opc]++;
+#endif
+        def = &tcg_op_defs[opc];
+#if 0
+        printf("%s: %d %d %d\n", def->name,
+               def->nb_oargs, def->nb_iargs, def->nb_cargs);
+        //        dump_regs(s);
+#endif
+        switch(opc) {
+        case INDEX_op_mov_i32:
+        case INDEX_op_mov_i64:
+            tcg_reg_alloc_mov(s, def, args, s->op_dead_args[op_index],
+                              s->op_sync_args[op_index]);
+            break;
+        case INDEX_op_movi_i32:
+        case INDEX_op_movi_i64:
+            tcg_reg_alloc_movi(s, args, s->op_dead_args[op_index],
+                               s->op_sync_args[op_index]);
+            break;
+        case INDEX_op_debug_insn_start:
+            /* debug instruction */
+            break;
+        case INDEX_op_nop:
+        case INDEX_op_nop1:
+        case INDEX_op_nop2:
+        case INDEX_op_nop3:
+            break;
+        case INDEX_op_nopn:
+            args += args[0];
+            goto next;
+        case INDEX_op_discard:
+            temp_dead(s, args[0]);
+            break;
+        case INDEX_op_set_label:
+            tcg_reg_alloc_bb_end(s, s->reserved_regs);
+            tcg_out_label(s, args[0], s->code_ptr);
+            break;
+        case INDEX_op_call:
+            args += tcg_reg_alloc_call(s, def, opc, args,
+                                       s->op_dead_args[op_index],
+                                       s->op_sync_args[op_index]);
+            goto next;
+        case INDEX_op_end:
+            goto the_end;
+        default:
+            /* Sanity check that we've not introduced any unhandled opcodes. */
+            if (def->flags & TCG_OPF_NOT_PRESENT) {
+                tcg_abort();
+            }
+            /* Note: in order to speed up the code, it would be much
+               faster to have specialized register allocator functions for
+               some common argument patterns */
+            tcg_reg_alloc_op(s, def, opc, args, s->op_dead_args[op_index],
+                             s->op_sync_args[op_index]);
+            break;
+        }
+        args += def->nb_args;
+    next:
+        if (search_pc >= 0 && search_pc < tcg_current_code_size(s)) {
+            return op_index;
+        }
+        op_index++;
+#ifndef NDEBUG
+        // check_regs(s);
+#endif
+    }
+ the_end:
+    /* Generate TB finalization at the end of block */
+#define tcg_out_tb_finalize(a)
+    tcg_out_tb_finalize(s);
+    return -1;
+}
+
+int tcg_gen_code(TCGContext *s, tcg_insn_unit *gen_code_buf)
+{
+#ifdef CONFIG_PROFILER
+    {
+        int n;
+        n = (s->gen_opc_ptr - s->gen_opc_buf);
+        s->op_count += n;
+        if (n > s->op_count_max)
+            s->op_count_max = n;
+
+        s->temp_count += s->nb_temps;
+        if (s->nb_temps > s->temp_count_max)
+            s->temp_count_max = s->nb_temps;
+    }
+#endif
+
+    tcg_gen_code_common(s, gen_code_buf, -1);
+
+    /* flush instruction cache */
+    flush_icache_range((uintptr_t)s->code_buf, (uintptr_t)s->code_ptr);
+
+    return tcg_current_code_size(s);
+}
+
+void QEMUDisasContext::compile()
+{
+}
+
+void QEMUDisasContext::link(void* dispDirect, void* dispIndirect)
+{
+}
 }
