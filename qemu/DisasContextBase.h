@@ -118,6 +118,9 @@ public:
     virtual TCGv_i32 temp_new_i32() = 0;
     virtual TCGv_ptr temp_new_ptr() = 0;
     virtual TCGv_i64 temp_new_i64() = 0;
+    virtual void temp_free_i32(TCGv_i32 a) = 0;
+    virtual void temp_free_i64(TCGv_i64 a) = 0;
+    virtual void temp_free_ptr(TCGv_ptr a) = 0;
     virtual void gen_callN(void* func, TCGArg ret,
         int nargs, TCGArg* args)
         = 0;

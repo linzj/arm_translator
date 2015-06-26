@@ -6,9 +6,6 @@ extern "C" {
 #endif
 
 #define tcg_temp_free tcg_temp_free_i32
-#define tcg_temp_free_i32(a)
-#define tcg_temp_free_i64(a)
-#define tcg_temp_free_ptr(T)
 #define tcg_temp_new() (TCGv) tcg_temp_new_i32();
 #define TCGV_UNUSED_I32(a) ((void)a)
 #define unlikely(x) __builtin_expect(!!(x), 0)
@@ -110,6 +107,9 @@ TCGv_i32 tcg_temp_local_new_i32(DisasContext* s);
 TCGv_i32 tcg_temp_new_i32(DisasContext* s);
 TCGv_ptr tcg_temp_new_ptr(DisasContext* s);
 TCGv_i64 tcg_temp_new_i64(DisasContext* s);
+void tcg_temp_free_i32(DisasContext* s, TCGv_i32 a);
+void tcg_temp_free_i64(DisasContext* s, TCGv_i64 a);
+void tcg_temp_free_ptr(DisasContext* s, TCGv_ptr ptr);
 void tcg_gen_callN(DisasContext* s, void* func, TCGArg ret,
     int nargs, TCGArg* args);
 

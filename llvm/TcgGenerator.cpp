@@ -545,6 +545,21 @@ TCGv_i64 tcg_temp_new_i64(DisasContext* s)
     return static_cast<DisasContextBase*>(s)->temp_new_i64();
 }
 
+void tcg_temp_free_i32(DisasContext* s, TCGv_i32 a)
+{
+    static_cast<DisasContextBase*>(s)->temp_free_i32(a);
+}
+
+void tcg_temp_free_i64(DisasContext* s, TCGv_i64 a)
+{
+    static_cast<DisasContextBase*>(s)->temp_free_i64(a);
+}
+
+void tcg_temp_free_ptr(DisasContext* s, TCGv_ptr ptr)
+{
+    static_cast<DisasContextBase*>(s)->temp_free_ptr(ptr);
+}
+
 void tcg_gen_callN(DisasContext* s, void* func, TCGArg ret,
     int nargs, TCGArg* args)
 {

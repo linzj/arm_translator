@@ -951,6 +951,18 @@ TCGv_i64 LLVMDisasContext::temp_new_i64()
     return allocateTcg<TCGv_i64>();
 }
 
+void LLVMDisasContext::temp_free_i32(TCGv_i32 a)
+{
+}
+
+void LLVMDisasContext::temp_free_i64(TCGv_i64 a)
+{
+}
+
+void LLVMDisasContext::temp_free_ptr(TCGv_ptr a)
+{
+}
+
 LValue LLVMDisasContext::myhandleCallRet(void* func, TCGArg ret,
     int nargs, TCGArg* args)
 {
