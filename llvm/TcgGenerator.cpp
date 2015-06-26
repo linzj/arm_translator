@@ -99,7 +99,7 @@ namespace jit {
 
 void translate(CPUARMState* env, TranslateDesc& desc)
 {
-    LLVMDisasContext ctx(desc.m_executableMemAllocator);
+    LLVMDisasContext ctx(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect);
     ARMCPU* cpu = arm_env_get_cpu(env);
     target_ulong pc;
     uint64_t flags;
@@ -108,7 +108,7 @@ void translate(CPUARMState* env, TranslateDesc& desc)
 
     gen_intermediate_code_internal(cpu, &tb, &ctx);
     ctx.compile();
-    ctx.link(desc.m_dispDirect, desc.m_dispIndirect);
+    ctx.link();
     desc.m_guestExtents = tb.size;
 }
 

@@ -33,6 +33,7 @@
 #endif
 namespace qemu {
 /* Default target word size to pointer size.  */
+#define USE_LIVENESS_ANALYSIS
 #ifndef TCG_TARGET_REG_BITS
 # if UINTPTR_MAX == UINT32_MAX
 #  define TCG_TARGET_REG_BITS 32
@@ -441,6 +442,8 @@ struct TCGContext {
 
     /* The TCGBackendData structure is private to tcg-target.c.  */
     struct TCGBackendData *be;
+    void* dispDirect;
+    void* dispIndirect;
 };
 
 /* pool based memory allocation */
@@ -464,7 +467,6 @@ static inline void *tcg_malloc(TCGContext* s, int size)
 }
 
 void tcg_prologue_init(TCGContext *s);
-void tcg_func_start(TCGContext *s);
 
 int tcg_gen_code(TCGContext *s, tcg_insn_unit *gen_code_buf);
 int tcg_gen_code_search_pc(TCGContext *s, tcg_insn_unit *gen_code_buf,

@@ -10,7 +10,7 @@ public:
     const DisasContextBase& operator=(const DisasContextBase&) = delete;
 
     virtual void compile() = 0;
-    virtual void link(void* dispDirect, void* dispIndirect) = 0;
+    virtual void link() = 0;
 
     virtual int gen_new_label() = 0;
     virtual void gen_set_label(int n) = 0;

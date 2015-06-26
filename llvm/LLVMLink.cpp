@@ -44,13 +44,13 @@ void patchIndirect(void*, uint8_t* p, void* entry)
     assembler.jmp_r(JSC::X86Registers::eax);
 }
 
-void LLVMDisasContext::link(void* dispDirect, void* dispIndirect)
+void LLVMDisasContext::link()
 {
     StackMaps sm;
     const LinkDesc desc = {
         nullptr,
-        dispDirect,
-        dispIndirect,
+        m_dispDirect,
+        m_dispIndirect,
         patchProloge,
         patchDirect,
         patchIndirect,

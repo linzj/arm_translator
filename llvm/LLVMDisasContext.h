@@ -13,7 +13,7 @@ namespace jit {
 
 class LLVMDisasContext : public DisasContextBase {
 public:
-    explicit LLVMDisasContext(ExecutableMemoryAllocator* allocator);
+    explicit LLVMDisasContext(ExecutableMemoryAllocator* allocator, void* dispDirect, void* dispInDirect);
     ~LLVMDisasContext();
     inline Output* output() { return m_output.get(); }
     inline CompilerState* state() { return m_state.get(); }
@@ -36,7 +36,7 @@ public:
     LValue tcgMemCastTo32(TCGMemOp op, LValue val);
 
     virtual void compile() override;
-    virtual void link(void* dispDirect, void* dispIndirect) override;
+    virtual void link() override;
     virtual int gen_new_label() override;
     virtual void gen_set_label(int n) override;
     virtual TCGv_i64 global_mem_new_i64(int reg, intptr_t offset, const char* name) override;
@@ -182,6 +182,8 @@ private:
     typedef std::unordered_map<int, LBasicBlock> LabelMap;
     LabelMap m_labelMap;
     int m_labelCount;
+    void* m_dispDirect;
+    void* m_dispIndirect;
 };
 }
 #endif /* LLVMDISASCONTEXT_H */

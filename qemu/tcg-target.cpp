@@ -262,8 +262,6 @@ static bool have_bmi2;
 #define have_bmi2 0
 #endif
 
-static tcg_insn_unit* tb_ret_addr;
-
 /* parse target specific constraints */
 static int target_parse_constraint(TCGArgConstraint* ct, const char** pct_str)
 {
@@ -1283,17 +1281,10 @@ static void tcg_out_movcond64(TCGContext* s, TCGCond cond, TCGArg dest,
 
 static void tcg_out_branch(TCGContext* s, int call, tcg_insn_unit* dest)
 {
-    intptr_t disp = tcg_pcrel_diff(s, dest) - 5;
-
-    if (disp == (int32_t)disp) {
-        tcg_out_opc(s, call ? OPC_CALL_Jz : OPC_JMP_long, 0, 0, 0);
-        tcg_out32(s, disp);
-    }
-    else {
-        tcg_out_movi(s, TCG_TYPE_PTR, TCG_REG_R10, (uintptr_t)dest);
-        tcg_out_modrm(s, OPC_GRP5,
-            call ? EXT5_CALLN_Ev : EXT5_JMPN_Ev, TCG_REG_R10);
-    }
+    EMASSERT(call == 1);
+    tcg_out_movi(s, TCG_TYPE_PTR, TCG_REG_EAX, (uintptr_t)dest);
+    tcg_out_modrm(s, OPC_GRP5,
+        call ? EXT5_CALLN_Ev : EXT5_JMPN_Ev, TCG_REG_R10);
 }
 
 static inline void tcg_out_call(TCGContext* s, tcg_insn_unit* dest)
@@ -1303,6 +1294,7 @@ static inline void tcg_out_call(TCGContext* s, tcg_insn_unit* dest)
 
 static void tcg_out_jmp(TCGContext* s, tcg_insn_unit* dest)
 {
+    EMUNREACHABLE();
     tcg_out_branch(s, 0, dest);
 }
 
@@ -1929,10 +1921,18 @@ static inline void tcg_out_op(TCGContext* s, TCGOpcode opc,
 #endif
 
     switch (opc) {
-    case INDEX_op_exit_tb:
-        tcg_out_movi(s, TCG_TYPE_PTR, TCG_REG_EAX, args[0]);
-        tcg_out_jmp(s, tb_ret_addr);
-        break;
+    case INDEX_op_exit_tb: {
+        void* dest;
+        if (args[0]) {
+            dest = s->dispDirect;
+        }
+        else {
+            dest = s->dispIndirect;
+        }
+        tcg_out_movi(s, TCG_TYPE_PTR, TCG_REG_EAX, (uintptr_t)dest);
+        tcg_out_modrm(s, OPC_GRP5,
+            args[0] ? EXT5_CALLN_Ev : EXT5_JMPN_Ev, TCG_REG_EAX);
+    } break;
     case INDEX_op_goto_tb:
         if (s->tb_jmp_offset) {
             /* direct jump method */
@@ -2613,56 +2613,6 @@ static int tcg_target_callee_save_regs[] = {
          + CPU_TEMP_BUF_NLONGS * sizeof(long) \
          + TCG_TARGET_STACK_ALIGN - 1)        \
         & ~(TCG_TARGET_STACK_ALIGN - 1))
-
-/* Generate global QEMU prologue and epilogue code */
-static void tcg_target_qemu_prologue(TCGContext* s)
-{
-    int i, stack_addend;
-
-    /* TB prologue */
-
-    /* Reserve some stack space, also for TCG temps.  */
-    stack_addend = FRAME_SIZE - PUSH_SIZE;
-    tcg_set_frame(s, TCG_REG_CALL_STACK, TCG_STATIC_CALL_ARGS_SIZE,
-        CPU_TEMP_BUF_NLONGS * sizeof(long));
-
-    /* Save all callee saved registers.  */
-    for (i = 0; i < ARRAY_SIZE(tcg_target_callee_save_regs); i++) {
-        tcg_out_push(s, tcg_target_callee_save_regs[i]);
-    }
-
-#if TCG_TARGET_REG_BITS == 32
-    tcg_out_ld(s, TCG_TYPE_PTR, TCG_AREG0, TCG_REG_ESP,
-        (ARRAY_SIZE(tcg_target_callee_save_regs) + 1) * 4);
-    tcg_out_addi(s, TCG_REG_ESP, -stack_addend);
-    /* jmp *tb.  */
-    tcg_out_modrm_offset(s, OPC_GRP5, EXT5_JMPN_Ev, TCG_REG_ESP,
-        (ARRAY_SIZE(tcg_target_callee_save_regs) + 2) * 4
-            + stack_addend);
-#else
-    tcg_out_mov(s, TCG_TYPE_PTR, TCG_AREG0, tcg_target_call_iarg_regs[0]);
-    tcg_out_addi(s, TCG_REG_ESP, -stack_addend);
-    /* jmp *tb.  */
-    tcg_out_modrm(s, OPC_GRP5, EXT5_JMPN_Ev, tcg_target_call_iarg_regs[1]);
-#endif
-
-    /* TB epilogue */
-    tb_ret_addr = s->code_ptr;
-
-    tcg_out_addi(s, TCG_REG_CALL_STACK, stack_addend);
-
-    for (i = ARRAY_SIZE(tcg_target_callee_save_regs) - 1; i >= 0; i--) {
-        tcg_out_pop(s, tcg_target_callee_save_regs[i]);
-    }
-    tcg_out_opc(s, OPC_RET, 0, 0, 0);
-
-#if !defined(CONFIG_SOFTMMU)
-    /* Try to set up a segment register to point to GUEST_BASE.  */
-    if (GUEST_BASE) {
-        setup_guest_base_seg();
-    }
-#endif
-}
 
 static TCGRegSet tcg_target_available_regs[2];
 static TCGRegSet tcg_target_call_clobber_regs;

@@ -52,10 +52,12 @@ static PlatformDesc g_desc = {
 };
 static pthread_once_t initLLVMOnce = PTHREAD_ONCE_INIT;
 
-LLVMDisasContext::LLVMDisasContext(ExecutableMemoryAllocator* executableMemAllocator)
+LLVMDisasContext::LLVMDisasContext(ExecutableMemoryAllocator* executableMemAllocator, void* dispDirect, void* dispIndirect)
     : m_currentBufferPointer(nullptr)
     , m_currentBufferEnd(nullptr)
     , m_labelCount(0)
+    , m_dispDirect(dispDirect)
+    , m_dispIndirect(dispIndirect)
 {
     pthread_once(&initLLVMOnce, initLLVM);
     m_state.reset(new CompilerState("qemu", g_desc));

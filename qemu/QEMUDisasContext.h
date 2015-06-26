@@ -3,15 +3,18 @@
 #include <memory>
 #include "DisasContextBase.h"
 #include "tcg.h"
+namespace jit {
 class ExecutableMemoryAllocator;
+}
 namespace qemu {
 
 class QEMUDisasContext : public DisasContextBase {
 public:
-    QEMUDisasContext(ExecutableMemoryAllocator* allocate);
+    QEMUDisasContext(jit::ExecutableMemoryAllocator* allocate);
+    virtual ~QEMUDisasContext();
 
     virtual void compile() override;
-    virtual void link(void* dispDirect, void* dispIndirect) override;
+    virtual void link() override;
 
     virtual int gen_new_label() override;
     virtual void gen_set_label(int n) override;
