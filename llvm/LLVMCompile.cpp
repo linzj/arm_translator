@@ -2,8 +2,8 @@
 #include "log.h"
 #include "LLVMAPI.h"
 #include "CompilerState.h"
-#include "Compile.h"
 #include "ExecutableMemoryAllocator.h"
+#include "LLVMDisasContext.h"
 #define SECTION_NAME_PREFIX "."
 #define SECTION_NAME(NAME) (SECTION_NAME_PREFIX NAME)
 
@@ -56,21 +56,24 @@ static void mmDestroy(void*)
 {
 }
 
-void compile(State& state)
+void LLVMDisasContext::compile()
 {
+#ifdef ENABLE_DUMP_LLVM_MODULE
+    dumpModule(state()->m_module);
+#endif // ENABLE_DUMP_LLVM_MODULE
     LLVMMCJITCompilerOptions options;
     llvmAPI->InitializeMCJITCompilerOptions(&options, sizeof(options));
     options.OptLevel = 2;
     LLVMExecutionEngineRef engine;
     char* error = 0;
     options.MCJMM = llvmAPI->CreateSimpleMCJITMemoryManager(
-        &state, mmAllocateCodeSection, mmAllocateDataSection, mmApplyPermissions, mmDestroy);
+        state(), mmAllocateCodeSection, mmAllocateDataSection, mmApplyPermissions, mmDestroy);
 
-    if (llvmAPI->CreateMCJITCompilerForModule(&engine, state.m_module, &options, sizeof(options), &error)) {
+    if (llvmAPI->CreateMCJITCompilerForModule(&engine, state()->m_module, &options, sizeof(options), &error)) {
         LOGE("FATAL: Could not create LLVM execution engine: %s", error);
         EMASSERT(false);
     }
-    LLVMModuleRef module = state.m_module;
+    LLVMModuleRef module = state()->m_module;
     LLVMPassManagerRef functionPasses = 0;
     LLVMPassManagerRef modulePasses;
     LLVMTargetDataRef targetData = llvmAPI->GetExecutionEngineTargetData(engine);
@@ -100,7 +103,7 @@ void compile(State& state)
     llvmAPI->AddLowerSwitchPass(modulePasses);
 
     llvmAPI->RunPassManager(modulePasses, module);
-    state.m_entryPoint = reinterpret_cast<void*>(llvmAPI->GetPointerToGlobal(engine, state.m_function));
+    state()->m_entryPoint = reinterpret_cast<void*>(llvmAPI->GetPointerToGlobal(engine, state()->m_function));
 
     if (functionPasses)
         llvmAPI->DisposePassManager(functionPasses);
