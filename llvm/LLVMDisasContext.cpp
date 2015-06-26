@@ -1064,17 +1064,17 @@ void LLVMDisasContext::gen_udiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
     storeToTCG(phi, ret);
 }
 
-#define DEFINE_VFP_OP(name1, name2, type, size)                                                        \
-    void LLVMDisasContext::gen_vfp_##name1(TCGv_i##size ret, TCGv_i##size arg1, TCGv_i##size arg2, int)     \
-    {                                                                                                  \
-        EMASSERT(ret->m_size == arg1->m_size && arg1->m_size == arg2->m_size && arg2->m_size == size); \
-        LValue arg1V = unwrap(arg1);                                                                   \
-        LValue arg2V = unwrap(arg2);                                                                   \
-        arg1V = output()->buildBitCast(arg1V, output()->repo().type);                                  \
-        arg2V = output()->buildBitCast(arg2V, output()->repo().type);                                  \
-        LValue retVal = output()->build##name2(arg1V, arg2V);                                          \
-        retVal = output()->buildBitCast(retVal, output()->repo().int##size);                           \
-        storeToTCG(retVal, ret);                                                                       \
+#define DEFINE_VFP_OP(name1, name2, type, size)                                                              \
+    void LLVMDisasContext::gen_vfp_##name1(TCGv_i##size ret, TCGv_i##size arg1, TCGv_i##size arg2, TCGv_ptr) \
+    {                                                                                                        \
+        EMASSERT(ret->m_size == arg1->m_size && arg1->m_size == arg2->m_size && arg2->m_size == size);       \
+        LValue arg1V = unwrap(arg1);                                                                         \
+        LValue arg2V = unwrap(arg2);                                                                         \
+        arg1V = output()->buildBitCast(arg1V, output()->repo().type);                                        \
+        arg2V = output()->buildBitCast(arg2V, output()->repo().type);                                        \
+        LValue retVal = output()->build##name2(arg1V, arg2V);                                                \
+        retVal = output()->buildBitCast(retVal, output()->repo().int##size);                                 \
+        storeToTCG(retVal, ret);                                                                             \
     }
 
 DEFINE_VFP_OP(adds, FAdd, floatType, 32)
@@ -1088,13 +1088,13 @@ DEFINE_VFP_OP(muld, FMul, doubleType, 64)
 DEFINE_VFP_OP(divd, FDiv, doubleType, 64)
 #undef DEFINE_VFP_OP
 
-#define DEFINE_VFP_OP(name, op, type, size)                                        \
-    void LLVMDisasContext::gen_vfp_##name(TCGv_i32 ret, TCGv_i##size arg, int)          \
-    {                                                                              \
-        LValue argV = unwrap(arg);                                                 \
-        argV = output()->buildBitCast(argV, output()->repo().type);                \
-        LValue retVal = output()->buildCast(op, argV, output()->repo().int##size); \
-        storeToTCG(retVal, ret);                                                   \
+#define DEFINE_VFP_OP(name, op, type, size)                                         \
+    void LLVMDisasContext::gen_vfp_##name(TCGv_i32 ret, TCGv_i##size arg, TCGv_ptr) \
+    {                                                                               \
+        LValue argV = unwrap(arg);                                                  \
+        argV = output()->buildBitCast(argV, output()->repo().type);                 \
+        LValue retVal = output()->buildCast(op, argV, output()->repo().int##size);  \
+        storeToTCG(retVal, ret);                                                    \
     }
 
 DEFINE_VFP_OP(touis, LLVMFPToUI, floatType, 32)
@@ -1108,13 +1108,13 @@ DEFINE_VFP_OP(tosid, LLVMFPToSI, doubleType, 64)
 DEFINE_VFP_OP(tosizd, LLVMFPToSI, doubleType, 64)
 #undef DEFINE_VFP_OP
 
-#define DEFINE_VFP_OP(name, op, type, size)                                   \
-    void LLVMDisasContext::gen_vfp_##name(TCGv_i##size ret, TCGv_i32 arg, int)     \
-    {                                                                         \
-        LValue argV = unwrap(arg);                                            \
-        LValue retVal = output()->buildCast(op, argV, output()->repo().type); \
-        retVal = output()->buildBitCast(retVal, output()->repo().int##size);  \
-        storeToTCG(retVal, ret);                                              \
+#define DEFINE_VFP_OP(name, op, type, size)                                         \
+    void LLVMDisasContext::gen_vfp_##name(TCGv_i##size ret, TCGv_i32 arg, TCGv_ptr) \
+    {                                                                               \
+        LValue argV = unwrap(arg);                                                  \
+        LValue retVal = output()->buildCast(op, argV, output()->repo().type);       \
+        retVal = output()->buildBitCast(retVal, output()->repo().int##size);        \
+        storeToTCG(retVal, ret);                                                    \
     }
 
 DEFINE_VFP_OP(sitos, LLVMSIToFP, floatType, 32)

@@ -109,34 +109,34 @@ void tcg_temp_free_ptr(DisasContext* s, TCGv_ptr ptr);
 void tcg_gen_callN(DisasContext* s, void* func, TCGArg ret,
     int nargs, TCGArg* args);
 
-void tcg_gen_sdiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon);
-void tcg_gen_udiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon);
+void tcg_gen_sdiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
+void tcg_gen_udiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
 
-void tcg_gen_vfp_adds(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon);
-void tcg_gen_vfp_subs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon);
-void tcg_gen_vfp_muls(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon);
-void tcg_gen_vfp_divs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon);
+void tcg_gen_vfp_adds(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, TCGv_ptr fpstatus);
+void tcg_gen_vfp_subs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, TCGv_ptr fpstatus);
+void tcg_gen_vfp_muls(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, TCGv_ptr fpstatus);
+void tcg_gen_vfp_divs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, TCGv_ptr fpstatus);
 
-void tcg_gen_vfp_addd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, int isNeon);
-void tcg_gen_vfp_subd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, int isNeon);
-void tcg_gen_vfp_muld(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, int isNeon);
-void tcg_gen_vfp_divd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, int isNeon);
+void tcg_gen_vfp_addd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, TCGv_ptr fpstatus);
+void tcg_gen_vfp_subd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, TCGv_ptr fpstatus);
+void tcg_gen_vfp_muld(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, TCGv_ptr fpstatus);
+void tcg_gen_vfp_divd(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, TCGv_ptr fpstatus);
 
-void tcg_gen_vfp_touis(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon);
-void tcg_gen_vfp_touizs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon);
-void tcg_gen_vfp_tosis(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon);
-void tcg_gen_vfp_tosizs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon);
+void tcg_gen_vfp_touis(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus);
+void tcg_gen_vfp_touizs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus);
+void tcg_gen_vfp_tosis(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus);
+void tcg_gen_vfp_tosizs(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus);
 
-void tcg_gen_vfp_touid(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, int isNeon);
-void tcg_gen_vfp_touizd(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, int isNeon);
-void tcg_gen_vfp_tosid(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, int isNeon);
-void tcg_gen_vfp_tosizd(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, int isNeon);
+void tcg_gen_vfp_touid(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, TCGv_ptr fpstatus);
+void tcg_gen_vfp_touizd(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, TCGv_ptr fpstatus);
+void tcg_gen_vfp_tosid(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, TCGv_ptr fpstatus);
+void tcg_gen_vfp_tosizd(DisasContext* s, TCGv_i32 ret, TCGv_i64 arg, TCGv_ptr fpstatus);
 
-void tcg_gen_vfp_sitos(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon);
-void tcg_gen_vfp_uitos(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, int isNeon);
+void tcg_gen_vfp_sitos(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus);
+void tcg_gen_vfp_uitos(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus);
 
-void tcg_gen_vfp_sitod(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg, int isNeon);
-void tcg_gen_vfp_uitod(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg, int isNeon);
+void tcg_gen_vfp_sitod(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg, TCGv_ptr fpstatus);
+void tcg_gen_vfp_uitod(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg, TCGv_ptr fpstatus);
 #ifdef __cplusplus
 }
 #endif

@@ -28,10 +28,13 @@ static const TCGHelperInfo all_helpers[] = {
 #include "helper-gen.h"
 }
 
-
 namespace qemu {
 qemu::TCGOpDef tcg_op_defs[] = {
-#define DEF(s, oargs, iargs, cargs, flags) { #s, oargs, iargs, cargs, iargs + oargs + cargs, flags },
+#define DEF(s, oargs, iargs, cargs, flags)                    \
+    {                                                         \
+        #s, oargs, iargs, cargs, iargs + oargs + cargs, flags \
+    }                                                         \
+    ,
 #include "tcg-opc.h"
 #undef DEF
 };
@@ -680,7 +683,6 @@ static void tcg_context_init(TCGContext* s)
     pthread_once(&initQEMUOnce, tcg_target_init);
     tcg_regset_clear(s->reserved_regs);
     tcg_regset_set_reg(s->reserved_regs, TCG_REG_CALL_STACK);
-
 }
 
 QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator, void* dispDirect, void* dispIndirect)
@@ -688,8 +690,8 @@ QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator, vo
 {
     memset(&m_impl->m_tcgCtx, sizeof(TCGContext), 0);
     tcg_func_start(&m_impl->m_tcgCtx);
-    m_impl->m_tcgCtx.dispDirect =  dispDirect;
-    m_impl->m_tcgCtx.dispIndirect =  dispIndirect;
+    m_impl->m_tcgCtx.dispDirect = dispDirect;
+    m_impl->m_tcgCtx.dispIndirect = dispIndirect;
 }
 
 QEMUDisasContext::~QEMUDisasContext()
@@ -3079,63 +3081,48 @@ void QEMUDisasContext::link()
 
 void QEMUDisasContext::gen_sdiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    gen_helper_sdiv(ret, arg1, arg2);
+    gen_helper_sdiv(this, ret, arg1, arg2);
 }
 
 void QEMUDisasContext::gen_udiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
-    gen_helper_udiv(ret, arg1, arg2);
+    gen_helper_udiv(this, ret, arg1, arg2);
 }
 
-TCGv_ptr QEMUDisasContext::get_fpstatus_ptr(int neon)
-{
-    TCGv_ptr statusptr = temp_new_ptr();
-    int offset;
-    if (neon) {
-        offset = offsetof(CPUARMState, vfp.standard_fp_status);
-    } else {
-        offset = offsetof(CPUARMState, vfp.fp_status);
+#define VFP_BINOP(name, size)                                                                                        \
+    void QEMUDisasContext::gen_vfp_##name(TCGv_i##size ret, TCGv_i##size arg1, TCGv_i##size arg2, TCGv_ptr fpstatus) \
+    {                                                                                                                \
+        gen_helper_vfp_##name(this, ret, arg1, arg2, fpstatus);                                                      \
     }
-    gen_addi_ptr(statusptr, cpu_env, offset);
-    return statusptr;
-}
+VFP_BINOP(adds, 32)
+VFP_BINOP(subs, 32)
+VFP_BINOP(muls, 32)
+VFP_BINOP(divs, 32)
 
-#define VFP_BINOP(name)\
-    void QEMUDisasContext::gen_vfp_##name(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, int isNeon) \
-    {\
-        TCGv_ptr fpstatus = get_fpstatus_ptr(isNeon);\
-        gen_helper_vfp_##name(this, ret, arg1, arg2, fpstatus);\
-    }
-VFP_BINOP(adds)
-VFP_BINOP(subs)
-VFP_BINOP(muls)
-VFP_BINOP(divs)
-    
-VFP_BINOP(addd)
-VFP_BINOP(subd)
-VFP_BINOP(muld)
-VFP_BINOP(divd)
+VFP_BINOP(addd, 64)
+VFP_BINOP(subd, 64)
+VFP_BINOP(muld, 64)
+VFP_BINOP(divd, 64)
 #undef VFP_BINOP
 
-#define VFP_UNARY(name)\
-    void QEMUDisasContext::gen_vfp_##name(TCGv_i32 ret, TCGv_i32 arg, int isNeon)\
-    {\
-        TCGv_ptr fpstatus = get_fpstatus_ptr(isNeon);\
-        gen_helper_vfp_##name(this, ret, arg, fpstatus);\
+#define VFP_UNARY(name, size1, size2)                                                              \
+    void QEMUDisasContext::gen_vfp_##name(TCGv_i##size1 ret, TCGv_i##size2 arg, TCGv_ptr fpstatus) \
+    {                                                                                              \
+        gen_helper_vfp_##name(this, ret, arg, fpstatus);                                           \
     }
-        
-VFP_UNARY(touis)
-VFP_UNARY(touizs)
-VFP_UNARY(tosis)
-VFP_UNARY(tosizs)
-VFP_UNARY(touid)
-VFP_UNARY(touizd)
-VFP_UNARY(tosid)
-VFP_UNARY(tosizd)
-VFP_UNARY(sitos)
-VFP_UNARY(uitos)
-VFP_UNARY(sitod)
-VFP_UNARY(uitod)
-#undef VFP_UNARY
 
+VFP_UNARY(touis, 32, 32)
+VFP_UNARY(touizs, 32, 32)
+VFP_UNARY(tosis, 32, 32)
+VFP_UNARY(tosizs, 32, 32)
+VFP_UNARY(touid, 32, 64)
+VFP_UNARY(touizd, 32, 64)
+VFP_UNARY(tosid, 32, 64)
+VFP_UNARY(tosizd, 32, 64)
+VFP_UNARY(sitos, 32, 32)
+VFP_UNARY(uitos, 32, 32)
+
+VFP_UNARY(uitod, 64, 32)
+VFP_UNARY(sitod, 64, 32)
+#undef VFP_UNARY
 }

@@ -1126,13 +1126,15 @@ static TCGv_ptr get_fpstatus_ptr(DisasContext *s, int neon)
 #define VFP_OP2(name)                                                 \
 static inline void gen_vfp_##name(DisasContext *s, int dp)            \
 {                                                                     \
+    TCGv_ptr statusptr = get_fpstatus_ptr(s, 0);                      \
     if (dp) {                                                         \
         tcg_gen_vfp_##name##d(s, cpu_F0d, cpu_F0d,                    \
-         cpu_F1d, 0);                                                 \
+         cpu_F1d, statusptr);                                         \
     } else {                                                          \
         tcg_gen_vfp_##name##s(s, cpu_F0s,                             \
-                cpu_F0s, cpu_F1s, 0);                                 \
+                cpu_F0s, cpu_F1s, statusptr);                         \
     }                                                                 \
+    tcg_temp_free_ptr(s, statusptr);                                  \
 }
 
 VFP_OP2(add)
@@ -1145,11 +1147,13 @@ VFP_OP2(div)
 static inline void gen_vfp_F1_mul(DisasContext *s, int dp)
 {
     /* Like gen_vfp_mul() but put result in F1 */
+    TCGv_ptr statusptr = get_fpstatus_ptr(s, 0);
     if (dp) {
-        tcg_gen_vfp_muld(s, cpu_F1d, cpu_F0d, cpu_F1d, 0);
+        tcg_gen_vfp_muld(s, cpu_F1d, cpu_F0d, cpu_F1d, statusptr);
     } else {
-        tcg_gen_vfp_muls(s, cpu_F1s, cpu_F0s, cpu_F1s, 0);
+        tcg_gen_vfp_muls(s, cpu_F1s, cpu_F0s, cpu_F1s, statusptr);
     }
+    tcg_temp_free_ptr(s, statusptr);
 }
 
 static inline void gen_vfp_F1_neg(DisasContext *s, int dp)
@@ -1213,11 +1217,13 @@ static inline void gen_vfp_F1_ld0(DisasContext *s, int dp)
 #define VFP_GEN_ITOF(name) \
 static inline void gen_vfp_##name(DisasContext *s, int dp, int neon) \
 { \
+    TCGv_ptr statusptr = get_fpstatus_ptr(s, neon); \
     if (dp) { \
-        tcg_gen_vfp_##name##d(s, cpu_F0d, cpu_F0s, neon); \
+        tcg_gen_vfp_##name##d(s, cpu_F0d, cpu_F0s, statusptr); \
     } else { \
-        tcg_gen_vfp_##name##s(s, cpu_F0s, cpu_F0s, neon); \
+        tcg_gen_vfp_##name##s(s, cpu_F0s, cpu_F0s, statusptr); \
     } \
+    tcg_temp_free_ptr(s, statusptr); \
 }
 
 VFP_GEN_ITOF(uito)
@@ -1227,11 +1233,13 @@ VFP_GEN_ITOF(sito)
 #define VFP_GEN_FTOI(name) \
 static inline void gen_vfp_##name(DisasContext *s, int dp, int neon) \
 { \
+    TCGv_ptr statusptr = get_fpstatus_ptr(s, neon); \
     if (dp) { \
-        tcg_gen_vfp_##name##d(s, cpu_F0s, cpu_F0d, neon); \
+        tcg_gen_vfp_##name##d(s, cpu_F0s, cpu_F0d, statusptr); \
     } else { \
-        tcg_gen_vfp_##name##s(s, cpu_F0s, cpu_F0s, neon); \
+        tcg_gen_vfp_##name##s(s, cpu_F0s, cpu_F0s, statusptr); \
     } \
+    tcg_temp_free_ptr(s, statusptr); \
 }
 
 VFP_GEN_FTOI(toui)
@@ -5510,10 +5518,10 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
             switch ((u << 2) | size) {
             case 0: /* VADD */
             case 4: /* VPADD */
-                tcg_gen_vfp_adds(s, tmp, tmp, tmp2, 1);
+                tcg_gen_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
                 break;
             case 2: /* VSUB */
-                tcg_gen_vfp_subs(s, tmp, tmp, tmp2, 1);
+                tcg_gen_vfp_subs(s, tmp, tmp, tmp2, fpstatus);
                 break;
             case 6: /* VABD */
                 gen_helper_neon_abd_f32(s, tmp, tmp, tmp2, fpstatus);
@@ -5527,14 +5535,14 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
         case NEON_3R_FLOAT_MULTIPLY:
         {
             TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
-            tcg_gen_vfp_muls(s, tmp, tmp, tmp2, 1);
+            tcg_gen_vfp_muls(s, tmp, tmp, tmp2, fpstatus);
             if (!u) {
                 tcg_temp_free_i32(s, tmp2);
                 tmp2 = neon_load_reg(s, rd, pass);
                 if (size == 0) {
-                    tcg_gen_vfp_adds(s, tmp, tmp, tmp2);
+                    tcg_gen_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
                 } else {
-                    tcg_gen_vfp_subs(s, tmp, tmp2, tmp);
+                    tcg_gen_vfp_subs(s, tmp, tmp2, tmp, fpstatus);
                 }
             }
             tcg_temp_free_ptr(s, fpstatus);
@@ -6329,7 +6337,9 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                                 gen_helper_neon_qrdmulh_s32(s, tmp, cpu_env, tmp, tmp2);
                             }
                         } else if (op & 1) {
-                            tcg_gen_vfp_muls(s, tmp, tmp, tmp2);
+                            TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
+                            tcg_gen_vfp_muls(s, tmp, tmp, tmp2, fpstatus);
+                            tcg_temp_free_ptr(s, fpstatus);
                         } else {
                             switch (size) {
                             case 0: gen_helper_neon_mul_u8(s, tmp, tmp, tmp2); break;
@@ -6348,7 +6358,9 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                                 break;
                             case 1:
                             {
-                                tcg_gen_vfp_adds(s, tmp, tmp, tmp2);
+                                TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
+                                tcg_gen_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
+                                tcg_temp_free_ptr(s, fpstatus);
                                 break;
                             }
                             case 4:
@@ -6356,7 +6368,9 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                                 break;
                             case 5:
                             {
-                                tcg_gen_vfp_subs(s, tmp, tmp2, tmp);
+                                TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
+                                tcg_gen_vfp_subs(s, tmp, tmp2, tmp, fpstatus);
+                                tcg_temp_free_ptr(s, fpstatus);
                                 break;
                             }
                             default:

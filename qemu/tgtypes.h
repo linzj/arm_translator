@@ -98,7 +98,7 @@ typedef enum TCGMemOp {
 
 typedef target_long tcg_target_long;
 typedef target_ulong tcg_target_ulong;
-typedef tcg_target_ulong TCGArg;
+typedef intptr_t TCGArg;
 
 #if TCG_TARGET_REG_BITS == 64
 # define TCG_AREG0 TCG_REG_R14

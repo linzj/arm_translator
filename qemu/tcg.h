@@ -253,8 +253,6 @@ typedef enum TCGType {
 #endif
 } TCGType;
 
-typedef tcg_target_ulong TCGArg;
-
 #if TCG_TARGET_REG_BITS == 32
 #define TCGV_LOW(t) MAKE_TCGV_I32(GET_TCGV_I64(t))
 #define TCGV_HIGH(t) MAKE_TCGV_I32(GET_TCGV_I64(t) + 1)
