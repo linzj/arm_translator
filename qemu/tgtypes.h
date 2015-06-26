@@ -1,10 +1,16 @@
 #ifndef TGTYPE_H
 #define TGTYPE_H
 #include "types.h"
+#include "compiler.h"
 
 typedef struct TCGv_i32__* TCGv_i32;
 typedef struct TCGv_i64__* TCGv_i64;
 typedef struct TCGv_ptr__* TCGv_ptr;
+#define tcg_temp_free tcg_temp_free_i32
+#define tcg_temp_new() (TCGv) tcg_temp_new_i32();
+#define TCGV_UNUSED_I32(a) ((void)a)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 #define TCGv TCGv_i32
 #define TARGET_FMT_lx "%08x"
 #define TCG_TARGET_REG_BITS 32
@@ -93,5 +99,70 @@ typedef enum TCGMemOp {
 typedef target_long tcg_target_long;
 typedef target_ulong tcg_target_ulong;
 typedef tcg_target_ulong TCGArg;
+
+#if TCG_TARGET_REG_BITS == 64
+# define TCG_AREG0 TCG_REG_R14
+#else
+# define TCG_AREG0 TCG_REG_EBP
+#endif
+typedef enum {
+    TCG_REG_EAX = 0,
+    TCG_REG_ECX,
+    TCG_REG_EDX,
+    TCG_REG_EBX,
+    TCG_REG_ESP,
+    TCG_REG_EBP,
+    TCG_REG_ESI,
+    TCG_REG_EDI,
+
+    /* 64-bit registers; always define the symbols to avoid
+       too much if-deffing.  */
+    TCG_REG_R8,
+    TCG_REG_R9,
+    TCG_REG_R10,
+    TCG_REG_R11,
+    TCG_REG_R12,
+    TCG_REG_R13,
+    TCG_REG_R14,
+    TCG_REG_R15,
+    TCG_REG_RAX = TCG_REG_EAX,
+    TCG_REG_RCX = TCG_REG_ECX,
+    TCG_REG_RDX = TCG_REG_EDX,
+    TCG_REG_RBX = TCG_REG_EBX,
+    TCG_REG_RSP = TCG_REG_ESP,
+    TCG_REG_RBP = TCG_REG_EBP,
+    TCG_REG_RSI = TCG_REG_ESI,
+    TCG_REG_RDI = TCG_REG_EDI,
+} TCGReg;
+
+static inline TCGv_i32 QEMU_ARTIFICIAL MAKE_TCGV_I32(intptr_t i)
+{
+    return (TCGv_i32)i;
+}
+
+static inline TCGv_i64 QEMU_ARTIFICIAL MAKE_TCGV_I64(intptr_t i)
+{
+    return (TCGv_i64)i;
+}
+
+static inline TCGv_ptr QEMU_ARTIFICIAL MAKE_TCGV_PTR(intptr_t i)
+{
+    return (TCGv_ptr)i;
+}
+
+static inline intptr_t QEMU_ARTIFICIAL GET_TCGV_I32(TCGv_i32 t)
+{
+    return (intptr_t)t;
+}
+
+static inline intptr_t QEMU_ARTIFICIAL GET_TCGV_I64(TCGv_i64 t)
+{
+    return (intptr_t)t;
+}
+
+static inline intptr_t QEMU_ARTIFICIAL GET_TCGV_PTR(TCGv_ptr t)
+{
+    return (intptr_t)t;
+}
 
 #endif /* TGTYPE_H */

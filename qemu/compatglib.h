@@ -44,6 +44,14 @@ GHashTable* g_hash_table_new_full (GHashFunc hash_func,
                                             GEqualFunc key_equal_func,
                                             GDestroyNotify key_destroy_func,
                                             GDestroyNotify value_destroy_func);
+extern
+GHashTable *
+g_hash_table_new (GHashFunc  hash_func,
+                  GEqualFunc key_equal_func);
+extern
+gpointer
+g_hash_table_lookup (GHashTable    *hash_table,
+                     gconstpointer  key);
 #define G_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2
 #define G_PASTE(identifier1,identifier2) G_PASTE_ARGS (identifier1, identifier2)
 #if     __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)

@@ -5,10 +5,6 @@
 extern "C" {
 #endif
 
-#define tcg_temp_free tcg_temp_free_i32
-#define tcg_temp_new() (TCGv) tcg_temp_new_i32();
-#define TCGV_UNUSED_I32(a) ((void)a)
-#define unlikely(x) __builtin_expect(!!(x), 0)
 typedef struct DisasContext DisasContext;
 
 int gen_new_label(DisasContext* s);
@@ -141,36 +137,6 @@ void tcg_gen_vfp_uitos(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg);
 
 void tcg_gen_vfp_sitod(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg);
 void tcg_gen_vfp_uitod(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg);
-
-static inline TCGv_i32 MAKE_TCGV_I32(intptr_t i)
-{
-    return (TCGv_i32)i;
-}
-
-static inline TCGv_i64 MAKE_TCGV_I64(intptr_t i)
-{
-    return (TCGv_i64)i;
-}
-
-static inline TCGv_ptr MAKE_TCGV_PTR(intptr_t i)
-{
-    return (TCGv_ptr)i;
-}
-
-static inline intptr_t GET_TCGV_I32(TCGv_i32 t)
-{
-    return (intptr_t)t;
-}
-
-static inline intptr_t GET_TCGV_I64(TCGv_i64 t)
-{
-    return (intptr_t)t;
-}
-
-static inline intptr_t GET_TCGV_PTR(TCGv_ptr t)
-{
-    return (intptr_t)t;
-}
 #ifdef __cplusplus
 }
 #endif

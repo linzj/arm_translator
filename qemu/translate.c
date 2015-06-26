@@ -34,7 +34,6 @@
 #include "helper-proto.h"
 #include "bswap.h"
 
-TCGContext tcg_ctx;
 #include "helper-gen.h"
 #define ENABLE_ARCH_4T    arm_dc_feature(s, ARM_FEATURE_V4T)
 #define ENABLE_ARCH_5     arm_dc_feature(s, ARM_FEATURE_V5)

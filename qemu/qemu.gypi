@@ -14,6 +14,7 @@
             'crc32c.c',
             'cpuinit.c',
             'compatglib.c',
+            'QEMUDisasContext.cpp',
         ],
         'llvmlog_level': 0,
     },

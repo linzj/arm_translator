@@ -1,5 +1,6 @@
 #ifndef DISASCONTEXTBASE_H
 #define DISASCONTEXTBASE_H
+#include "cpu.h"
 #include "translate.h"
 class DisasContextBase : public DisasContext {
 public:

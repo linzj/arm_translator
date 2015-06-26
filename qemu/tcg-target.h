@@ -34,35 +34,6 @@
 # define TCG_TARGET_NB_REGS    8
 #endif
 
-typedef enum {
-    TCG_REG_EAX = 0,
-    TCG_REG_ECX,
-    TCG_REG_EDX,
-    TCG_REG_EBX,
-    TCG_REG_ESP,
-    TCG_REG_EBP,
-    TCG_REG_ESI,
-    TCG_REG_EDI,
-
-    /* 64-bit registers; always define the symbols to avoid
-       too much if-deffing.  */
-    TCG_REG_R8,
-    TCG_REG_R9,
-    TCG_REG_R10,
-    TCG_REG_R11,
-    TCG_REG_R12,
-    TCG_REG_R13,
-    TCG_REG_R14,
-    TCG_REG_R15,
-    TCG_REG_RAX = TCG_REG_EAX,
-    TCG_REG_RCX = TCG_REG_ECX,
-    TCG_REG_RDX = TCG_REG_EDX,
-    TCG_REG_RBX = TCG_REG_EBX,
-    TCG_REG_RSP = TCG_REG_ESP,
-    TCG_REG_RBP = TCG_REG_EBP,
-    TCG_REG_RSI = TCG_REG_ESI,
-    TCG_REG_RDI = TCG_REG_EDI,
-} TCGReg;
 
 /* used for function call generation */
 #define TCG_REG_CALL_STACK TCG_REG_ESP 

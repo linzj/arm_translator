@@ -6,15 +6,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#if TCG_TARGET_REG_BITS == 64
-# define TCG_AREG0 TCG_REG_R14
-#else
-# define TCG_AREG0 TCG_REG_EBP
-#endif
-enum {
-TCG_AREG0,
-};
 #define DISAS_NEXT    0 /* next instruction can be analyzed */
 #define DISAS_JUMP    1 /* only pc was modified dynamically */
 #define DISAS_UPDATE  2 /* cpu state was modified dynamically */

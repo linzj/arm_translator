@@ -120,6 +120,9 @@ public:
     virtual TCGv_i32 temp_new_i32() override;
     virtual TCGv_ptr temp_new_ptr() override;
     virtual TCGv_i64 temp_new_i64() override;
+    virtual void temp_free_i32(TCGv_i32 a) override;
+    virtual void temp_free_i64(TCGv_i64 a) override;
+    virtual void temp_free_ptr(TCGv_ptr a) override;
     virtual void gen_callN(void* func, TCGArg ret,
         int nargs, TCGArg* args)
         override;
@@ -154,111 +157,134 @@ public:
     virtual void gen_vfp_uitod(TCGv_i64 ret, TCGv_i32 arg) override;
 
 private:
-    int tcg_global_mem_new_internal(TCGType type, int reg,
+    int global_mem_new_internal(TCGType type, int reg,
         intptr_t offset,
         const char* name);
-    void tcg_gen_op0(TCGOpcode opc);
+    void gen_op0(TCGOpcode opc);
 
-    void tcg_gen_op1_i32(TCGOpcode opc, TCGv_i32 arg1);
+    void gen_op1_i32(TCGOpcode opc, TCGv_i32 arg1);
 
-    void tcg_gen_op1_i64(TCGOpcode opc, TCGv_i64 arg1);
+    void gen_op1_i64(TCGOpcode opc, TCGv_i64 arg1);
 
-    void tcg_gen_op1i(TCGOpcode opc, TCGArg arg1);
+    void gen_op1i(TCGOpcode opc, TCGArg arg1);
 
-    void tcg_gen_op2_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2);
+    void gen_op2_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2);
 
-    void tcg_gen_op2_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2);
+    void gen_op2_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2);
 
-    void tcg_gen_op2i_i32(TCGOpcode opc, TCGv_i32 arg1, TCGArg arg2);
+    void gen_op2i_i32(TCGOpcode opc, TCGv_i32 arg1, TCGArg arg2);
 
-    void tcg_gen_op2i_i64(TCGOpcode opc, TCGv_i64 arg1, TCGArg arg2);
+    void gen_op2i_i64(TCGOpcode opc, TCGv_i64 arg1, TCGArg arg2);
 
-    void tcg_gen_op2ii(TCGOpcode opc, TCGArg arg1, TCGArg arg2);
+    void gen_op2ii(TCGOpcode opc, TCGArg arg1, TCGArg arg2);
 
-    void tcg_gen_op3_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
+    void gen_op3_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
         TCGv_i32 arg3);
 
-    void tcg_gen_op3_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
+    void gen_op3_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
         TCGv_i64 arg3);
 
-    void tcg_gen_op3i_i32(TCGOpcode opc, TCGv_i32 arg1,
+    void gen_op3i_i32(TCGOpcode opc, TCGv_i32 arg1,
         TCGv_i32 arg2, TCGArg arg3);
 
-    void tcg_gen_op3i_i64(TCGOpcode opc, TCGv_i64 arg1,
+    void gen_op3i_i64(TCGOpcode opc, TCGv_i64 arg1,
         TCGv_i64 arg2, TCGArg arg3);
 
-    void tcg_gen_ldst_op_i32(TCGOpcode opc, TCGv_i32 val,
+    void gen_ldst_op_i32(TCGOpcode opc, TCGv_i32 val,
         TCGv_ptr base, TCGArg offset);
 
-    void tcg_gen_ldst_op_i64(TCGOpcode opc, TCGv_i64 val,
+    void gen_ldst_op_i64(TCGOpcode opc, TCGv_i64 val,
         TCGv_ptr base, TCGArg offset);
 
-    void tcg_gen_op4_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
+    void gen_op4_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
         TCGv_i32 arg3, TCGv_i32 arg4);
 
-    void tcg_gen_op4_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
+    void gen_op4_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
         TCGv_i64 arg3, TCGv_i64 arg4);
 
-    void tcg_gen_op4i_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
+    void gen_op4i_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
         TCGv_i32 arg3, TCGArg arg4);
 
-    void tcg_gen_op4i_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
+    void gen_op4i_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
         TCGv_i64 arg3, TCGArg arg4);
 
-    void tcg_gen_op4ii_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
+    void gen_op4ii_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
         TCGArg arg3, TCGArg arg4);
 
-    void tcg_gen_op4ii_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
+    void gen_op4ii_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
         TCGArg arg3, TCGArg arg4);
 
-    void tcg_gen_op5_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
+    void gen_op5_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
         TCGv_i32 arg3, TCGv_i32 arg4, TCGv_i32 arg5);
 
-    void tcg_gen_op5_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
+    void gen_op5_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
         TCGv_i64 arg3, TCGv_i64 arg4, TCGv_i64 arg5);
 
-    void tcg_gen_op5i_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
+    void gen_op5i_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
         TCGv_i32 arg3, TCGv_i32 arg4, TCGArg arg5);
 
-    void tcg_gen_op5i_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
+    void gen_op5i_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
         TCGv_i64 arg3, TCGv_i64 arg4, TCGArg arg5);
 
-    void tcg_gen_op5ii_i32(TCGOpcode opc, TCGv_i32 arg1,
+    void gen_op5ii_i32(TCGOpcode opc, TCGv_i32 arg1,
         TCGv_i32 arg2, TCGv_i32 arg3,
         TCGArg arg4, TCGArg arg5);
 
-    void tcg_gen_op5ii_i64(TCGOpcode opc, TCGv_i64 arg1,
+    void gen_op5ii_i64(TCGOpcode opc, TCGv_i64 arg1,
         TCGv_i64 arg2, TCGv_i64 arg3,
         TCGArg arg4, TCGArg arg5);
 
-    void tcg_gen_op6_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
+    void gen_op6_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
         TCGv_i32 arg3, TCGv_i32 arg4, TCGv_i32 arg5,
         TCGv_i32 arg6);
 
-    void tcg_gen_op6_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
+    void gen_op6_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
         TCGv_i64 arg3, TCGv_i64 arg4, TCGv_i64 arg5,
         TCGv_i64 arg6);
 
-    void tcg_gen_op6i_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
+    void gen_op6i_i32(TCGOpcode opc, TCGv_i32 arg1, TCGv_i32 arg2,
         TCGv_i32 arg3, TCGv_i32 arg4,
         TCGv_i32 arg5, TCGArg arg6);
 
-    void tcg_gen_op6i_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
+    void gen_op6i_i64(TCGOpcode opc, TCGv_i64 arg1, TCGv_i64 arg2,
         TCGv_i64 arg3, TCGv_i64 arg4,
         TCGv_i64 arg5, TCGArg arg6);
 
-    void tcg_gen_op6ii_i32(TCGOpcode opc, TCGv_i32 arg1,
+    void gen_op6ii_i32(TCGOpcode opc, TCGv_i32 arg1,
         TCGv_i32 arg2, TCGv_i32 arg3,
         TCGv_i32 arg4, TCGArg arg5, TCGArg arg6);
 
-    void tcg_gen_op6ii_i64(TCGOpcode opc, TCGv_i64 arg1,
+    void gen_op6ii_i64(TCGOpcode opc, TCGv_i64 arg1,
         TCGv_i64 arg2, TCGv_i64 arg3,
         TCGv_i64 arg4, TCGArg arg5, TCGArg arg6);
 
+#if TCG_TARGET_REG_BITS == 32
+#define tcg_add_param_tl tcg_add_param_i32
+#else
+#define tcg_add_param_tl tcg_add_param_i64
+#endif
     void tcg_add_param_i32(TCGv_i32 val);
 
     void tcg_add_param_i64(TCGv_i64 val);
+    TCGv_i32 tcg_temp_new_internal_i32(int temp_local);
+    TCGv_i64 tcg_temp_new_internal_i64(int temp_local);
+
+    int tcg_temp_new_internal(TCGType type, int temp_local);
+    int global_reg_new_internal(TCGType type, int reg,
+        const char* name);
+    TCGv_i32 global_reg_new_i32(int reg, const char* name);
+    void gen_br(int label);
+    void gen_brcond_i32(TCGCond cond, TCGv_i32 arg1,
+        TCGv_i32 arg2, int label_index);
+#if TCG_TARGET_REG_BITS == 32
+    void gen_shifti_i64(TCGv_i64 ret, TCGv_i64 arg1,
+        int c, int right, int arith);
+#endif
+
+    void gen_trunc_shr_i64_i32(TCGv_i32 ret, TCGv_i64 arg,
+        unsigned int count);
     struct QEMUDisasContextImpl;
+    void temp_free_internal(int idx);
     std::unique_ptr<QEMUDisasContextImpl> m_impl;
 };
 }
