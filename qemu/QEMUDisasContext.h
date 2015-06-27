@@ -10,7 +10,7 @@ namespace qemu {
 
 class QEMUDisasContext : public DisasContextBase {
 public:
-    explicit QEMUDisasContext(jit::ExecutableMemoryAllocator* allocate, void* dispDirect, void* dispIndirect);
+    explicit QEMUDisasContext(jit::ExecutableMemoryAllocator* allocate, void* dispDirect, void* dispIndirect, void* dispHot);
     virtual ~QEMUDisasContext();
 
     virtual void compile() override;

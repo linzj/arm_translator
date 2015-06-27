@@ -7,6 +7,7 @@ class ExecutableMemoryAllocator;
 struct TranslateDesc {
     void* m_dispDirect;
     void* m_dispIndirect;
+    void* m_dispHot;
     ExecutableMemoryAllocator* m_executableMemAllocator;
     size_t m_guestExtents;
 };

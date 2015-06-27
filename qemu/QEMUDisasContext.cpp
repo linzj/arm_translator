@@ -700,13 +700,14 @@ static void tcg_context_init(TCGContext* s)
     tcg_regset_set_reg(s->reserved_regs, TCG_REG_CALL_STACK);
 }
 
-QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator, void* dispDirect, void* dispIndirect)
+QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator, void* dispDirect, void* dispIndirect, void* dispHot)
     : m_impl(new QEMUDisasContextImpl({ allocator }))
 {
     memset(&m_impl->m_tcgCtx, sizeof(TCGContext), 0);
     tcg_context_init(&m_impl->m_tcgCtx);
     m_impl->m_tcgCtx.dispDirect = dispDirect;
     m_impl->m_tcgCtx.dispIndirect = dispIndirect;
+    m_impl->m_tcgCtx.dispHot = dispHot;
 }
 
 QEMUDisasContext::~QEMUDisasContext()
@@ -2930,6 +2931,36 @@ static void tcg_liveness_analysis(TCGContext* s)
 }
 #endif
 
+static void tcg_generate_prologue_check(TCGContext* s)
+{
+#ifndef __i386__
+#error unsupported arch
+#endif
+    // call +5
+    tcg_out_opc(s, OPC_CALL_Jz, 0, 0, 0);
+    tcg_out32(s, 0);
+    tcg_out_pop(s, TCG_REG_ESI);
+    int offset = 0x18, offset2 = 0x10, offset3 = 0x4;
+    static const int threshold = 1000;
+
+    tcg_out_modrm_sib_offset(s, OPC_LEA, TCG_REG_ESI, TCG_REG_ESI, -1, 0,
+        offset);
+    tcg_out_modrm_offset(s, OPC_ARITH_EvIz, ARITH_CMP, TCG_REG_ESI, 0);
+    tcg_out32(s, threshold);
+
+    tcg_out8(s, OPC_JCC_short + JCC_JL);
+    tcg_out8(s, offset2);
+    // call the function here
+    tcg_out_st(s, TCG_TYPE_I32, TCG_REG_ESI, TCG_REG_CALL_STACK, 0);
+    tcg_out_call(s, reinterpret_cast<tcg_insn_unit*>(s->dispHot));
+    tcg_out8(s, OPC_JMP_short);
+    tcg_out8(s, offset3);
+    tcg_out32(s, 0);
+    // here the start
+    tcg_out_modrm_offset(s, OPC_ARITH_EvIb, EXT5_INC_Ev, TCG_REG_ESI, 0);
+    tcg_out8(s, 1);
+}
+
 static inline int tcg_gen_code_common(TCGContext* s,
     tcg_insn_unit* gen_code_buf,
     long search_pc)
@@ -2984,7 +3015,7 @@ static inline int tcg_gen_code_common(TCGContext* s,
 
     args = s->gen_opparam_buf;
     op_index = 0;
-
+    tcg_generate_prologue_check(s);
     for (;;) {
         opc = static_cast<TCGOpcode>(s->gen_opc_buf[op_index]);
 #ifdef CONFIG_PROFILER

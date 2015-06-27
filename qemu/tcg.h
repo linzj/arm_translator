@@ -440,6 +440,7 @@ struct TCGContext {
     struct TCGBackendData *be;
     void* dispDirect;
     void* dispIndirect;
+    void* dispHot;
 };
 
 /* pool based memory allocation */
