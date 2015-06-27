@@ -3118,7 +3118,7 @@ int tcg_gen_code(TCGContext* s, tcg_insn_unit* gen_code_buf)
 
 void QEMUDisasContext::compile()
 {
-    static const size_t codeBufferSize = 4096 * 10;
+    static const size_t codeBufferSize = 4096;
     std::vector<tcg_insn_unit> genCodeBuffer(codeBufferSize);
     tcg_insn_unit* gen_code_buf = const_cast<tcg_insn_unit*>(genCodeBuffer.data());
     int size = tcg_gen_code(&m_impl->m_tcgCtx, gen_code_buf);
