@@ -105,7 +105,7 @@ void translate(CPUARMState* env, TranslateDesc& desc)
         ctxptr.reset(new jit::LLVMDisasContext(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect));
     }
     else {
-        ctxptr.reset(new qemu::QEMUDisasContext(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect, reinterpret_cast<void*>(desc.m_dispHot)));
+        ctxptr.reset(new qemu::QEMUDisasContext(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect, reinterpret_cast<void*>(desc.m_dispHot), desc.m_hotObject));
     }
     DisasContextBase& ctx = *ctxptr;
     ARMCPU* cpu = arm_env_get_cpu(env);

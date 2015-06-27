@@ -700,7 +700,7 @@ static void tcg_context_init(TCGContext* s)
     tcg_regset_set_reg(s->reserved_regs, TCG_REG_CALL_STACK);
 }
 
-QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator, void* dispDirect, void* dispIndirect, void* dispHot)
+QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator, void* dispDirect, void* dispIndirect, void* dispHot, void* hotObject)
     : m_impl(new QEMUDisasContextImpl({ allocator }))
 {
     memset(&m_impl->m_tcgCtx, sizeof(TCGContext), 0);
@@ -708,6 +708,7 @@ QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator, vo
     m_impl->m_tcgCtx.dispDirect = dispDirect;
     m_impl->m_tcgCtx.dispIndirect = dispIndirect;
     m_impl->m_tcgCtx.dispHot = dispHot;
+    m_impl->m_tcgCtx.hotObject = hotObject;
 }
 
 QEMUDisasContext::~QEMUDisasContext()
@@ -2940,7 +2941,7 @@ static void tcg_generate_prologue_check(TCGContext* s)
     tcg_out_opc(s, OPC_CALL_Jz, 0, 0, 0);
     tcg_out32(s, 0);
     tcg_out_pop(s, TCG_REG_ESI);
-    int offset = 0x1e, offset2 = 0x16, offset3 = 0xd;
+    int offset = 0x25, offset2 = 0x21, offset3 = 0xb, offset4 = 0x29;
     static const int threshold = 1000;
 
     tcg_out_modrm_sib_offset(s, OPC_LEA, TCG_REG_ESI, TCG_REG_ESI, -1, 0,
@@ -2952,13 +2953,20 @@ static void tcg_generate_prologue_check(TCGContext* s)
     tcg_out8(s, offset2);
     // call the function here
     tcg_out_st(s, TCG_TYPE_I32, TCG_AREG0, TCG_REG_CALL_STACK, 0);
+    tcg_out_ld(s, TCG_TYPE_I32, TCG_REG_EAX, TCG_REG_ESI, 4);
+
+    tcg_out_st(s, TCG_TYPE_I32, TCG_REG_EAX, TCG_REG_CALL_STACK, 4);
+
     tcg_out_call(s, reinterpret_cast<tcg_insn_unit*>(s->dispHot));
-    tcg_out8(s, OPC_JMP_short);
-    tcg_out8(s, offset3);
     tcg_out_modrm_offset(s, OPC_MOVL_EvIz, 0, TCG_REG_ESI, 0);
     tcg_out32(s, 0);
+
+    tcg_out8(s, OPC_JMP_short);
+    tcg_out8(s, offset3);
     // the counter
     tcg_out32(s, 0);
+    // the object
+    tcg_out32(s, reinterpret_cast<uint32_t>(s->hotObject));
     // here the start
     tcg_out_modrm_offset(s, OPC_ARITH_EvIb, EXT5_INC_Ev, TCG_REG_ESI, 0);
     tcg_out8(s, 1);

@@ -463,6 +463,7 @@ struct TCGContext {
     void* dispDirect;
     void* dispIndirect;
     void* dispHot;
+    void* hotObject;
 };
 
 /* pool based memory allocation */
