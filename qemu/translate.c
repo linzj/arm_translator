@@ -11001,6 +11001,7 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
     dc->is_ldex = false;
     dc->ss_same_el = false; /* Can't be true since EL_d must be AArch64 */
     arm_translate_init(dc);
+    tcg_func_start(dc);
     dc->__cpu_F0s = tcg_temp_new_i32(dc);
     dc->__cpu_F1s = tcg_temp_new_i32(dc);
     dc->__cpu_F0d = tcg_temp_new_i64(dc);

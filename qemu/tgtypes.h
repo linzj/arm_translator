@@ -8,7 +8,9 @@ typedef struct TCGv_i64__* TCGv_i64;
 typedef struct TCGv_ptr__* TCGv_ptr;
 #define tcg_temp_free tcg_temp_free_i32
 #define tcg_temp_new() (TCGv) tcg_temp_new_i32();
-#define TCGV_UNUSED_I32(a) ((void)a)
+#define TCGV_UNUSED_I32(x) x = MAKE_TCGV_I32(-1)
+#define TCGV_UNUSED_I64(x) x = MAKE_TCGV_I64(-1)
+#define TCGV_UNUSED_PTR(x) x = MAKE_TCGV_PTR(-1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define TCGv TCGv_i32

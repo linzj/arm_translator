@@ -74,13 +74,14 @@ VG_(disp_run_translations):
 
 	/* Set up the guest state pointer */
 	movl	28+8(%esp), %ebp
+    subl    $128 * 4, %esp
 
         /* and jump into the code cache.  Chained translations in
            the code cache run, until for whatever reason, they can't
            continue.  When that happens, the translation in question
            will jump (or call) to one of the continuation points
            VG_(cp_...) below. */
-        jmpl    *28+12(%esp)
+        jmpl    *28+12 + 128*4(%esp)
 	/*NOTREACHED*/
 
 /*----------------------------------------------------*/
@@ -99,6 +100,7 @@ postamble:
 	   holds the tentative return value, but any others are OK. */
 
 remove_frame:
+        add $128*4, %esp
         /* Stash return values */
         movl    28+4(%esp), %edi        /* two_words */
         movl    %eax, 0(%edi)

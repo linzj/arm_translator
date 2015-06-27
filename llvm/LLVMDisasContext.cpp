@@ -1005,6 +1005,10 @@ void LLVMDisasContext::gen_callN(void* func, TCGArg ret,
     }
 }
 
+void LLVMDisasContext::func_start()
+{
+}
+
 void LLVMDisasContext::gen_sdiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
     LValue num = unwrap(arg1);

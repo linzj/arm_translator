@@ -263,8 +263,6 @@ typedef enum TCGType {
 #define TCGV_EQUAL_PTR(a, b) (GET_TCGV_PTR(a) == GET_TCGV_PTR(b))
 
 /* Dummy definition to avoid compiler warnings.  */
-#define TCGV_UNUSED_I64(x) x = MAKE_TCGV_I64(-1)
-#define TCGV_UNUSED_PTR(x) x = MAKE_TCGV_PTR(-1)
 
 #define TCGV_IS_UNUSED_I32(x) (GET_TCGV_I32(x) == -1)
 #define TCGV_IS_UNUSED_I64(x) (GET_TCGV_I64(x) == -1)
@@ -469,8 +467,6 @@ void tcg_prologue_init(TCGContext *s);
 int tcg_gen_code(TCGContext *s, tcg_insn_unit *gen_code_buf);
 int tcg_gen_code_search_pc(TCGContext *s, tcg_insn_unit *gen_code_buf,
                            long offset);
-
-void tcg_set_frame(TCGContext *s, int reg, intptr_t start, intptr_t size);
 
 TCGv_i32 tcg_global_reg_new_i32(int reg, const char *name);
 TCGv_i32 tcg_global_mem_new_i32(int reg, intptr_t offset, const char *name);

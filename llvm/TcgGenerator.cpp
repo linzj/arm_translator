@@ -568,6 +568,11 @@ void tcg_gen_callN(DisasContext* s, void* func, TCGArg ret,
         nargs, args);
 }
 
+void tcg_func_start(DisasContext* s)
+{
+    static_cast<DisasContextBase*>(s)->func_start();
+}
+
 void tcg_gen_sdiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
     static_cast<DisasContextBase*>(s)->gen_sdiv(ret, arg1, arg2);

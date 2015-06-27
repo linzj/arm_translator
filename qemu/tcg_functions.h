@@ -108,6 +108,7 @@ void tcg_temp_free_i64(DisasContext* s, TCGv_i64 a);
 void tcg_temp_free_ptr(DisasContext* s, TCGv_ptr ptr);
 void tcg_gen_callN(DisasContext* s, void* func, TCGArg ret,
     int nargs, TCGArg* args);
+void tcg_func_start(DisasContext*s);
 
 void tcg_gen_sdiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);
 void tcg_gen_udiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2);

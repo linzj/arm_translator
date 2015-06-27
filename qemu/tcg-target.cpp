@@ -1284,7 +1284,7 @@ static void tcg_out_branch(TCGContext* s, int call, tcg_insn_unit* dest)
     EMASSERT(call == 1);
     tcg_out_movi(s, TCG_TYPE_PTR, TCG_REG_EAX, (uintptr_t)dest);
     tcg_out_modrm(s, OPC_GRP5,
-        call ? EXT5_CALLN_Ev : EXT5_JMPN_Ev, TCG_REG_R10);
+        call ? EXT5_CALLN_Ev : EXT5_JMPN_Ev, TCG_REG_EAX);
 }
 
 static inline void tcg_out_call(TCGContext* s, tcg_insn_unit* dest)

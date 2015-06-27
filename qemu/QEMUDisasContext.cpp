@@ -639,25 +639,13 @@ int QEMUDisasContext::tcg_temp_new_internal(TCGType type, int temp_local)
 
 static pthread_once_t initQEMUOnce = PTHREAD_ONCE_INIT;
 
-static void tcg_context_init(TCGContext* s)
+static GHashTable* helper_table;
+static void tcg_init_common(void)
 {
     int op, total_args, n, i;
     TCGOpDef* def;
     TCGArgConstraint* args_ct;
     int* sorted_args;
-    GHashTable* helper_table;
-
-    memset(s, 0, sizeof(*s));
-    s->nb_globals = 0;
-
-    /* Count total number of arguments and allocate the corresponding
-       space */
-    total_args = 0;
-    for (op = 0; op < NB_OPS; op++) {
-        def = &tcg_op_defs[op];
-        n = def->nb_iargs + def->nb_oargs;
-        total_args += n;
-    }
 
     args_ct = (TCGArgConstraint*)malloc(sizeof(TCGArgConstraint) * total_args);
     sorted_args = (int*)malloc(sizeof(int) * total_args);
@@ -671,16 +659,43 @@ static void tcg_context_init(TCGContext* s)
         args_ct += n;
     }
 
+    /* Count total number of arguments and allocate the corresponding
+       space */
+    total_args = 0;
+    for (op = 0; op < NB_OPS; op++) {
+        def = &tcg_op_defs[op];
+        n = def->nb_iargs + def->nb_oargs;
+        total_args += n;
+    }
+
     /* Register helpers.  */
     /* Use g_direct_hash/equal for direct pointer comparisons on func.  */
-    s->helpers = helper_table = g_hash_table_new(NULL, NULL);
+    helper_table = g_hash_table_new(NULL, NULL);
 
-    for (i = 0; i < ARRAY_SIZE(all_helpers); ++i) {
+    for (int i = 0; i < ARRAY_SIZE(all_helpers); ++i) {
         g_hash_table_insert(helper_table, (gpointer)all_helpers[i].func,
             (gpointer)&all_helpers[i]);
     }
+    tcg_target_init();
+}
 
-    pthread_once(&initQEMUOnce, tcg_target_init);
+static void tcg_set_frame(TCGContext* s, int reg, intptr_t start, intptr_t size)
+{
+    s->frame_start = start;
+    s->frame_end = start + size;
+    s->frame_reg = reg;
+}
+
+static void tcg_context_init(TCGContext* s)
+{
+    memset(s, 0, sizeof(*s));
+    s->nb_globals = 0;
+
+    pthread_once(&initQEMUOnce, tcg_init_common);
+    s->helpers = helper_table;
+    tcg_set_frame(s, TCG_REG_CALL_STACK,
+        -CPU_TEMP_BUF_NLONGS * sizeof(long),
+        CPU_TEMP_BUF_NLONGS * sizeof(long));
     tcg_regset_clear(s->reserved_regs);
     tcg_regset_set_reg(s->reserved_regs, TCG_REG_CALL_STACK);
 }
@@ -689,7 +704,7 @@ QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator, vo
     : m_impl(new QEMUDisasContextImpl({ allocator }))
 {
     memset(&m_impl->m_tcgCtx, sizeof(TCGContext), 0);
-    tcg_func_start(&m_impl->m_tcgCtx);
+    tcg_context_init(&m_impl->m_tcgCtx);
     m_impl->m_tcgCtx.dispDirect = dispDirect;
     m_impl->m_tcgCtx.dispIndirect = dispIndirect;
 }
@@ -1875,6 +1890,11 @@ void QEMUDisasContext::gen_callN(void* func, TCGArg ret,
 
     /* total parameters, needed to go backward in the instruction stream */
     *s->gen_opparam_ptr++ = 1 + nb_rets + real_args + 3;
+}
+
+void QEMUDisasContext::func_start()
+{
+    tcg_func_start(&m_impl->m_tcgCtx);
 }
 
 void QEMUDisasContext::temp_free_internal(int idx)
