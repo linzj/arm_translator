@@ -703,7 +703,6 @@ static void tcg_context_init(TCGContext* s)
 QEMUDisasContext::QEMUDisasContext(jit::ExecutableMemoryAllocator* allocator, void* dispDirect, void* dispIndirect, void* dispHot, void* hotObject)
     : m_impl(new QEMUDisasContextImpl({ allocator }))
 {
-    memset(&m_impl->m_tcgCtx, sizeof(TCGContext), 0);
     tcg_context_init(&m_impl->m_tcgCtx);
     m_impl->m_tcgCtx.dispDirect = dispDirect;
     m_impl->m_tcgCtx.dispIndirect = dispIndirect;
