@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include <stdio.h>
 typedef uint8_t flag;
-typedef uint32_t target_ulong;
-typedef int32_t target_long;
 #ifndef __cplusplus
 typedef uint8_t bool;
 #define true (bool)1

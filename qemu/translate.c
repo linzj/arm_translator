@@ -938,37 +938,37 @@ static inline void gen_aa32_st64(DisasContext *s, TCGv_i64 val, TCGv_i32 addr, i
 #else
 
 #define DO_GEN_LD(SUFF, OPC)                                             \
-static inline void gen_aa32_ld##SUFF(TCGv_i32 val, TCGv_i32 addr, int index) \
+static inline void gen_aa32_ld##SUFF(DisasContext*s, TCGv_i32 val, TCGv_i32 addr, int index) \
 {                                                                        \
-    TCGv addr64 = tcg_temp_new();                                        \
+    TCGv addr64 = tcg_temp_new(s);                                        \
     tcg_gen_extu_i32_i64(s, addr64, addr);                                  \
     tcg_gen_qemu_ld_i32(s, val, addr64, index, OPC);                        \
-    tcg_temp_free(addr64);                                               \
+    tcg_temp_free(s, addr64);                                               \
 }
 
 #define DO_GEN_ST(SUFF, OPC)                                             \
-static inline void gen_aa32_st##SUFF(TCGv_i32 val, TCGv_i32 addr, int index) \
+static inline void gen_aa32_st##SUFF(DisasContext* s, TCGv_i32 val, TCGv_i32 addr, int index) \
 {                                                                        \
-    TCGv addr64 = tcg_temp_new();                                        \
+    TCGv addr64 = tcg_temp_new(s);                                        \
     tcg_gen_extu_i32_i64(s, addr64, addr);                                  \
     tcg_gen_qemu_st_i32(s, val, addr64, index, OPC);                        \
-    tcg_temp_free(addr64);                                               \
+    tcg_temp_free(s, addr64);                                               \
 }
 
-static inline void gen_aa32_ld64(s, TCGv_i64 val, TCGv_i32 addr, int index)
+static inline void gen_aa32_ld64(DisasContext* s, TCGv_i64 val, TCGv_i32 addr, int index)
 {
-    TCGv addr64 = tcg_temp_new();
+    TCGv addr64 = tcg_temp_new(s);
     tcg_gen_extu_i32_i64(s, addr64, addr);
     tcg_gen_qemu_ld_i64(s, val, addr64, index, MO_TEQ);
-    tcg_temp_free(addr64);
+    tcg_temp_free(s, addr64);
 }
 
-static inline void gen_aa32_st64(s, TCGv_i64 val, TCGv_i32 addr, int index)
+static inline void gen_aa32_st64(DisasContext* s, TCGv_i64 val, TCGv_i32 addr, int index)
 {
-    TCGv addr64 = tcg_temp_new();
+    TCGv addr64 = tcg_temp_new(s);
     tcg_gen_extu_i32_i64(s, addr64, addr);
     tcg_gen_qemu_st_i64(s, val, addr64, index, MO_TEQ);
-    tcg_temp_free(addr64);
+    tcg_temp_free(s, addr64);
 }
 
 #endif

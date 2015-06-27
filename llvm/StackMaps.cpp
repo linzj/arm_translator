@@ -3,7 +3,7 @@ namespace jit {
 
 Reg DWARFRegister::reg() const
 {
-#if __i386__
+#if __i386__ || __x86_64__
     if (m_dwarfRegNum >= 0 && m_dwarfRegNum < 16) {
         switch (dwarfRegNum()) {
         case 0:

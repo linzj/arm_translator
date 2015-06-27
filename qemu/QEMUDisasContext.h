@@ -278,6 +278,7 @@ private:
     int global_reg_new_internal(TCGType type, int reg,
         const char* name);
     TCGv_i32 global_reg_new_i32(int reg, const char* name);
+    TCGv_i64 global_reg_new_i64(int reg, const char* name);
     void gen_br(int label);
     void gen_brcond_i32(TCGCond cond, TCGv_i32 arg1,
         TCGv_i32 arg2, int label_index);
@@ -288,6 +289,9 @@ private:
 
     void gen_trunc_shr_i64_i32(TCGv_i32 ret, TCGv_i64 arg,
         unsigned int count);
+    void gen_deposit_i64(TCGv_i64 ret, TCGv_i64 arg1,
+        TCGv_i64 arg2, unsigned int ofs,
+        unsigned int len);
     struct QEMUDisasContextImpl;
     void temp_free_internal(int idx);
     std::unique_ptr<QEMUDisasContextImpl> m_impl;

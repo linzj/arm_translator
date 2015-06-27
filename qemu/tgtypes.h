@@ -6,17 +6,11 @@
 typedef struct TCGv_i32__* TCGv_i32;
 typedef struct TCGv_i64__* TCGv_i64;
 typedef struct TCGv_ptr__* TCGv_ptr;
-#define tcg_temp_free tcg_temp_free_i32
-#define tcg_temp_new() (TCGv) tcg_temp_new_i32();
 #define TCGV_UNUSED_I32(x) x = MAKE_TCGV_I32(-1)
 #define TCGV_UNUSED_I64(x) x = MAKE_TCGV_I64(-1)
 #define TCGV_UNUSED_PTR(x) x = MAKE_TCGV_PTR(-1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-#define TCGv TCGv_i32
-#define TARGET_FMT_lx "%08x"
-#define TCG_TARGET_REG_BITS 32
-#define TARGET_LONG_BITS 32
 #ifdef __x86_64__
 #define TARGET_X86_64
 #endif
@@ -26,7 +20,34 @@ typedef struct TCGv_ptr__* TCGv_ptr;
 #define TARGET_LONG_BITS 32
 #endif
 
-#define TCG_CALL_DUMMY_ARG      ((TCGArg)(-1))
+#define TARGET_LONG_SIZE (TARGET_LONG_BITS / 8)
+
+/* target_ulong is the type of a virtual address */
+#if TARGET_LONG_SIZE == 4
+typedef int32_t target_long;
+typedef uint32_t target_ulong;
+#define TARGET_FMT_lx "%08x"
+#define TARGET_FMT_ld "%d"
+#define TARGET_FMT_lu "%u"
+#define tcg_temp_new(s) (TCGv) tcg_temp_new_i32(s);
+#define TCGv TCGv_i32
+#define tcg_temp_free tcg_temp_free_i32
+#define TCG_TARGET_REG_BITS 32
+#elif TARGET_LONG_SIZE == 8
+typedef int64_t target_long;
+typedef uint64_t target_ulong;
+#define TARGET_FMT_lx "%016" PRIx64
+#define TARGET_FMT_ld "%" PRId64
+#define TARGET_FMT_lu "%" PRIu64
+#define tcg_temp_new(s) (TCGv) tcg_temp_new_i64(s);
+#define TCGv TCGv_i64
+#define tcg_temp_free tcg_temp_free_i64
+#define TCG_TARGET_REG_BITS 64
+#else
+#error TARGET_LONG_SIZE undefined
+#endif
+
+#define TCG_CALL_DUMMY_ARG ((TCGArg)(-1))
 typedef enum {
     /* non-signed */
     TCG_COND_NEVER = 0 | 0 | 0 | 0,
@@ -103,9 +124,9 @@ typedef target_ulong tcg_target_ulong;
 typedef intptr_t TCGArg;
 
 #if TCG_TARGET_REG_BITS == 64
-# define TCG_AREG0 TCG_REG_R14
+#define TCG_AREG0 TCG_REG_R14
 #else
-# define TCG_AREG0 TCG_REG_EBP
+#define TCG_AREG0 TCG_REG_EBP
 #endif
 typedef enum {
     TCG_REG_EAX = 0,

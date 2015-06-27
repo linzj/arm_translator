@@ -1,5 +1,5 @@
-#define R_386_PC32	   2		/* PC relative 32 bit */
-#define R_386_PC8      23
+#define R_386_PC32 2 /* PC relative 32 bit */
+#define R_386_PC8 23
 #if TCG_TARGET_INSN_UNIT_SIZE == 1
 static __attribute__((unused)) inline void tcg_out8(TCGContext* s, uint8_t v)
 {
@@ -221,8 +221,8 @@ static const int tcg_target_call_oarg_regs[] = {
    registers on x86_64, and two random call clobbered registers on
    i386. */
 #if TCG_TARGET_REG_BITS == 64
-#define TCG_REG_L0 tcg_target_call_iarg_regs[0]
-#define TCG_REG_L1 tcg_target_call_iarg_regs[1]
+#define TCG_REG_L0 ((TCGReg)tcg_target_call_iarg_regs[0])
+#define TCG_REG_L1 ((TCGReg)tcg_target_call_iarg_regs[1])
 #else
 #define TCG_REG_L0 TCG_REG_EAX
 #define TCG_REG_L1 TCG_REG_EDX
@@ -2244,15 +2244,15 @@ static inline void tcg_out_op(TCGContext* s, TCGOpcode opc,
         break;
 
     case INDEX_op_brcond_i64:
-        tcg_out_brcond64(s, args[2], args[0], args[1], const_args[1],
+        tcg_out_brcond64(s, (TCGCond)args[2], args[0], args[1], const_args[1],
             args[3], 0);
         break;
     case INDEX_op_setcond_i64:
-        tcg_out_setcond64(s, args[3], args[0], args[1],
+        tcg_out_setcond64(s, (TCGCond)args[3], args[0], args[1],
             args[2], const_args[2]);
         break;
     case INDEX_op_movcond_i64:
-        tcg_out_movcond64(s, args[5], args[0], args[1],
+        tcg_out_movcond64(s, (TCGCond)args[5], args[0], args[1],
             args[2], const_args[2], args[3]);
         break;
 

@@ -668,7 +668,6 @@ static void tcg_init_common(void)
         args_ct += n;
     }
 
-
     /* Register helpers.  */
     /* Use g_direct_hash/equal for direct pointer comparisons on func.  */
     helper_table = g_hash_table_new(NULL, NULL);
@@ -803,6 +802,14 @@ TCGv_i32 QEMUDisasContext::global_mem_new_i32(int reg, intptr_t offset, const ch
     return MAKE_TCGV_I32(idx);
 }
 
+TCGv_i64 QEMUDisasContext::global_reg_new_i64(int reg, const char* name)
+{
+    int idx;
+
+    idx = global_reg_new_internal(TCG_TYPE_I64, reg, name);
+    return MAKE_TCGV_I64(idx);
+}
+
 TCGv_i32 QEMUDisasContext::global_reg_new_i32(int reg, const char* name)
 {
     int idx;
@@ -865,11 +872,15 @@ void QEMUDisasContext::gen_add_i32(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 
 void QEMUDisasContext::gen_add_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
 {
+#if TCG_TARGET_REG_BITS == 32
     gen_op6_i32(INDEX_op_add2_i32, TCGV_LOW(ret), TCGV_HIGH(ret),
         TCGV_LOW(arg1), TCGV_HIGH(arg1), TCGV_LOW(arg2),
         TCGV_HIGH(arg2));
     /* Allow the optimizer room to replace add2 with two moves.  */
     gen_op0(INDEX_op_nop);
+#else
+    gen_op3_i64(INDEX_op_add_i64, ret, arg1, arg2);
+#endif
 }
 
 void QEMUDisasContext::gen_addi_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
@@ -1065,6 +1076,57 @@ void QEMUDisasContext::gen_bswap32_i32(TCGv_i32 ret, TCGv_i32 arg)
         EMUNREACHABLE();
     }
 }
+
+void QEMUDisasContext::gen_deposit_i64(TCGv_i64 ret, TCGv_i64 arg1,
+    TCGv_i64 arg2, unsigned int ofs,
+    unsigned int len)
+{
+    uint64_t mask;
+    TCGv_i64 t1;
+
+    EMASSERT(ofs < 64);
+    EMASSERT(len <= 64);
+    EMASSERT(ofs + len <= 64);
+
+    if (ofs == 0 && len == 64) {
+        gen_mov_i64(ret, arg2);
+        return;
+    }
+    if (TCG_TARGET_HAS_deposit_i64 && TCG_TARGET_deposit_i64_valid(ofs, len)) {
+        gen_op5ii_i64(INDEX_op_deposit_i64, ret, arg1, arg2, ofs, len);
+        return;
+    }
+
+#if TCG_TARGET_REG_BITS == 32
+    if (ofs >= 32) {
+        gen_deposit_i32(TCGV_HIGH(ret), TCGV_HIGH(arg1),
+            TCGV_LOW(arg2), ofs - 32, len);
+        gen_mov_i32(TCGV_LOW(ret), TCGV_LOW(arg1));
+        return;
+    }
+    if (ofs + len <= 32) {
+        gen_deposit_i32(TCGV_LOW(ret), TCGV_LOW(arg1),
+            TCGV_LOW(arg2), ofs, len);
+        gen_mov_i32(TCGV_HIGH(ret), TCGV_HIGH(arg1));
+        return;
+    }
+#endif
+
+    mask = (1ull << len) - 1;
+    t1 = temp_new_i64();
+
+    if (ofs + len < 64) {
+        gen_andi_i64(t1, arg2, mask);
+        gen_shli_i64(t1, t1, ofs);
+    }
+    else {
+        gen_shli_i64(t1, arg2, ofs);
+    }
+    gen_andi_i64(ret, arg1, ~(mask << ofs));
+    gen_or_i64(ret, ret, t1);
+
+    temp_free_i64(t1);
+}
 void QEMUDisasContext::gen_concat_i32_i64(TCGv_i64 dest, TCGv_i32 low,
     TCGv_i32 high)
 
@@ -1201,7 +1263,9 @@ void QEMUDisasContext::gen_ext_i32_i64(TCGv_i64 ret, TCGv_i32 arg)
     gen_mov_i32(TCGV_LOW(ret), arg);
     gen_sari_i32(TCGV_HIGH(ret), TCGV_LOW(ret), 31);
 #else
-#error not supported yet
+    gen_op2_i64(INDEX_op_ext32s_i64, ret, MAKE_TCGV_I64(GET_TCGV_I32(arg)));
+
+    gen_op2_i64(INDEX_op_ext32s_i64, ret, MAKE_TCGV_I64(GET_TCGV_I32(arg)));
 #endif
 }
 
@@ -1223,8 +1287,12 @@ void QEMUDisasContext::gen_ld_i32(TCGv_i32 ret, TCGv_ptr arg2, tcg_target_long o
 void QEMUDisasContext::gen_ld_i64(TCGv_i64 ret, TCGv_ptr arg2,
     target_long offset)
 {
+#if TCG_TARGET_REG_BITS == 32
     gen_ld_i32(TCGV_LOW(ret), arg2, offset);
     gen_ld_i32(TCGV_HIGH(ret), arg2, offset + 4);
+#else
+    gen_ldst_op_i64(INDEX_op_ld_i64, ret, arg2, offset);
+#endif
 }
 
 void QEMUDisasContext::gen_movcond_i32(TCGCond cond, TCGv_i32 ret,
@@ -1519,7 +1587,7 @@ void QEMUDisasContext::gen_rotri_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
         }
         else if (TCG_TARGET_HAS_rot_i32) {
             TCGv_i32 t0 = const_i32(arg2);
-            gen_op3_i32(INDEX_op_rotl_i32, ret, arg1, (TCGv_i32)arg2);
+            gen_op3_i32(INDEX_op_rotl_i32, ret, arg1, (TCGv_i32)(intptr_t)arg2);
             temp_free_i32(t0);
         }
         else {
@@ -1635,7 +1703,15 @@ void QEMUDisasContext::gen_shli_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
 #if TCG_TARGET_REG_BITS == 32
     gen_shifti_i64(ret, arg1, arg2, 0, 0);
 #else
-#error unsupported yet
+    if (arg2 == 0) {
+        gen_mov_i64(ret, arg1);
+    }
+    else {
+        TCGv_i64 t0 = tcg_const_i64(arg2);
+        gen_op3_i64(INDEX_op_shl_i64, ret, arg1, (TCGv_i64)arg2);
+
+        tcg_temp_free_i64(t0);
+    }
 #endif
 }
 
@@ -1661,7 +1737,15 @@ void QEMUDisasContext::gen_shri_i64(TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2)
 #if TCG_TARGET_REG_BITS == 32
     gen_shifti_i64(ret, arg1, arg2, 1, 0);
 #else
-#error unsupported yet
+    if (arg2 == 0) {
+        gen_mov_i64(ret, arg1);
+    }
+    else {
+        TCGv_i64 t0 = tcg_const_i64(arg2);
+        gen_op3_i64(INDEX_op_shr_i64, ret, arg1, (TCGv_i64)arg2);
+
+        tcg_temp_free_i64(t0);
+    }
 #endif
 }
 
@@ -1714,6 +1798,7 @@ void QEMUDisasContext::gen_subi_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 void QEMUDisasContext::gen_trunc_shr_i64_i32(TCGv_i32 ret, TCGv_i64 arg,
     unsigned int count)
 {
+#if TCG_TARGET_REG_BITS == 32
     EMASSERT(count < 64);
     if (count >= 32) {
         gen_shri_i32(ret, TCGV_HIGH(arg), count - 32);
@@ -1727,6 +1812,22 @@ void QEMUDisasContext::gen_trunc_shr_i64_i32(TCGv_i32 ret, TCGv_i64 arg,
         gen_mov_i32(ret, TCGV_LOW(t));
         temp_free_i64(t);
     }
+#else
+    EMASSERT(count < 64);
+    if (TCG_TARGET_HAS_trunc_shr_i32) {
+        gen_op3i_i32(INDEX_op_trunc_shr_i32, ret,
+            MAKE_TCGV_I32(GET_TCGV_I64(arg)), count);
+    }
+    else if (count == 0) {
+        gen_mov_i32(ret, MAKE_TCGV_I32(GET_TCGV_I64(arg)));
+    }
+    else {
+        TCGv_i64 t = temp_new_i64();
+        gen_shri_i64(t, arg, count);
+        gen_mov_i32(ret, MAKE_TCGV_I32(GET_TCGV_I64(t)));
+        temp_free_i64(t);
+    }
+#endif
 }
 
 void QEMUDisasContext::gen_trunc_i64_i32(TCGv_i32 ret, TCGv_i64 arg)
