@@ -36,6 +36,9 @@
                   {
                       'cflags': [
                         '-m32',
+                        '-g3',
+                        '-Wall',
+                        #'-fsanitize=undefined',
                       ],
                       'cflags_cc': [
                         '-std=c++11',
@@ -43,6 +46,7 @@
                       'ldflags': [
                         '-m32',
                         '-fuse-ld=gold',
+                        #'-fsanitize=undefined',
                       ]
                   }
                 ],
@@ -59,7 +63,6 @@
                   {
                       'cflags': [
                         '-O0',
-                        '-g3',
                       ],
                   }
                 ],

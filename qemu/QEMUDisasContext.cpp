@@ -642,10 +642,19 @@ static pthread_once_t initQEMUOnce = PTHREAD_ONCE_INIT;
 static GHashTable* helper_table;
 static void tcg_init_common(void)
 {
-    int op, total_args, n, i;
+    int op, total_args, n;
     TCGOpDef* def;
     TCGArgConstraint* args_ct;
     int* sorted_args;
+
+    /* Count total number of arguments and allocate the corresponding
+       space */
+    total_args = 0;
+    for (op = 0; op < NB_OPS; op++) {
+        def = &tcg_op_defs[op];
+        n = def->nb_iargs + def->nb_oargs;
+        total_args += n;
+    }
 
     args_ct = (TCGArgConstraint*)malloc(sizeof(TCGArgConstraint) * total_args);
     sorted_args = (int*)malloc(sizeof(int) * total_args);
@@ -659,14 +668,6 @@ static void tcg_init_common(void)
         args_ct += n;
     }
 
-    /* Count total number of arguments and allocate the corresponding
-       space */
-    total_args = 0;
-    for (op = 0; op < NB_OPS; op++) {
-        def = &tcg_op_defs[op];
-        n = def->nb_iargs + def->nb_oargs;
-        total_args += n;
-    }
 
     /* Register helpers.  */
     /* Use g_direct_hash/equal for direct pointer comparisons on func.  */
@@ -718,7 +719,7 @@ QEMUDisasContext::~QEMUDisasContext()
 int QEMUDisasContext::gen_new_label()
 {
     TCGContext* s = &m_impl->m_tcgCtx;
-    qemu::gen_new_label(s);
+    return qemu::gen_new_label(s);
 }
 
 void QEMUDisasContext::gen_set_label(int n)
@@ -2940,7 +2941,7 @@ static void tcg_generate_prologue_check(TCGContext* s)
     tcg_out_opc(s, OPC_CALL_Jz, 0, 0, 0);
     tcg_out32(s, 0);
     tcg_out_pop(s, TCG_REG_ESI);
-    int offset = 0x25, offset2 = 0x21, offset3 = 0xb, offset4 = 0x29;
+    int offset = 0x25, offset2 = 0x21, offset3 = 0xb;
     static const int threshold = 1000;
 
     tcg_out_modrm_sib_offset(s, OPC_LEA, TCG_REG_ESI, TCG_REG_ESI, -1, 0,

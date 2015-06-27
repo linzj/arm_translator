@@ -164,7 +164,7 @@ private:
             EMASSERT(m_val->m_intVec->size() <= 2);
             const int64_t* p = reinterpret_cast<const int64_t*>(pointer);
             for (auto v : *m_val->m_intVec) {
-                if (*p++ != v) {
+                if (*p++ != static_cast<int64_t>(v)) {
                     return false;
                 }
             }
@@ -173,7 +173,7 @@ private:
             EMASSERT(m_val->m_intVec->size() <= 4);
             const int32_t* p = reinterpret_cast<const int32_t*>(pointer);
             for (auto v : *m_val->m_intVec) {
-                if (*p++ != v) {
+                if (*p++ != static_cast<int32_t>(v)) {
                     return false;
                 }
             }
@@ -182,7 +182,7 @@ private:
             EMASSERT(m_val->m_intVec->size() <= 8);
             const int16_t* p = reinterpret_cast<const int16_t*>(pointer);
             for (auto v : *m_val->m_intVec) {
-                if (*p++ != v) {
+                if (*p++ != static_cast<int16_t>(v)) {
                     return false;
                 }
             }
@@ -191,7 +191,7 @@ private:
             EMASSERT(m_val->m_intVec->size() <= 16);
             const int8_t* p = reinterpret_cast<const int8_t*>(pointer);
             for (auto v : *m_val->m_intVec) {
-                if (*p++ != v) {
+                if (*p++ != static_cast<int8_t>(v)) {
                     return false;
                 }
             }

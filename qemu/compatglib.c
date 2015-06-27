@@ -1636,6 +1636,7 @@ g_hash_table_foreach_remove_or_steal (GHashTable *hash_table,
   gint i;
 #ifndef G_DISABLE_ASSERT
   gint version = hash_table->version;
+  (void)version;
 #endif
 
   for (i = 0; i < hash_table->size; i++)
@@ -1745,6 +1746,7 @@ g_hash_table_foreach (GHashTable *hash_table,
   gint i;
 #ifndef G_DISABLE_ASSERT
   gint version;
+  (void)version;
 #endif
 
   g_return_if_fail (hash_table != NULL);
@@ -1803,6 +1805,7 @@ g_hash_table_find (GHashTable *hash_table,
   gint i;
 #ifndef G_DISABLE_ASSERT
   gint version;
+  (void)version;
 #endif
   gboolean match;
 

@@ -34,10 +34,11 @@ public:
 private:
     virtual void* allocate(int size, int align) override
     {
-        EMASSERT(size < execMemSize);
+        EMASSERT(size < static_cast<int>(execMemSize));
         EMASSERT(m_buffer == nullptr);
         m_buffer = mmap(nullptr, execMemSize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         EMASSERT(m_buffer != MAP_FAILED);
+        return m_buffer;
     }
 
 private:
@@ -224,6 +225,7 @@ static void* worker(void* p)
         LOGE("%s: status is %d r15 = %08x.\n", fileName, twoWords[0], cpu.env.regs[15]);
     }
     checkRun("llvm", context, twoWords, cpu.env);
+    return nullptr;
 }
 
 int main(int argc, char** argv)

@@ -87,6 +87,7 @@ uintptr_t RegisterInitMemory::getVal()
         *static_cast<uint32_t*>(m_buffer) = static_cast<uint32_t>(m_val);
     }
     uintptr_t val = reinterpret_cast<uintptr_t>(m_buffer);
+    return val;
 }
 
 void RegisterInitMemory::init(CPUARMState& env, const std::string& name)

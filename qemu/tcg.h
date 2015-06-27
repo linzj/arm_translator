@@ -167,6 +167,7 @@ typedef enum TCGOpcode {
 #include "tcg-opc.h"
 #undef DEF
     NB_OPS,
+    INVALID_OPS = -1,
 } TCGOpcode;
 
 #define tcg_regset_clear(d) (d) = 0

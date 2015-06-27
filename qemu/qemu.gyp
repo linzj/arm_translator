@@ -14,6 +14,10 @@
             'defines': [
                 'LLVMLOG_LEVEL=<(llvmlog_level)',
             ],
+            'cflags': [
+                '-Wno-sign-compare',
+                '-Wno-unused-function',
+            ],
             'direct_dependent_settings': {
                 'include_dirs': [
                     '.',

@@ -2353,7 +2353,7 @@ static void tcg_add_target_add_op_defs(const TCGTargetOpDef* tdefs)
     int i, nb_args;
 
     for (;;) {
-        if (tdefs->op == (TCGOpcode)-1)
+        if (tdefs->op == INVALID_OPS)
             break;
         op = tdefs->op;
         EMASSERT((unsigned)op < NB_OPS);
@@ -2573,7 +2573,7 @@ static const TCGTargetOpDef x86_op_defs[] = {
     { INDEX_op_qemu_ld_i64, { "r", "r", "L", "L" } },
     { INDEX_op_qemu_st_i64, { "L", "L", "L", "L" } },
 #endif
-    { (TCGOpcode)-1 },
+    { (TCGOpcode)INVALID_OPS },
 };
 
 static int tcg_target_callee_save_regs[] = {

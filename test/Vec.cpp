@@ -33,7 +33,7 @@ std::ostream& operator<<(std::ostream& out, const NumberVector& vec)
     for (i = 0; i < static_cast<int>(vec.m_intVec->size() - 1); ++i) {
         out << std::hex << (*vec.m_intVec)[i] << ", ";
     }
-    if (i < vec.m_intVec->size()) {
+    if (i < static_cast<int>(vec.m_intVec->size())) {
         out << std::hex << (*vec.m_intVec)[i];
         out << " }";
     }
