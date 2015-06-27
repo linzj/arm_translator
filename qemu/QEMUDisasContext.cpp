@@ -2940,7 +2940,7 @@ static void tcg_generate_prologue_check(TCGContext* s)
     tcg_out_opc(s, OPC_CALL_Jz, 0, 0, 0);
     tcg_out32(s, 0);
     tcg_out_pop(s, TCG_REG_ESI);
-    int offset = 0x18, offset2 = 0x10, offset3 = 0x4;
+    int offset = 0x1e, offset2 = 0x16, offset3 = 0xd;
     static const int threshold = 1000;
 
     tcg_out_modrm_sib_offset(s, OPC_LEA, TCG_REG_ESI, TCG_REG_ESI, -1, 0,
@@ -2951,10 +2951,13 @@ static void tcg_generate_prologue_check(TCGContext* s)
     tcg_out8(s, OPC_JCC_short + JCC_JL);
     tcg_out8(s, offset2);
     // call the function here
-    tcg_out_st(s, TCG_TYPE_I32, TCG_REG_ESI, TCG_REG_CALL_STACK, 0);
+    tcg_out_st(s, TCG_TYPE_I32, TCG_AREG0, TCG_REG_CALL_STACK, 0);
     tcg_out_call(s, reinterpret_cast<tcg_insn_unit*>(s->dispHot));
     tcg_out8(s, OPC_JMP_short);
     tcg_out8(s, offset3);
+    tcg_out_modrm_offset(s, OPC_MOVL_EvIz, 0, TCG_REG_ESI, 0);
+    tcg_out32(s, 0);
+    // the counter
     tcg_out32(s, 0);
     // here the start
     tcg_out_modrm_offset(s, OPC_ARITH_EvIb, EXT5_INC_Ev, TCG_REG_ESI, 0);

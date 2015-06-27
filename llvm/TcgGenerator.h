@@ -7,7 +7,7 @@ class ExecutableMemoryAllocator;
 struct TranslateDesc {
     void* m_dispDirect;
     void* m_dispIndirect;
-    void* m_dispHot;
+    void (*m_dispHot)(CPUARMState*);
     ExecutableMemoryAllocator* m_executableMemAllocator;
     bool m_optimal;
     // output is here

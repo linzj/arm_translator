@@ -44,10 +44,9 @@ private:
     void* m_buffer;
 };
 
-static void invokeLLVM(int* location)
+static void invokeLLVM(CPUARMState* env)
 {
-    LOGE("should try to invoke llvm here.\n");
-    *location = 0;
+    LOGE("should try to invoke llvm here, env = %p.\n", env);
 }
 
 extern "C" {
@@ -212,7 +211,7 @@ static void* worker(void* p)
     uintptr_t twoWords[2];
     while (cpu.env.regs[15] != 0xfffffffe) {
         MyExecutableMemoryAllocator allocator;
-        jit::TranslateDesc tdesc = { reinterpret_cast<void*>(vex_disp_cp_chain_me_to_fastEP), reinterpret_cast<void*>(vex_disp_cp_xindir), reinterpret_cast<void*>(invokeLLVM), &allocator };
+        jit::TranslateDesc tdesc = { reinterpret_cast<void*>(vex_disp_cp_chain_me_to_fastEP), reinterpret_cast<void*>(vex_disp_cp_xindir), invokeLLVM, &allocator };
         struct timespec t2, t1;
         clock_gettime(CLOCK_MONOTONIC, &t1);
         jit::translate(&cpu.env, tdesc);
