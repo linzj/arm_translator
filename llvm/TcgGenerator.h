@@ -9,6 +9,8 @@ struct TranslateDesc {
     void* m_dispIndirect;
     void* m_dispHot;
     ExecutableMemoryAllocator* m_executableMemAllocator;
+    bool m_optimal;
+    // output is here
     size_t m_guestExtents;
 };
 void translate(CPUARMState* env, TranslateDesc& desc);

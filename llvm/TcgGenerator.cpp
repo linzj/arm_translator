@@ -100,7 +100,14 @@ namespace jit {
 
 void translate(CPUARMState* env, TranslateDesc& desc)
 {
-    qemu::QEMUDisasContext ctx(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect, desc.m_dispHot);
+    std::unique_ptr<DisasContextBase> ctxptr;
+    if (desc.m_optimal) {
+        ctxptr.reset(new jit::LLVMDisasContext(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect));
+    }
+    else {
+        ctxptr.reset(new qemu::QEMUDisasContext(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect, desc.m_dispHot));
+    }
+    DisasContextBase& ctx = *ctxptr;
     ARMCPU* cpu = arm_env_get_cpu(env);
     target_ulong pc;
     uint64_t flags;
