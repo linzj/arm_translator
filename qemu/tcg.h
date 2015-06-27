@@ -34,6 +34,7 @@
 namespace qemu {
 /* Default target word size to pointer size.  */
 #define USE_LIVENESS_ANALYSIS
+#define USE_TCG_OPTIMIZATIONS
 #ifndef TCG_TARGET_REG_BITS
 # if UINTPTR_MAX == UINT32_MAX
 #  define TCG_TARGET_REG_BITS 32
@@ -355,6 +356,24 @@ typedef struct TCGTempSet {
     unsigned long l[BITS_TO_LONGS(TCG_MAX_TEMPS)];
 } TCGTempSet;
 
+#ifdef USE_TCG_OPTIMIZATIONS
+
+typedef enum {
+    TCG_TEMP_UNDEF = 0,
+    TCG_TEMP_CONST,
+    TCG_TEMP_COPY,
+} tcg_temp_state;
+
+struct tcg_temp_info {
+    tcg_temp_state state;
+    uint16_t prev_copy;
+    uint16_t next_copy;
+    tcg_target_ulong val;
+    tcg_target_ulong mask;
+};
+#endif
+
+
 struct TCGContext {
     uint8_t *pool_cur, *pool_end;
     TCGPool *pool_first, *pool_current, *pool_first_large;
@@ -388,6 +407,9 @@ struct TCGContext {
     tcg_insn_unit *code_ptr;
     TCGTemp temps[TCG_MAX_TEMPS]; /* globals first, temps after */
     TCGTempSet free_temps[TCG_TYPE_COUNT * 2];
+#ifdef USE_TCG_OPTIMIZATIONS
+    struct tcg_temp_info temps_info[TCG_MAX_TEMPS];
+#endif
 
     GHashTable *helpers;
 

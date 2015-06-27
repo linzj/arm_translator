@@ -2961,6 +2961,10 @@ static void tcg_generate_prologue_check(TCGContext* s)
     tcg_out8(s, 1);
 }
 
+#ifdef USE_TCG_OPTIMIZATIONS
+#include "tcg-optimize.cpp"
+#endif
+
 static inline int tcg_gen_code_common(TCGContext* s,
     tcg_insn_unit* gen_code_buf,
     long search_pc)
