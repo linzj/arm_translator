@@ -1127,6 +1127,7 @@ void QEMUDisasContext::gen_deposit_i64(TCGv_i64 ret, TCGv_i64 arg1,
 
     temp_free_i64(t1);
 }
+
 void QEMUDisasContext::gen_concat_i32_i64(TCGv_i64 dest, TCGv_i32 low,
     TCGv_i32 high)
 
@@ -1263,8 +1264,6 @@ void QEMUDisasContext::gen_ext_i32_i64(TCGv_i64 ret, TCGv_i32 arg)
     gen_mov_i32(TCGV_LOW(ret), arg);
     gen_sari_i32(TCGV_HIGH(ret), TCGV_LOW(ret), 31);
 #else
-    gen_op2_i64(INDEX_op_ext32s_i64, ret, MAKE_TCGV_I64(GET_TCGV_I32(arg)));
-
     gen_op2_i64(INDEX_op_ext32s_i64, ret, MAKE_TCGV_I64(GET_TCGV_I32(arg)));
 #endif
 }
