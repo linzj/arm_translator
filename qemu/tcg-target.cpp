@@ -1,4 +1,5 @@
-#include <elf.h>
+#define R_386_PC32	   2		/* PC relative 32 bit */
+#define R_386_PC8      23
 #if TCG_TARGET_INSN_UNIT_SIZE == 1
 static __attribute__((unused)) inline void tcg_out8(TCGContext* s, uint8_t v)
 {
