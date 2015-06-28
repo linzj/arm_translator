@@ -101,7 +101,7 @@ namespace jit {
 void translate(CPUARMState* env, TranslateDesc& desc)
 {
     std::unique_ptr<DisasContextBase> ctxptr;
-    if (desc.m_optimal) {
+    if (true) {
         ctxptr.reset(new jit::LLVMDisasContext(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect));
     }
     else {

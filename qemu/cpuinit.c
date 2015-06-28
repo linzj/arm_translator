@@ -69,6 +69,11 @@ void cortex_a15_initfn(ARMCPU* cpu)
     arm_cpu_reset(&cpu->state);
 }
 
+void cortex_a15_deinitfn(ARMCPU* cpu)
+{
+    g_hash_table_destroy(cpu->cp_regs);
+}
+
 static void cp_reg_reset(gpointer key, gpointer value, gpointer opaque)
 {
     /* Reset a single ARMCPRegInfo register */

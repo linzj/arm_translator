@@ -129,6 +129,14 @@ void* tcg_malloc_internal(TCGContext* s, int size)
     return p->data;
 }
 
+static char* tcg_strdup(TCGContext* s, const char* str)
+{
+    int len = strlen(str);
+    char* ret = static_cast<char*>(tcg_malloc(s, len + 1));
+    memcpy(ret, str, len + 1);
+    return ret;
+}
+
 static void tcg_func_start(TCGContext* s)
 {
     s->nb_temps = s->nb_globals;
@@ -153,7 +161,11 @@ void tcg_pool_reset(TCGContext* s)
     TCGPool *p, *t;
     for (p = s->pool_first_large; p; p = t) {
         t = p->next;
-        g_free(p);
+        free(p);
+    }
+    for (p = s->pool_first; p; p = t) {
+        t = p->next;
+        free(p);
     }
     s->pool_first_large = NULL;
     s->pool_cur = s->pool_end = NULL;
@@ -637,7 +649,8 @@ int QEMUDisasContext::tcg_temp_new_internal(TCGType type, int temp_local)
 
 #include "tcg-target.cpp"
 
-static pthread_once_t initQEMUOnce = PTHREAD_ONCE_INIT;
+static pthread_mutex_t initMutex = PTHREAD_MUTEX_INITIALIZER;
+static bool tcg_init_common_called = false;
 
 static GHashTable* helper_table;
 static void tcg_init_common(void)
@@ -647,6 +660,12 @@ static void tcg_init_common(void)
     TCGArgConstraint* args_ct;
     int* sorted_args;
 
+    pthread_mutex_lock(&initMutex);
+    if (tcg_init_common_called) {
+        pthread_mutex_unlock(&initMutex);
+        return;
+    }
+    tcg_init_common_called = true;
     /* Count total number of arguments and allocate the corresponding
        space */
     total_args = 0;
@@ -677,6 +696,7 @@ static void tcg_init_common(void)
             (gpointer)&all_helpers[i]);
     }
     tcg_target_init();
+    pthread_mutex_unlock(&initMutex);
 }
 
 static void tcg_set_frame(TCGContext* s, int reg, intptr_t start, intptr_t size)
@@ -691,7 +711,7 @@ static void tcg_context_init(TCGContext* s)
     memset(s, 0, sizeof(*s));
     s->nb_globals = 0;
 
-    pthread_once(&initQEMUOnce, tcg_init_common);
+    tcg_init_common();
     s->helpers = helper_table;
     tcg_set_frame(s, TCG_REG_CALL_STACK,
         -CPU_TEMP_BUF_NLONGS * sizeof(long),
@@ -752,7 +772,7 @@ int QEMUDisasContext::global_mem_new_internal(TCGType type, int reg,
 #endif
         strncpy(buf, name, sizeof(buf));
         strncat(buf, "_0", sizeof(buf));
-        ts->name = strdup(buf);
+        ts->name = tcg_strdup(s, buf);
         ts++;
 
         ts->base_type = type;
@@ -769,7 +789,7 @@ int QEMUDisasContext::global_mem_new_internal(TCGType type, int reg,
 #define pstrcat(a, b, c) strncat(a, c, b)
         pstrcpy(buf, sizeof(buf), name);
         pstrcat(buf, sizeof(buf), "_1");
-        ts->name = strdup(buf);
+        ts->name = tcg_strdup(s, buf);
 
         s->nb_globals += 2;
     }

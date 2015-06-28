@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 void cortex_a15_initfn(ARMCPU* cpu);
+void cortex_a15_deinitfn(ARMCPU* cpu);
 #ifdef __cplusplus
 }
 #endif

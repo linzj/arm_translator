@@ -31,6 +31,7 @@ public:
         }
     }
     inline void* buffer() { return m_buffer; }
+
 private:
     virtual void* allocate(int size, int align) override
     {
@@ -69,14 +70,14 @@ void vex_disp_cp_xassisted(void);
 void vex_disp_cp_evcheck_fail(void);
 }
 
-static void initGuestState(CPUARMState& state, const IRContextInternal& context)
+static void initGuestState(CPUARMState& state, const IRContextInternal& context, char* stack)
 {
     for (auto&& ri : context.m_registerInit) {
         ri.m_control->reset();
         ri.m_control->init(state, ri.m_name);
     }
     // init sp
-    state.regs[13] = reinterpret_cast<intptr_t>(malloc(1024));
+    state.regs[13] = reinterpret_cast<uintptr_t>(stack);
     state.regs[13] += 1024;
     // init lr
     state.regs[14] = 0xffffffff;
@@ -205,8 +206,8 @@ static void* worker(void* p)
     ARMCPU cpu = { 0 };
 
     cortex_a15_initfn(&cpu);
-    // FIXME: translate here and copy to code to execMem
-    initGuestState(cpu.env, context);
+    std::vector<char> stack(1024);
+    initGuestState(cpu.env, context, const_cast<char*>(stack.data()));
     // setup pc
     cpu.env.regs[15] = (uint32_t)(uintptr_t)binaryCode.data();
     uintptr_t twoWords[2];
@@ -225,6 +226,7 @@ static void* worker(void* p)
         LOGE("%s: status is %d r15 = %08x.\n", fileName, twoWords[0], cpu.env.regs[15]);
     }
     checkRun("llvm", context, twoWords, cpu.env);
+    cortex_a15_deinitfn(&cpu);
     return nullptr;
 }
 
