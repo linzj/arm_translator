@@ -36,7 +36,7 @@ class FunctionTable(object):
         self.m_table = {}
     def add(self, name, functionDesc):
         if name in self.m_table:
-            #raise Exception("name appears twice.")
+            raise Exception("name appears twice.")
             return
         self.m_table[name] = functionDesc
 
@@ -69,8 +69,9 @@ class ElfDb(object):
         self.m_baseOffset = 0
 
     def handleDIEType(self, die):
-        if die.tag == 'DW_TAG_subprogram':
+        if die.tag == 'DW_TAG_subprogram' and 'DW_AT_declaration' not in die.attributes:
             self.m_functions.append(die)
+            setattr(die, "m_baseOffset", self.m_baseOffset)
             return
 
         if die.tag and isinstance(die.tag, str):
@@ -78,6 +79,9 @@ class ElfDb(object):
             self.m_DIETable.add(die.offset, die)
 
     def getFuncName(self, fdie):
+        spec = fdie.attributes.get('DW_AT_specification')
+        if spec:
+            fdie = self.m_DIETable.get(fdie.m_baseOffset + spec.value)
         r = fdie.attributes.get('DW_AT_linkage_name')
         if r:
             return r.value
@@ -174,6 +178,11 @@ class ElfDb(object):
         lowPCAttr = fdie.attributes.get('DW_AT_low_pc')
         if lowPCAttr:
             funcDesc.m_lowPC = lowPCAttr.value
+        else:
+            """
+            no declaration
+            """
+            return
         self.m_functionTable.add(name, funcDesc)
 
     def compose(self):
