@@ -45,6 +45,9 @@ class FunctionTable(object):
     def get(self, name):
         return self.m_table[name];
 
+    def getNothrow(self, name):
+        return self.m_table.get(name)
+
     def items(self):
         return self.m_table.items()
 
@@ -209,13 +212,6 @@ class ElfDb(object):
         lowPCAttr = fdie.attributes.get('DW_AT_low_pc')
         if lowPCAttr:
             funcDesc.m_lowPC = lowPCAttr.value
-        else:
-            """
-            no declaration
-            """
-            return
-        if funcDesc.m_lowPC == 0:
-            return
         funcDesc.m_markedSubroutine = self.m_markedSubroutine
         self.m_functionTable.add(name, funcDesc)
 
@@ -225,6 +221,19 @@ class ElfDb(object):
                self.composeFunction(f)
            except Exception:
             pass
+    def updateLowPC(self, elf):
+        """
+        update m_lowPC for each function in .symtab section
+        """
+        sect = elf.get_section_by_name(".symtab")
+        if not sect:
+            raise Exception("unable to find .symtab section")
+        for sym in sect.iter_symbols():
+            funcDesc = self.m_functionTable.getNothrow(sym.name)
+            if not funcDesc:
+                continue
+            if funcDesc.m_lowPC == 0:
+                funcDesc.m_lowPC = sym.entry.st_value
 
     def handle(self, elf):
         self.m_elfClass = elf.elfclass
@@ -240,7 +249,7 @@ class ElfDb(object):
         self.compose()
         self.m_functions = None
         self.m_DIETable = None
-
+        self.updateLowPC(elf)
     def funcTable(self):
         return self.m_functionTable
 
