@@ -29,6 +29,17 @@ class FunctionDesc(object):
         self.m_lowPC = 0
         self.m_markedSubroutine = None
 
+    def __repr__(self):
+        if isinstance(self.m_paramtersSize, (types.IntType, types.LongType)):
+            paramterSize = "%d" % self.m_paramtersSize
+        else:
+            paramterSize = "unspecified"
+        if self.m_markedSubroutine:
+            markedSubroutine = ", marked subroutines: (" + ", ".join([ "{0}".format(a) for a in self.m_markedSubroutine ]) + ")"
+        else:
+            markedSubroutine = ""
+        return "return type:%s, param size: %s, lowpc: %x%s" % (returnNames[self.m_returnType], paramterSize, self.m_lowPC, markedSubroutine)
+
 class FunctionTable(object):
     def __init__(self):
         """
@@ -256,15 +267,7 @@ class ElfDb(object):
     def __repr__(self):
         io = StringIO()
         for funcName, funcDesc in self.m_functionTable.items():
-            if isinstance(funcDesc.m_paramtersSize, (types.IntType, types.LongType)):
-                paramterSize = "%d" % funcDesc.m_paramtersSize
-            else:
-                paramterSize = "unspecified"
-            if funcDesc.m_markedSubroutine:
-                markedSubroutine = ", marked subroutines: (" + ", ".join([ "{0}".format(a) for a in funcDesc.m_markedSubroutine ]) + ")"
-            else:
-                markedSubroutine = ""
-            print >>io, "name: %s, return type:%s, param size: %s, lowpc: %x%s" % (funcName, returnNames[funcDesc.m_returnType], paramterSize, funcDesc.m_lowPC, markedSubroutine)
+            print >>io, "name: %s, %s" % (funcName, str(funcDesc))
         return io.getvalue()
 
 def main(argv):
