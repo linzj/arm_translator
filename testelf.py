@@ -1,4 +1,5 @@
-import sys
+import sys, traceback
+import types
 from cStringIO import StringIO
 from elftools.elf import elffile
 
@@ -26,6 +27,7 @@ class FunctionDesc(object):
         self.m_returnType = RETURN_VOID
         self.m_paramtersSize = 0
         self.m_lowPC = 0
+        self.m_markedSubroutine = None
 
 class FunctionTable(object):
     def __init__(self):
@@ -67,6 +69,9 @@ class ElfDb(object):
         self.m_elfclass = None
         self.m_debugName = None
         self.m_baseOffset = 0
+        self.m_returnPointer = None
+        self.m_unspecifiedParamter = None
+        self.m_markedSubroutine = None
 
     def handleDIEType(self, die):
         if die.tag == 'DW_TAG_subprogram' and 'DW_AT_declaration' not in die.attributes:
@@ -97,12 +102,14 @@ class ElfDb(object):
         while True:
             offset = te.value + fdie.m_baseOffset
             try:
-                ty = self.m_DIETable.get(offset + fdie.m_baseOffset)
+                ty = self.m_DIETable.get(offset)
             except Exception as e:
                 raise ContinueException(e)
             bs = ty.attributes.get('DW_AT_byte_size')
             if not bs:
                 #must be const modifer or something like that
+                if ty.tag == 'DW_TAG_pointer_type':
+                    return self.m_returnPointer
                 try:
                     te = ty.attributes['DW_AT_type']
                 except Exception as e:
@@ -130,19 +137,13 @@ class ElfDb(object):
     def getParamSize(self, fdie):
         ret = 0
         try:
+            index = 0
             for param in fdie.iter_children():
                 if param.tag != 'DW_TAG_formal_parameter':
-                    if param.tag == 'DW_TAG_template_type_param':
-                        continue
-                    if param.tag == 16647 or param.tag == 16648:
-                        continue
-                    if param.tag == 'DW_TAG_template_value_param':
-                        continue
-                    if param.tag == 'DW_TAG_lexical_block':
-                        continue
                     if param.tag == 'DW_TAG_unspecified_parameters':
-                        raise ContinueException()
-                    raise Exception("Unknown function child: " + param.tag)
+                        self.m_unspecifiedParamter = True
+                        return
+                    continue
                 while True:
                     ao = param.attributes.get('DW_AT_abstract_origin')
                     if not ao:
@@ -161,20 +162,50 @@ class ElfDb(object):
                     value = bs.value
                     break
                 ret += value
+                self.markSubroutineParam(param, index)
+                index += 1
             return ret
         except Exception as e:
+            traceback.print_exc(e, file = sys.stdout)
             raise e
+
+    def unwrapPointerTypedef(self, die):
+        if die.tag == 'DW_TAG_pointer_type' or die.tag == 'DW_TAG_typedef':
+            te = die.attributes.get('DW_AT_type')
+            if not te:
+                return None
+            return self.m_DIETable.get(te.value + die.m_baseOffset)
+        return None
+
+    def markSubroutineParam(self, param, index):
+        te = param.attributes.get('DW_AT_type')
+        ty = self.m_DIETable.get(te.value + param.m_baseOffset)
+        while True:
+            ty2 = self.unwrapPointerTypedef(ty)
+            if not ty2:
+                break
+            ty = ty2
+        if ty.tag == 'DW_TAG_subroutine_type':
+            self.m_markedSubroutine.append(index)
+
+    def clearMarkedSubroutineParam(self):
+        self.m_markedSubroutine = []
 
     def composeFunction(self, fdie):
         name = self.getFuncName(fdie)
         self.m_debugName = name
         returnType = self.getReturnType(fdie)
+        self.m_unspecifiedParamter = False
+        self.clearMarkedSubroutineParam()
         paramtersSize = self.getParamSize(fdie)
-        if returnType == RETURN_GREAT:
+        if not self.m_unspecifiedParamter and returnType == RETURN_GREAT:
             paramtersSize += self.m_elfClass / 8
         funcDesc = FunctionDesc()
         funcDesc.m_returnType = returnType
-        funcDesc.m_paramtersSize = paramtersSize
+        if self.m_unspecifiedParamter:
+            funcDesc.m_paramtersSize = None
+        else:
+            funcDesc.m_paramtersSize = paramtersSize
         lowPCAttr = fdie.attributes.get('DW_AT_low_pc')
         if lowPCAttr:
             funcDesc.m_lowPC = lowPCAttr.value
@@ -183,6 +214,9 @@ class ElfDb(object):
             no declaration
             """
             return
+        if funcDesc.m_lowPC == 0:
+            return
+        funcDesc.m_markedSubroutine = self.m_markedSubroutine
         self.m_functionTable.add(name, funcDesc)
 
     def compose(self):
@@ -194,6 +228,10 @@ class ElfDb(object):
 
     def handle(self, elf):
         self.m_elfClass = elf.elfclass
+        if self.m_elfClass == 64:
+            self.m_returnPointer = RETURN_8BYTES
+        else:
+            self.m_returnPointer = RETURN_4BYTES
         dw = elf.get_dwarf_info()
         for cu in dw.iter_CUs():
             self.m_baseOffset = cu.cu_offset
@@ -206,18 +244,27 @@ class ElfDb(object):
     def __repr__(self):
         io = StringIO()
         for funcName, funcDesc in self.m_functionTable.items():
-            print >>io, "name: %s, return type:%s, param size: %d, lowpc: %x" % (funcName, returnNames[funcDesc.m_returnType], funcDesc.m_paramtersSize, funcDesc.m_lowPC)
+            if isinstance(funcDesc.m_paramtersSize, (types.IntType, types.LongType)):
+                paramterSize = "%d" % funcDesc.m_paramtersSize
+            else:
+                paramterSize = "unspecified"
+            if funcDesc.m_markedSubroutine:
+                markedSubroutine = ", marked subroutines: (" + ", ".join([ "{0}".format(a) for a in funcDesc.m_markedSubroutine ]) + ")"
+            else:
+                markedSubroutine = ""
+            print >>io, "name: %s, return type:%s, param size: %s, lowpc: %x%s" % (funcName, returnNames[funcDesc.m_returnType], paramterSize, funcDesc.m_lowPC, markedSubroutine)
         return io.getvalue()
 
 def main(argv):
-    with open(argv[1], 'r') as f:
-        db = ElfDb()
-        elf = elffile.ELFFile(f)
-        if not elf.has_dwarf_info():
-            print "%s has no dwarf info." % argv[1]
-            return
-        db.handle(elf)
-    print "%s" % (str(db))
+    for i in range(1, len(argv)):
+        with open(argv[i], 'r') as f:
+            db = ElfDb()
+            elf = elffile.ELFFile(f)
+            if not elf.has_dwarf_info():
+                print "%s has no dwarf info." % argv[1]
+                return
+            db.handle(elf)
+        print "%s" % (str(db))
 
 if __name__ == '__main__':
     main(sys.argv)
