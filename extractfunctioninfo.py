@@ -241,6 +241,9 @@ class ElfDb(object):
         self.m_functions = None
         self.m_DIETable = None
 
+    def funcTable(self):
+        return self.m_functionTable
+
     def __repr__(self):
         io = StringIO()
         for funcName, funcDesc in self.m_functionTable.items():
