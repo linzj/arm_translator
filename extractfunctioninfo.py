@@ -88,7 +88,7 @@ class ElfDb(object):
         self.m_markedSubroutine = None
 
     def handleDIEType(self, die):
-        if die.tag == 'DW_TAG_subprogram' and 'DW_AT_declaration' not in die.attributes:
+        if die.tag == 'DW_TAG_subprogram':
             self.m_functions.append(die)
             setattr(die, "m_baseOffset", self.m_baseOffset)
             return
