@@ -649,8 +649,7 @@ int QEMUDisasContext::tcg_temp_new_internal(TCGType type, int temp_local)
 
 #include "tcg-target.cpp"
 
-static pthread_mutex_t initMutex = PTHREAD_MUTEX_INITIALIZER;
-static bool tcg_init_common_called = false;
+static pthread_once_t tcgInitOnce = PTHREAD_ONCE_INIT;
 
 static GHashTable* helper_table;
 static void tcg_init_common(void)
@@ -660,12 +659,6 @@ static void tcg_init_common(void)
     TCGArgConstraint* args_ct;
     int* sorted_args;
 
-    pthread_mutex_lock(&initMutex);
-    if (tcg_init_common_called) {
-        pthread_mutex_unlock(&initMutex);
-        return;
-    }
-    tcg_init_common_called = true;
     /* Count total number of arguments and allocate the corresponding
        space */
     total_args = 0;
@@ -696,7 +689,6 @@ static void tcg_init_common(void)
             (gpointer)&all_helpers[i]);
     }
     tcg_target_init();
-    pthread_mutex_unlock(&initMutex);
 }
 
 static void tcg_set_frame(TCGContext* s, int reg, intptr_t start, intptr_t size)
@@ -711,7 +703,7 @@ static void tcg_context_init(TCGContext* s)
     memset(s, 0, sizeof(*s));
     s->nb_globals = 0;
 
-    tcg_init_common();
+    pthread_once(&tcgInitOnce, tcg_init_common);
     s->helpers = helper_table;
     tcg_set_frame(s, TCG_REG_CALL_STACK,
         -CPU_TEMP_BUF_NLONGS * sizeof(long),
