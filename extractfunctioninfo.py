@@ -104,6 +104,9 @@ class ElfDb(object):
         r = fdie.attributes.get('DW_AT_linkage_name')
         if r:
             return r.value
+        r = fdie.attributes.get('DW_AT_MIPS_linkage_name')
+        if r:
+            return r.value
         r = fdie.attributes.get('DW_AT_name')
         if not r:
             raise ContinueException("unknown func name")
