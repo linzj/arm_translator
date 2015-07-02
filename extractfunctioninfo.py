@@ -25,13 +25,13 @@ class ContinueException(Exception):
 class FunctionDesc(object):
     def __init__(self):
         self.m_returnType = RETURN_VOID
-        self.m_paramtersSize = 0
+        self.m_paramtersSizes = None
         self.m_lowPC = 0
         self.m_markedSubroutine = None
 
     def __repr__(self):
-        if isinstance(self.m_paramtersSize, (types.IntType, types.LongType)):
-            paramterSize = "%d" % self.m_paramtersSize
+        if self.m_paramtersSizes is not None:
+            paramterSize = ", ".join(["%d" % a for a in self.m_paramtersSizes])
         else:
             paramterSize = "unspecified"
         if self.m_markedSubroutine:
@@ -151,18 +151,6 @@ class ElfDb(object):
                 return RETURN_8BYTES
             raise Exception("Unknown return type.")
 
-    # for arm eabi compatibility
-    def getParamSize(self, sizes):
-        ret = 0
-        for size in sizes:
-            if size == 8:
-                if ret & 7:
-                    ret += 12
-                else:
-                    ret += 8
-            else:
-                ret += 4
-        return ret
 
     def getParamSizes(self, fdie):
         ret = []
@@ -231,13 +219,12 @@ class ElfDb(object):
         paramtersSizes = self.getParamSizes(fdie)
         if not self.m_unspecifiedParamter and returnType == RETURN_GREAT:
             paramtersSizes.insert(0, self.m_elfClass / 8)
-        paramtersSize = self.getParamSize(paramtersSizes)
         funcDesc = FunctionDesc()
         funcDesc.m_returnType = returnType
         if self.m_unspecifiedParamter:
-            funcDesc.m_paramtersSize = None
+            funcDesc.m_paramtersSizes = None
         else:
-            funcDesc.m_paramtersSize = paramtersSize
+            funcDesc.m_paramtersSizes = paramtersSizes
         lowPCAttr = fdie.attributes.get('DW_AT_low_pc')
         if lowPCAttr:
             funcDesc.m_lowPC = lowPCAttr.value
