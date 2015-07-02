@@ -151,8 +151,21 @@ class ElfDb(object):
                 return RETURN_8BYTES
             raise Exception("Unknown return type.")
 
-    def getParamSize(self, fdie):
+    # for arm eabi compatibility
+    def getParamSize(self, sizes):
         ret = 0
+        for size in sizes:
+            if size == 8:
+                if ret & 7:
+                    ret += 12
+                else:
+                    ret += 8
+            else:
+                ret += 4
+        return ret
+
+    def getParamSizes(self, fdie):
+        ret = []
         try:
             index = 0
             for param in fdie.iter_children():
@@ -178,7 +191,8 @@ class ElfDb(object):
                         continue
                     value = bs.value
                     break
-                ret += value
+
+                ret.append(value)
                 self.markSubroutineParam(param, index)
                 index += 1
             return ret
@@ -214,9 +228,10 @@ class ElfDb(object):
         returnType = self.getReturnType(fdie)
         self.m_unspecifiedParamter = False
         self.clearMarkedSubroutineParam()
-        paramtersSize = self.getParamSize(fdie)
+        paramtersSizes = self.getParamSizes(fdie)
         if not self.m_unspecifiedParamter and returnType == RETURN_GREAT:
-            paramtersSize += self.m_elfClass / 8
+            paramtersSizes.insert(0, self.m_elfClass / 8)
+        paramtersSize = self.getParamSize(paramtersSizes)
         funcDesc = FunctionDesc()
         funcDesc.m_returnType = returnType
         if self.m_unspecifiedParamter:
