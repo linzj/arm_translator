@@ -897,9 +897,9 @@ static inline uint32_t syn_aa32_smc(void)
     return (EC_AA32_SMC << ARM_EL_EC_SHIFT) | ARM_EL_IL;
 }
 
-static inline uint32_t syn_aa32_svc(uint32_t imm16, bool is_thumb)
+static inline uint32_t syn_aa32_svc(uint32_t imm24, bool is_thumb)
 {
-    return (EC_AA32_SVC << ARM_EL_EC_SHIFT) | (imm16 & 0xffff)
+    return (EC_AA32_SVC << ARM_EL_EC_SHIFT) | (imm24 & 0xffffff)
         | (is_thumb ? 0 : ARM_EL_IL);
 }
 
