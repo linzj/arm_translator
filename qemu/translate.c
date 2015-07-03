@@ -10939,7 +10939,6 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
                                         DisasContext* dc)
 {
     CPUARMState *env = &cpu->env;
-    CPUState* cs = CPU(cpu);
     /* disable for llvm uint16_t *gen_opc_end; */
     target_ulong pc_start;
     target_ulong next_page_start;
@@ -10977,7 +10976,7 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
     dc->vec_len = ARM_TBFLAG_VECLEN(tb->flags);
     dc->vec_stride = ARM_TBFLAG_VECSTRIDE(tb->flags);
     dc->c15_cpar = ARM_TBFLAG_XSCALE_CPAR(tb->flags);
-    dc->cp_regs = cs->cp_regs;
+    dc->cp_regs = cpu->cp_regs;
     dc->current_el = arm_current_el(env);
     dc->features = env->features;
 

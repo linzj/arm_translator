@@ -85,8 +85,7 @@ uint32_t cpsr_read(CPUARMState *env)
 
 const ARMCPRegInfo *get_arm_cp_reginfo(GHashTable *cpregs, uint32_t encoded_cp)
 {
-    // return g_hash_table_lookup(cpregs, &encoded_cp);
-    return NULL;
+    return g_hash_table_lookup(cpregs, &encoded_cp);
 }
 
 void cpu_abort(CPUState *cpu, const char *fmt, ...)
@@ -1988,7 +1987,7 @@ uint32_t HELPER(crc32c)(uint32_t acc, uint32_t val, uint32_t bytes)
     return crc32c(acc, buf, bytes) ^ 0xffffffff;
 }
 
-static void arm_cp_reset_ignore(CPUARMState *env, const ARMCPRegInfo *opaque)
+void arm_cp_reset_ignore(CPUARMState *env, const ARMCPRegInfo *opaque)
 {
     /* Helper coprocessor reset function for do-nothing-on-reset registers */
 }

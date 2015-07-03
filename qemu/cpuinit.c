@@ -2,6 +2,11 @@
 #include "cpuinit.h"
 #include "compatglib.h"
 
+# define __get_tls() \
+({ register void* __val; \
+asm ("movl %%gs:0, %0" : "=r"(__val)); \
+(volatile void*) __val; })
+
 #define REGINFO_SENTINEL        \
     {                           \
         .type = ARM_CP_SENTINEL \
@@ -12,8 +17,19 @@ static inline void set_feature(CPUARMState* env, int feature)
     env->features |= 1ULL << feature;
 }
 
+static inline void cpu_set_tls(CPUARMState *env, target_ulong newtls)
+{
+    env->cp15.tpidrro_el0 = newtls;
+}
+
+#define offsetoflow32(S, M) offsetof(S, M)
+
 static const ARMCPRegInfo cortexa15_cp_reginfo[] = {
     {.name = "L2ECTLR", .cp = 15, .crn = 9, .crm = 0, .opc1 = 1, .opc2 = 3, .access = PL1_RW, .type = ARM_CP_CONST, .resetvalue = 0 },
+    { .name = "TPIDRURO", .cp = 15, .crn = 13, .crm = 0, .opc1 = 0, .opc2 = 3,
+      .access = PL0_R|PL1_W,
+      .fieldoffset = offsetoflow32(CPUARMState, cp15.tpidrro_el0),
+      .resetfn = arm_cp_reset_ignore },
     REGINFO_SENTINEL
 };
 
@@ -64,9 +80,10 @@ void cortex_a15_initfn(ARMCPU* cpu)
     cpu->ccsidr[0] = 0x701fe00a; /* 32K L1 dcache */
     cpu->ccsidr[1] = 0x201fe00a; /* 32K L1 icache */
     cpu->ccsidr[2] = 0x711fe07a; /* 4096K L2 unified cache */
-    define_arm_cp_regs(cpu, cortexa15_cp_reginfo);
 
     arm_cpu_reset(&cpu->state);
+    define_arm_cp_regs(cpu, cortexa15_cp_reginfo);
+    cpu_set_tls(&cpu->env, (uint32_t)__get_tls());
 }
 
 void cortex_a15_deinitfn(ARMCPU* cpu)

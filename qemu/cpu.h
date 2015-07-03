@@ -495,7 +495,6 @@ struct ARMCPRegInfo {
 #define MMU_USER_IDX 0
 
 typedef struct {
-    GHashTable* cp_regs;
     jmp_buf exit_buf;
     int exception_index;
     int halted;
@@ -1226,6 +1225,9 @@ static inline bool cpreg_field_is_64bit(const ARMCPRegInfo *ri)
 {
     return (ri->state == ARM_CP_STATE_AA64) || (ri->type & ARM_CP_64BIT);
 }
+
+void arm_cp_reset_ignore(CPUARMState *env, const ARMCPRegInfo *opaque);
+
 #ifdef __cplusplus
 }
 #endif
