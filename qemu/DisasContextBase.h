@@ -126,6 +126,7 @@ public:
         int nargs, TCGArg* args)
         = 0;
     virtual void func_start() = 0;
+    virtual bool should_continue() = 0;
 
     virtual void gen_sdiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2) = 0;
     virtual void gen_udiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2) = 0;

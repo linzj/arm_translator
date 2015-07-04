@@ -131,6 +131,7 @@ public:
         override;
 
     virtual void func_start() override;
+    virtual bool should_continue() override;
 
     virtual void gen_sdiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2) override;
     virtual void gen_udiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2) override;

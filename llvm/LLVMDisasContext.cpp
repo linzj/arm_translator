@@ -1009,6 +1009,11 @@ void LLVMDisasContext::func_start()
 {
 }
 
+bool LLVMDisasContext::should_continue()
+{
+    return true;
+}
+
 void LLVMDisasContext::gen_sdiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
     LValue num = unwrap(arg1);

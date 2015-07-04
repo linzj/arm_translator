@@ -11114,8 +11114,7 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
         num_insns ++;
     } while (!dc->is_jmp && 
             /* disable for llvm tcg_ctx.gen_opc_ptr < gen_opc_end && */
-             true &&
-             true &&
+            tcg_should_continue(dc) &&
              !dc->ss_active &&
              dc->pc < next_page_start &&
              num_insns < max_insns);

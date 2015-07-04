@@ -91,13 +91,6 @@ extern const ARMCPRegInfo *get_arm_cp_reginfo(GHashTable *cpregs, uint32_t encod
 #define MAX_OP_PER_INSTR 266
 #define OPC_MAX_SIZE (OPC_BUF_SIZE - MAX_OP_PER_INSTR)
 
-typedef struct {
-    uint16_t gen_opc_buf[OPC_BUF_SIZE];
-    uint16_t *gen_opc_ptr;
-    uint8_t gen_opc_instr_start[OPC_BUF_SIZE];
-    target_ulong gen_opc_pc[OPC_BUF_SIZE];
-    uint16_t gen_opc_icount[OPC_BUF_SIZE];
-} TCGContext;
 
 void gen_intermediate_code_internal(ARMCPU* cpu, TranslationBlock *tb, DisasContext* dc);
                                                   

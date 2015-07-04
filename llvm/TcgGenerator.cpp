@@ -580,6 +580,11 @@ void tcg_func_start(DisasContext* s)
     static_cast<DisasContextBase*>(s)->func_start();
 }
 
+bool tcg_should_continue(DisasContext*s)
+{
+    static_cast<DisasContextBase*>(s)->should_continue();
+}
+
 void tcg_gen_sdiv(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2)
 {
     static_cast<DisasContextBase*>(s)->gen_sdiv(ret, arg1, arg2);

@@ -2011,6 +2011,11 @@ void QEMUDisasContext::func_start()
     tcg_func_start(&m_impl->m_tcgCtx);
 }
 
+bool QEMUDisasContext::should_continue()
+{
+    return m_impl->m_tcgCtx.gen_opc_ptr < m_impl->m_tcgCtx.gen_opc_ptr;
+}
+
 void QEMUDisasContext::temp_free_internal(int idx)
 {
     TCGContext* s = &m_impl->m_tcgCtx;
