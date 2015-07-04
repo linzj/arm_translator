@@ -1,0 +1,15 @@
+r0 = 12
+%%
+CheckEqual r0 12
+CheckEqual r1 12
+CheckEqual r2 12
+CheckEqual r3 12
+CheckEqual r4 12
+CheckEqual r5 12
+CheckEqual r6 12
+CheckEqual r7 12
+CheckEqual r8 12
+CheckEqual r9 12
+CheckEqual r10 12
+CheckEqual r11 12
+CheckEqual r12 12

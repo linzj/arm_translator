@@ -2013,7 +2013,7 @@ void QEMUDisasContext::func_start()
 
 bool QEMUDisasContext::should_continue()
 {
-    return m_impl->m_tcgCtx.gen_opc_ptr < m_impl->m_tcgCtx.gen_opc_ptr;
+    return m_impl->m_tcgCtx.gen_opc_ptr < (&m_impl->m_tcgCtx.gen_opc_buf[0]) + OPC_MAX_SIZE;
 }
 
 void QEMUDisasContext::temp_free_internal(int idx)
