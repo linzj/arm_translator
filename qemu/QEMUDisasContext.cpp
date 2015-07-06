@@ -1598,7 +1598,7 @@ void QEMUDisasContext::gen_rotri_i32(TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
         }
         else if (TCG_TARGET_HAS_rot_i32) {
             TCGv_i32 t0 = const_i32(arg2);
-            gen_op3_i32(INDEX_op_rotl_i32, ret, arg1, (TCGv_i32)(intptr_t)arg2);
+            gen_op3_i32(INDEX_op_rotr_i32, ret, arg1, t0);
             temp_free_i32(t0);
         }
         else {
