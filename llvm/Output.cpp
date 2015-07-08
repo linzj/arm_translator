@@ -3,6 +3,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include "CompilerState.h"
 #include "Output.h"
+#include "log.h"
 
 namespace jit {
 Output::Output(CompilerState& state)
@@ -272,7 +273,8 @@ void Output::buildTcgDirectPatch(void)
     llvmAPI->SetInstructionCallConv(call, LLVMAnyRegCallConv);
     buildUnreachable(m_builder);
     // record the stack map info
-    m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+    auto result = m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+    EMASSERT(result.second == true);
     m_currentBlockTerminated = true;
 }
 
@@ -283,7 +285,8 @@ void Output::buildTcgIndirectPatch(void)
     llvmAPI->SetInstructionCallConv(call, LLVMAnyRegCallConv);
     buildUnreachable(m_builder);
     // record the stack map info
-    m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+    auto result = m_state.m_patchMap.insert(std::make_pair(m_stackMapsId++, desc));
+    EMASSERT(result.second == true);
     m_currentBlockTerminated = true;
 }
 

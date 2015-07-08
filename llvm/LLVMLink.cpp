@@ -63,7 +63,6 @@ void LLVMDisasContext::link()
     uint8_t* body = static_cast<uint8_t*>(state()->m_entryPoint);
     desc.m_patchPrologue(desc.m_opaque, prologue);
     for (auto& record : rm) {
-        EMASSERT(record.second.size() == 1);
         auto found = state()->m_patchMap.find(record.first);
         if (found == state()->m_patchMap.end()) {
             // should be the tcg helpers.
@@ -72,12 +71,14 @@ void LLVMDisasContext::link()
         PatchDesc& patchDesc = found->second;
         switch (patchDesc.m_type) {
         case PatchType::TcgDirect: {
-            auto& recordUnit = record.second[0];
-            desc.m_patchTcgDirect(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcgDirect);
+            for (auto& recordUnit : record.second) {
+                desc.m_patchTcgDirect(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcgDirect);
+            }
         } break;
         case PatchType::TcgIndirect: {
-            auto& recordUnit = record.second[0];
-            desc.m_patchTcgIndirect(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcgIndirect);
+            for (auto& recordUnit : record.second) {
+                desc.m_patchTcgIndirect(desc.m_opaque, body + recordUnit.instructionOffset, desc.m_dispTcgIndirect);
+            }
         } break;
         default:
             EMUNREACHABLE();
