@@ -23,6 +23,7 @@ static inline void cpu_set_tls(CPUARMState *env, target_ulong newtls)
 }
 
 #define offsetoflow32(S, M) offsetof(S, M)
+#define offsetofhigh32(S, M) (offsetof(S, M) + sizeof(uint32_t))
 
 static const ARMCPRegInfo cortexa15_cp_reginfo[] = {
     {.name = "L2ECTLR", .cp = 15, .crn = 9, .crm = 0, .opc1 = 1, .opc2 = 3, .access = PL1_RW, .type = ARM_CP_CONST, .resetvalue = 0 },
@@ -30,6 +31,19 @@ static const ARMCPRegInfo cortexa15_cp_reginfo[] = {
       .access = PL0_R|PL1_W,
       .fieldoffset = offsetoflow32(CPUARMState, cp15.tpidrro_el0),
       .resetfn = arm_cp_reset_ignore },
+    { .name = "MVA_prefetch",
+      .cp = 15, .crn = 7, .crm = 13, .opc1 = 0, .opc2 = 1,
+      .access = PL1_W, .type = ARM_CP_NOP },
+    { .name = "ISB", .cp = 15, .crn = 7, .crm = 5, .opc1 = 0, .opc2 = 4,
+      .access = PL0_W, .type = ARM_CP_NOP },
+    { .name = "DSB", .cp = 15, .crn = 7, .crm = 10, .opc1 = 0, .opc2 = 4,
+      .access = PL0_W, .type = ARM_CP_NOP },
+    { .name = "DMB", .cp = 15, .crn = 7, .crm = 10, .opc1 = 0, .opc2 = 5,
+      .access = PL0_W, .type = ARM_CP_NOP },
+    { .name = "IFAR", .cp = 15, .crn = 6, .crm = 0, .opc1 = 0, .opc2 = 2,
+      .access = PL1_RW,
+      .fieldoffset = offsetofhigh32(CPUARMState, cp15.far_el[1]),
+      .resetvalue = 0, },
     REGINFO_SENTINEL
 };
 

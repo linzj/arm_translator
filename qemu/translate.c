@@ -261,6 +261,7 @@ static void gen_exception(DisasContext *s, int excp, uint32_t syndrome)
     gen_helper_exception_with_syndrome(s, cpu_env, tcg_excp, tcg_syn);
     tcg_temp_free_i32(s, tcg_syn);
     tcg_temp_free_i32(s, tcg_excp);
+    tcg_gen_exit_tb(s, 0);
 }
 
 static void gen_ss_advance(DisasContext *s)
