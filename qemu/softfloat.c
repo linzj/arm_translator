@@ -88,6 +88,24 @@ static inline flag extractFloat16Sign(float16 a)
     return float16_val(a)>>15;
 }
 
+#define BEGIN_SSE_FLOAT_SCOPE(rounding)\
+{\
+    uint32_t save_mxcsr, mxcrs;\
+    asm ("stmxcsr %0\n"\
+            : "=m"(save_mxcsr));\
+    mxcrs = save_mxcsr;\
+    mxcrs |= (rounding & 3) << 13;\
+    asm ("ldmxcsr %0\n"\
+    :\
+    : "m" (mxcrs));
+
+#define END_SSE_FLOAT_SCOPE()\
+    asm ("ldmxcsr %0\n"\
+    :\
+    : "m" (save_mxcsr));\
+}
+
+
 /*----------------------------------------------------------------------------
 | Takes a 64-bit fixed-point value `absZ' with binary point between bits 6
 | and 7, and returns the properly rounded 32-bit integer corresponding to the
@@ -98,6 +116,7 @@ static inline flag extractFloat16Sign(float16 a)
 | point input is too large, the invalid exception is raised and the largest
 | positive or negative integer is returned.
 *----------------------------------------------------------------------------*/
+
 
 static int32 roundAndPackInt32( flag zSign, uint64_t absZ STATUS_PARAM)
 {
@@ -1431,23 +1450,16 @@ float128 uint64_to_float128(uint64_t a STATUS_PARAM)
 
 int32 float32_to_int32( float32 a STATUS_PARAM )
 {
-    flag aSign;
-    int_fast16_t aExp, shiftCount;
-    uint32_t aSig;
-    uint64_t aSig64;
+    int8 roundingMode;
+    int32 ret;
 
-    a = float32_squash_input_denormal(a STATUS_VAR);
-    aSig = extractFloat32Frac( a );
-    aExp = extractFloat32Exp( a );
-    aSign = extractFloat32Sign( a );
-    if ( ( aExp == 0xFF ) && aSig ) aSign = 0;
-    if ( aExp ) aSig |= 0x00800000;
-    shiftCount = 0xAF - aExp;
-    aSig64 = aSig;
-    aSig64 <<= 32;
-    if ( 0 < shiftCount ) shift64RightJamming( aSig64, shiftCount, &aSig64 );
-    return roundAndPackInt32( aSign, aSig64 STATUS_VAR );
-
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("cvttss2si %[myfloat], %[myint]\n"
+    : [myint] "=r" (ret)
+    : [myfloat] "g" (a));
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 }
 
 /*----------------------------------------------------------------------------
