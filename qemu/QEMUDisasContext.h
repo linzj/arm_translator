@@ -133,35 +133,6 @@ public:
     virtual void func_start() override;
     virtual bool should_continue() override;
 
-    virtual void gen_sdiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2) override;
-    virtual void gen_udiv(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2) override;
-
-    virtual void gen_vfp_adds(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_subs(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_muls(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_divs(TCGv_i32 ret, TCGv_i32 arg1, TCGv_i32 arg2, TCGv_ptr fpstatus) override;
-
-    virtual void gen_vfp_addd(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_subd(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_muld(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_divd(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2, TCGv_ptr fpstatus) override;
-
-    virtual void gen_vfp_touis(TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_touizs(TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_tosis(TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_tosizs(TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus) override;
-
-    virtual void gen_vfp_touid(TCGv_i32 ret, TCGv_i64 arg, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_touizd(TCGv_i32 ret, TCGv_i64 arg, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_tosid(TCGv_i32 ret, TCGv_i64 arg, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_tosizd(TCGv_i32 ret, TCGv_i64 arg, TCGv_ptr fpstatus) override;
-
-    virtual void gen_vfp_sitos(TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_uitos(TCGv_i32 ret, TCGv_i32 arg, TCGv_ptr fpstatus) override;
-
-    virtual void gen_vfp_sitod(TCGv_i64 ret, TCGv_i32 arg, TCGv_ptr fpstatus) override;
-    virtual void gen_vfp_uitod(TCGv_i64 ret, TCGv_i32 arg, TCGv_ptr fpstatus) override;
-
 private:
     int global_mem_new_internal(TCGType type, int reg,
         intptr_t offset,

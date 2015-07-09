@@ -1129,10 +1129,10 @@ static inline void gen_vfp_##name(DisasContext *s, int dp)            \
 {                                                                     \
     TCGv_ptr statusptr = get_fpstatus_ptr(s, 0);                      \
     if (dp) {                                                         \
-        tcg_gen_vfp_##name##d(s, cpu_F0d, cpu_F0d,                    \
+        gen_helper_vfp_##name##d(s, cpu_F0d, cpu_F0d,                    \
          cpu_F1d, statusptr);                                         \
     } else {                                                          \
-        tcg_gen_vfp_##name##s(s, cpu_F0s,                             \
+        gen_helper_vfp_##name##s(s, cpu_F0s,                             \
                 cpu_F0s, cpu_F1s, statusptr);                         \
     }                                                                 \
     tcg_temp_free_ptr(s, statusptr);                                  \
@@ -1150,9 +1150,9 @@ static inline void gen_vfp_F1_mul(DisasContext *s, int dp)
     /* Like gen_vfp_mul() but put result in F1 */
     TCGv_ptr statusptr = get_fpstatus_ptr(s, 0);
     if (dp) {
-        tcg_gen_vfp_muld(s, cpu_F1d, cpu_F0d, cpu_F1d, statusptr);
+        gen_helper_vfp_muld(s, cpu_F1d, cpu_F0d, cpu_F1d, statusptr);
     } else {
-        tcg_gen_vfp_muls(s, cpu_F1s, cpu_F0s, cpu_F1s, statusptr);
+        gen_helper_vfp_muls(s, cpu_F1s, cpu_F0s, cpu_F1s, statusptr);
     }
     tcg_temp_free_ptr(s, statusptr);
 }
@@ -1220,9 +1220,9 @@ static inline void gen_vfp_##name(DisasContext *s, int dp, int neon) \
 { \
     TCGv_ptr statusptr = get_fpstatus_ptr(s, neon); \
     if (dp) { \
-        tcg_gen_vfp_##name##d(s, cpu_F0d, cpu_F0s, statusptr); \
+        gen_helper_vfp_##name##d(s, cpu_F0d, cpu_F0s, statusptr); \
     } else { \
-        tcg_gen_vfp_##name##s(s, cpu_F0s, cpu_F0s, statusptr); \
+        gen_helper_vfp_##name##s(s, cpu_F0s, cpu_F0s, statusptr); \
     } \
     tcg_temp_free_ptr(s, statusptr); \
 }
@@ -1236,9 +1236,9 @@ static inline void gen_vfp_##name(DisasContext *s, int dp, int neon) \
 { \
     TCGv_ptr statusptr = get_fpstatus_ptr(s, neon); \
     if (dp) { \
-        tcg_gen_vfp_##name##d(s, cpu_F0s, cpu_F0d, statusptr); \
+        gen_helper_vfp_##name##d(s, cpu_F0s, cpu_F0d, statusptr); \
     } else { \
-        tcg_gen_vfp_##name##s(s, cpu_F0s, cpu_F0s, statusptr); \
+        gen_helper_vfp_##name##s(s, cpu_F0s, cpu_F0s, statusptr); \
     } \
     tcg_temp_free_ptr(s, statusptr); \
 }
@@ -5519,10 +5519,10 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
             switch ((u << 2) | size) {
             case 0: /* VADD */
             case 4: /* VPADD */
-                tcg_gen_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
+                gen_helper_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
                 break;
             case 2: /* VSUB */
-                tcg_gen_vfp_subs(s, tmp, tmp, tmp2, fpstatus);
+                gen_helper_vfp_subs(s, tmp, tmp, tmp2, fpstatus);
                 break;
             case 6: /* VABD */
                 gen_helper_neon_abd_f32(s, tmp, tmp, tmp2, fpstatus);
@@ -5536,14 +5536,14 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
         case NEON_3R_FLOAT_MULTIPLY:
         {
             TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
-            tcg_gen_vfp_muls(s, tmp, tmp, tmp2, fpstatus);
+            gen_helper_vfp_muls(s, tmp, tmp, tmp2, fpstatus);
             if (!u) {
                 tcg_temp_free_i32(s, tmp2);
                 tmp2 = neon_load_reg(s, rd, pass);
                 if (size == 0) {
-                    tcg_gen_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
+                    gen_helper_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
                 } else {
-                    tcg_gen_vfp_subs(s, tmp, tmp2, tmp, fpstatus);
+                    gen_helper_vfp_subs(s, tmp, tmp2, tmp, fpstatus);
                 }
             }
             tcg_temp_free_ptr(s, fpstatus);
@@ -6339,7 +6339,7 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                             }
                         } else if (op & 1) {
                             TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
-                            tcg_gen_vfp_muls(s, tmp, tmp, tmp2, fpstatus);
+                            gen_helper_vfp_muls(s, tmp, tmp, tmp2, fpstatus);
                             tcg_temp_free_ptr(s, fpstatus);
                         } else {
                             switch (size) {
@@ -6360,7 +6360,7 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                             case 1:
                             {
                                 TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
-                                tcg_gen_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
+                                gen_helper_vfp_adds(s, tmp, tmp, tmp2, fpstatus);
                                 tcg_temp_free_ptr(s, fpstatus);
                                 break;
                             }
@@ -6370,7 +6370,7 @@ static int disas_neon_data_insn(DisasContext *s, uint32_t insn)
                             case 5:
                             {
                                 TCGv_ptr fpstatus = get_fpstatus_ptr(s, 1);
-                                tcg_gen_vfp_subs(s, tmp, tmp2, tmp, fpstatus);
+                                gen_helper_vfp_subs(s, tmp, tmp2, tmp, fpstatus);
                                 tcg_temp_free_ptr(s, fpstatus);
                                 break;
                             }
@@ -8652,9 +8652,9 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
                         tmp = load_reg(s, rm);
                         tmp2 = load_reg(s, rs);
                         if (insn & (1 << 21)) {
-                            tcg_gen_udiv(s, tmp, tmp, tmp2);
+                            gen_helper_udiv(s, tmp, tmp, tmp2);
                         } else {
-                            tcg_gen_sdiv(s, tmp, tmp, tmp2);
+                            gen_helper_sdiv(s, tmp, tmp, tmp2);
                         }
                         tcg_temp_free_i32(s, tmp2);
                         store_reg(s, rn, tmp);
@@ -9625,9 +9625,9 @@ static int disas_thumb2_insn(CPUARMState *env, DisasContext *s, uint16_t insn_hw
                     goto illegal_op;
                 }
                 if (op & 0x20)
-                    tcg_gen_udiv(s, tmp, tmp, tmp2);
+                    gen_helper_udiv(s, tmp, tmp, tmp2);
                 else
-                    tcg_gen_sdiv(s, tmp, tmp, tmp2);
+                    gen_helper_sdiv(s, tmp, tmp, tmp2);
                 tcg_temp_free_i32(s, tmp2);
                 store_reg(s, rd, tmp);
             } else if ((op & 0xe) == 0xc) {
