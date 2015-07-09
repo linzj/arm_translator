@@ -38,6 +38,7 @@
                         '-m32',
                         '-g3',
                         '-Wall',
+                        '-msse2',
                         #'-fsanitize=undefined',
                       ],
                       'cflags_cc': [
