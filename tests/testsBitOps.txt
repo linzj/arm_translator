@@ -1,9 +1,11 @@
 r0 = 0xff
 r1 = 0x1234
 r2 = 0xff00
+r6 = 0x80
 %%
 CheckEqual r0 0x34
 CheckEqual r1 0xed34
 CheckEqual r3 0xfffffd34
 CheckEqual r4 0xfffd3400
 CheckEqual r5 0x00fffffd
+CheckEqual r6 0

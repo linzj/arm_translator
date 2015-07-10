@@ -23,6 +23,7 @@ foo:
     mov r2, #8
     lsl r4, r3, r2
     lsr r5, r3, r2
+    and r6, r6, #1
 	bx	lr
 
 
