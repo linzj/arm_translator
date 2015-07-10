@@ -3049,46 +3049,6 @@ static void tcg_liveness_analysis(TCGContext* s)
 }
 #endif
 
-static void tcg_generate_prologue_check(TCGContext* s)
-{
-#ifndef __i386__
-#error unsupported arch
-#endif
-    // call +5
-    tcg_out_opc(s, OPC_CALL_Jz, 0, 0, 0);
-    tcg_out32(s, 0);
-    tcg_out_pop(s, TCG_REG_ESI);
-    int offset = 0x25, offset2 = 0x21, offset3 = 0xb;
-    static const int threshold = 1000;
-
-    tcg_out_modrm_sib_offset(s, OPC_LEA, TCG_REG_ESI, TCG_REG_ESI, -1, 0,
-        offset);
-    tcg_out_modrm_offset(s, OPC_ARITH_EvIz, ARITH_CMP, TCG_REG_ESI, 0);
-    tcg_out32(s, threshold);
-
-    tcg_out8(s, OPC_JCC_short + JCC_JL);
-    tcg_out8(s, offset2);
-    // call the function here
-    tcg_out_st(s, TCG_TYPE_I32, TCG_AREG0, TCG_REG_CALL_STACK, 0);
-    tcg_out_ld(s, TCG_TYPE_I32, TCG_REG_EAX, TCG_REG_ESI, 4);
-
-    tcg_out_st(s, TCG_TYPE_I32, TCG_REG_EAX, TCG_REG_CALL_STACK, 4);
-
-    tcg_out_call(s, reinterpret_cast<tcg_insn_unit*>(s->dispHot));
-    tcg_out_modrm_offset(s, OPC_MOVL_EvIz, 0, TCG_REG_ESI, 0);
-    tcg_out32(s, 0);
-
-    tcg_out8(s, OPC_JMP_short);
-    tcg_out8(s, offset3);
-    // the counter
-    tcg_out32(s, 0);
-    // the object
-    tcg_out32(s, reinterpret_cast<uint32_t>(s->hotObject));
-    // here the start
-    tcg_out_modrm_offset(s, OPC_ARITH_EvIb, EXT5_INC_Ev, TCG_REG_ESI, 0);
-    tcg_out8(s, 1);
-}
-
 #ifdef USE_TCG_OPTIMIZATIONS
 #include "tcg-optimize.cpp"
 #endif
@@ -3147,7 +3107,7 @@ static inline int tcg_gen_code_common(TCGContext* s,
 
     args = s->gen_opparam_buf;
     op_index = 0;
-    tcg_generate_prologue_check(s);
+
     for (;;) {
         opc = static_cast<TCGOpcode>(s->gen_opc_buf[op_index]);
 #ifdef CONFIG_PROFILER
