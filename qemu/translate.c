@@ -8933,6 +8933,7 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
                 /* swi */
                 TCGv_i32 svc_imm;
                 svc_imm = tcg_const_i32(s, extract32(insn, 0, 24));
+                gen_set_pc_im(s, s->pc);
                 gen_helper_handle_swi(s, cpu_env, svc_imm);
                 tcg_temp_free_i32(s, svc_imm);
                 s->is_jmp = DISAS_UPDATE;
@@ -10896,6 +10897,7 @@ static void disas_thumb_insn(CPUARMState *env, DisasContext *s)
             /* swi */
             TCGv_i32 svc_imm;
             svc_imm = tcg_const_i32(s, extract32(insn, 0, 8));
+            gen_set_pc_im(s, s->pc);
             gen_helper_handle_swi(s, cpu_env, svc_imm);
             tcg_temp_free_i32(s, svc_imm);
             s->is_jmp = DISAS_UPDATE;
