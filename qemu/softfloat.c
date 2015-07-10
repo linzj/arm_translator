@@ -2530,7 +2530,7 @@ int float32_eq( float32 a, float32 b STATUS_PARAM )
     "movd %[b], %%xmm1\n"
     "ucomiss %%xmm1, %%xmm0\n"
     "sete %[ret]\n"
-    : [ret] "=r" (ret)
+    : [ret] "=m" (ret)
     : [a] "g" (a)
     , [b] "g" (b)
     : "xmm0", "xmm1", "cc");
@@ -2557,7 +2557,7 @@ int float32_le( float32 a, float32 b STATUS_PARAM )
     "movd %[b], %%xmm1\n"
     "ucomiss %%xmm1, %%xmm0\n"
     "setna %[ret]\n"
-    : [ret] "=r" (ret)
+    : [ret] "=m" (ret)
     : [a] "g" (a)
     , [b] "g" (b)
     : "xmm0", "xmm1", "cc");
@@ -2585,7 +2585,7 @@ int float32_lt( float32 a, float32 b STATUS_PARAM )
     "movd %[b], %%xmm1\n"
     "ucomiss %%xmm1, %%xmm0\n"
     "setb %[ret]\n"
-    : [ret] "=r" (ret)
+    : [ret] "=m" (ret)
     : [a] "g" (a)
     , [b] "g" (b)
     : "xmm0", "xmm1", "cc");
