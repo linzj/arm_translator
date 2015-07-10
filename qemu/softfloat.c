@@ -3581,19 +3581,21 @@ static float64 subFloat64Sigs( float64 a, float64 b, flag zSign STATUS_PARAM )
 
 float64 float64_add( float64 a, float64 b STATUS_PARAM )
 {
-    flag aSign, bSign;
-    a = float64_squash_input_denormal(a STATUS_VAR);
-    b = float64_squash_input_denormal(b STATUS_VAR);
+    int8 roundingMode;
+    float64 ret;
 
-    aSign = extractFloat64Sign( a );
-    bSign = extractFloat64Sign( b );
-    if ( aSign == bSign ) {
-        return addFloat64Sigs( a, b, aSign STATUS_VAR );
-    }
-    else {
-        return subFloat64Sigs( a, b, aSign STATUS_VAR );
-    }
-
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("movq %[a], %%xmm0\n"
+    "movq %[b], %%xmm1\n"
+    "addsd %%xmm1, %%xmm0\n"
+    "movq %%xmm0, %[ret]\n"
+    : [ret] "=m" (ret)
+    : [a] "m" (a)
+    , [b] "m" (b)
+    : "xmm0", "xmm1");
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 }
 
 /*----------------------------------------------------------------------------
@@ -3604,18 +3606,21 @@ float64 float64_add( float64 a, float64 b STATUS_PARAM )
 
 float64 float64_sub( float64 a, float64 b STATUS_PARAM )
 {
-    flag aSign, bSign;
-    a = float64_squash_input_denormal(a STATUS_VAR);
-    b = float64_squash_input_denormal(b STATUS_VAR);
+    int8 roundingMode;
+    float64 ret;
 
-    aSign = extractFloat64Sign( a );
-    bSign = extractFloat64Sign( b );
-    if ( aSign == bSign ) {
-        return subFloat64Sigs( a, b, aSign STATUS_VAR );
-    }
-    else {
-        return addFloat64Sigs( a, b, aSign STATUS_VAR );
-    }
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("movq %[a], %%xmm0\n"
+    "movq %[b], %%xmm1\n"
+    "subsd %%xmm1, %%xmm0\n"
+    "movq %%xmm0, %[ret]\n"
+    : [ret] "=m" (ret)
+    : [a] "m" (a)
+    , [b] "m" (b)
+    : "xmm0", "xmm1");
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 
 }
 
@@ -3627,56 +3632,21 @@ float64 float64_sub( float64 a, float64 b STATUS_PARAM )
 
 float64 float64_mul( float64 a, float64 b STATUS_PARAM )
 {
-    flag aSign, bSign, zSign;
-    int_fast16_t aExp, bExp, zExp;
-    uint64_t aSig, bSig, zSig0, zSig1;
+    int8 roundingMode;
+    float64 ret;
 
-    a = float64_squash_input_denormal(a STATUS_VAR);
-    b = float64_squash_input_denormal(b STATUS_VAR);
-
-    aSig = extractFloat64Frac( a );
-    aExp = extractFloat64Exp( a );
-    aSign = extractFloat64Sign( a );
-    bSig = extractFloat64Frac( b );
-    bExp = extractFloat64Exp( b );
-    bSign = extractFloat64Sign( b );
-    zSign = aSign ^ bSign;
-    if ( aExp == 0x7FF ) {
-        if ( aSig || ( ( bExp == 0x7FF ) && bSig ) ) {
-            return propagateFloat64NaN( a, b STATUS_VAR );
-        }
-        if ( ( bExp | bSig ) == 0 ) {
-            float_raise( float_flag_invalid STATUS_VAR);
-            return float64_default_nan;
-        }
-        return packFloat64( zSign, 0x7FF, 0 );
-    }
-    if ( bExp == 0x7FF ) {
-        if ( bSig ) return propagateFloat64NaN( a, b STATUS_VAR );
-        if ( ( aExp | aSig ) == 0 ) {
-            float_raise( float_flag_invalid STATUS_VAR);
-            return float64_default_nan;
-        }
-        return packFloat64( zSign, 0x7FF, 0 );
-    }
-    if ( aExp == 0 ) {
-        if ( aSig == 0 ) return packFloat64( zSign, 0, 0 );
-        normalizeFloat64Subnormal( aSig, &aExp, &aSig );
-    }
-    if ( bExp == 0 ) {
-        if ( bSig == 0 ) return packFloat64( zSign, 0, 0 );
-        normalizeFloat64Subnormal( bSig, &bExp, &bSig );
-    }
-    zExp = aExp + bExp - 0x3FF;
-    aSig = ( aSig | LIT64( 0x0010000000000000 ) )<<10;
-    bSig = ( bSig | LIT64( 0x0010000000000000 ) )<<11;
-    mul64To128( aSig, bSig, &zSig0, &zSig1 );
-    zSig0 |= ( zSig1 != 0 );
-    if ( 0 <= (int64_t) ( zSig0<<1 ) ) {
-        zSig0 <<= 1;
-        --zExp;
-    }
-    return roundAndPackFloat64( zSign, zExp, zSig0 STATUS_VAR );
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("movq %[a], %%xmm0\n"
+    "movq %[b], %%xmm1\n"
+    "mulsd %%xmm1, %%xmm0\n"
+    "movq %%xmm0, %[ret]\n"
+    : [ret] "=m" (ret)
+    : [a] "m" (a)
+    , [b] "m" (b)
+    : "xmm0", "xmm1");
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 
 }
 
@@ -3688,67 +3658,21 @@ float64 float64_mul( float64 a, float64 b STATUS_PARAM )
 
 float64 float64_div( float64 a, float64 b STATUS_PARAM )
 {
-    flag aSign, bSign, zSign;
-    int_fast16_t aExp, bExp, zExp;
-    uint64_t aSig, bSig, zSig;
-    uint64_t rem0, rem1;
-    uint64_t term0, term1;
-    a = float64_squash_input_denormal(a STATUS_VAR);
-    b = float64_squash_input_denormal(b STATUS_VAR);
+    int8 roundingMode;
+    float64 ret;
 
-    aSig = extractFloat64Frac( a );
-    aExp = extractFloat64Exp( a );
-    aSign = extractFloat64Sign( a );
-    bSig = extractFloat64Frac( b );
-    bExp = extractFloat64Exp( b );
-    bSign = extractFloat64Sign( b );
-    zSign = aSign ^ bSign;
-    if ( aExp == 0x7FF ) {
-        if ( aSig ) return propagateFloat64NaN( a, b STATUS_VAR );
-        if ( bExp == 0x7FF ) {
-            if ( bSig ) return propagateFloat64NaN( a, b STATUS_VAR );
-            float_raise( float_flag_invalid STATUS_VAR);
-            return float64_default_nan;
-        }
-        return packFloat64( zSign, 0x7FF, 0 );
-    }
-    if ( bExp == 0x7FF ) {
-        if ( bSig ) return propagateFloat64NaN( a, b STATUS_VAR );
-        return packFloat64( zSign, 0, 0 );
-    }
-    if ( bExp == 0 ) {
-        if ( bSig == 0 ) {
-            if ( ( aExp | aSig ) == 0 ) {
-                float_raise( float_flag_invalid STATUS_VAR);
-                return float64_default_nan;
-            }
-            float_raise( float_flag_divbyzero STATUS_VAR);
-            return packFloat64( zSign, 0x7FF, 0 );
-        }
-        normalizeFloat64Subnormal( bSig, &bExp, &bSig );
-    }
-    if ( aExp == 0 ) {
-        if ( aSig == 0 ) return packFloat64( zSign, 0, 0 );
-        normalizeFloat64Subnormal( aSig, &aExp, &aSig );
-    }
-    zExp = aExp - bExp + 0x3FD;
-    aSig = ( aSig | LIT64( 0x0010000000000000 ) )<<10;
-    bSig = ( bSig | LIT64( 0x0010000000000000 ) )<<11;
-    if ( bSig <= ( aSig + aSig ) ) {
-        aSig >>= 1;
-        ++zExp;
-    }
-    zSig = estimateDiv128To64( aSig, 0, bSig );
-    if ( ( zSig & 0x1FF ) <= 2 ) {
-        mul64To128( bSig, zSig, &term0, &term1 );
-        sub128( aSig, 0, term0, term1, &rem0, &rem1 );
-        while ( (int64_t) rem0 < 0 ) {
-            --zSig;
-            add128( rem0, rem1, 0, bSig, &rem0, &rem1 );
-        }
-        zSig |= ( rem1 != 0 );
-    }
-    return roundAndPackFloat64( zSign, zExp, zSig STATUS_VAR );
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("movq %[a], %%xmm0\n"
+    "movq %[b], %%xmm1\n"
+    "divsd %%xmm1, %%xmm0\n"
+    "movq %%xmm0, %[ret]\n"
+    : [ret] "=m" (ret)
+    : [a] "m" (a)
+    , [b] "m" (b)
+    : "xmm0", "xmm1");
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 
 }
 
@@ -4192,19 +4116,22 @@ float64 float64_log2( float64 a STATUS_PARAM )
 
 int float64_eq( float64 a, float64 b STATUS_PARAM )
 {
-    uint64_t av, bv;
-    a = float64_squash_input_denormal(a STATUS_VAR);
-    b = float64_squash_input_denormal(b STATUS_VAR);
+    int8 roundingMode;
+    int8 ret;
 
-    if (    ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) )
-         || ( ( extractFloat64Exp( b ) == 0x7FF ) && extractFloat64Frac( b ) )
-       ) {
-        float_raise( float_flag_invalid STATUS_VAR);
-        return 0;
-    }
-    av = float64_val(a);
-    bv = float64_val(b);
-    return ( av == bv ) || ( (uint64_t) ( ( av | bv )<<1 ) == 0 );
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("movb $0, %[ret]\n"
+    "movq %[a], %%xmm0\n"
+    "movq %[b], %%xmm1\n"
+    "ucomisd %%xmm1, %%xmm0\n"
+    "sete %[ret]\n"
+    : [ret] "=m" (ret)
+    : [a] "m" (a)
+    , [b] "m" (b)
+    : "xmm0", "xmm1", "cc");
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 
 }
 
@@ -4217,23 +4144,22 @@ int float64_eq( float64 a, float64 b STATUS_PARAM )
 
 int float64_le( float64 a, float64 b STATUS_PARAM )
 {
-    flag aSign, bSign;
-    uint64_t av, bv;
-    a = float64_squash_input_denormal(a STATUS_VAR);
-    b = float64_squash_input_denormal(b STATUS_VAR);
+    int8 roundingMode;
+    int8 ret;
 
-    if (    ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) )
-         || ( ( extractFloat64Exp( b ) == 0x7FF ) && extractFloat64Frac( b ) )
-       ) {
-        float_raise( float_flag_invalid STATUS_VAR);
-        return 0;
-    }
-    aSign = extractFloat64Sign( a );
-    bSign = extractFloat64Sign( b );
-    av = float64_val(a);
-    bv = float64_val(b);
-    if ( aSign != bSign ) return aSign || ( (uint64_t) ( ( av | bv )<<1 ) == 0 );
-    return ( av == bv ) || ( aSign ^ ( av < bv ) );
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("movb $0, %[ret]\n"
+    "movq %[a], %%xmm0\n"
+    "movq %[b], %%xmm1\n"
+    "ucomisd %%xmm1, %%xmm0\n"
+    "setna %[ret]\n"
+    : [ret] "=m" (ret)
+    : [a] "m" (a)
+    , [b] "m" (b)
+    : "xmm0", "xmm1", "cc");
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 
 }
 
@@ -4246,23 +4172,22 @@ int float64_le( float64 a, float64 b STATUS_PARAM )
 
 int float64_lt( float64 a, float64 b STATUS_PARAM )
 {
-    flag aSign, bSign;
-    uint64_t av, bv;
+    int8 roundingMode;
+    int8 ret;
 
-    a = float64_squash_input_denormal(a STATUS_VAR);
-    b = float64_squash_input_denormal(b STATUS_VAR);
-    if (    ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) )
-         || ( ( extractFloat64Exp( b ) == 0x7FF ) && extractFloat64Frac( b ) )
-       ) {
-        float_raise( float_flag_invalid STATUS_VAR);
-        return 0;
-    }
-    aSign = extractFloat64Sign( a );
-    bSign = extractFloat64Sign( b );
-    av = float64_val(a);
-    bv = float64_val(b);
-    if ( aSign != bSign ) return aSign && ( (uint64_t) ( ( av | bv )<<1 ) != 0 );
-    return ( av != bv ) && ( aSign ^ ( av < bv ) );
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("movb $0, %[ret]\n"
+    "movq %[a], %%xmm0\n"
+    "movq %[b], %%xmm1\n"
+    "ucomisd %%xmm1, %%xmm0\n"
+    "setb %[ret]\n"
+    : [ret] "=m" (ret)
+    : [a] "m" (a)
+    , [b] "m" (b)
+    : "xmm0", "xmm1", "cc");
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 
 }
 
