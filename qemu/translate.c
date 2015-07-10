@@ -7440,7 +7440,10 @@ static void gen_store_exclusive(DisasContext *s, int rd, int rt, int rt2,
     tcg_gen_extu_i32_i64(s, cpu_exclusive_test, addr);
     tcg_gen_movi_i32(s, cpu_exclusive_info,
                      size | (rd << 4) | (rt << 8) | (rt2 << 12));
-    gen_exception_internal_insn(s, 4, EXCP_STREX);
+    gen_set_condexec(s);
+    gen_set_pc_im(s, s->pc - 4);
+    gen_helper_handle_strex(s, cpu_env);
+    s->is_jmp = DISAS_JUMP;
 }
 
 /* gen_srs:
@@ -8926,12 +8929,14 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
                 goto illegal_op;
             }
             break;
-        case 0xf:
-            /* swi */
-            gen_set_pc_im(s, s->pc);
-            s->svc_imm = extract32(insn, 0, 24);
-            s->is_jmp = DISAS_SWI;
-            break;
+        case 0xf: {
+                /* swi */
+                TCGv_i32 svc_imm;
+                svc_imm = tcg_const_i32(s, extract32(insn, 0, 24));
+                gen_helper_handle_swi(s, cpu_env, svc_imm);
+                tcg_temp_free_i32(s, svc_imm);
+                s->is_jmp = DISAS_UPDATE;
+            } break;
         default:
         illegal_op:
             gen_exception_insn(s, 4, EXCP_UDEF, syn_uncategorized());
@@ -10889,9 +10894,11 @@ static void disas_thumb_insn(CPUARMState *env, DisasContext *s)
 
         if (cond == 0xf) {
             /* swi */
-            gen_set_pc_im(s, s->pc);
-            s->svc_imm = extract32(insn, 0, 8);
-            s->is_jmp = DISAS_SWI;
+            TCGv_i32 svc_imm;
+            svc_imm = tcg_const_i32(s, extract32(insn, 0, 8));
+            gen_helper_handle_swi(s, cpu_env, svc_imm);
+            tcg_temp_free_i32(s, svc_imm);
+            s->is_jmp = DISAS_UPDATE;
             break;
         }
         /* generate a conditional jump to next instruction */
@@ -11060,7 +11067,7 @@ void gen_intermediate_code_internal(ARMCPU* cpu,
         if (dc->pc >= 0xffff0000) {
             /* We always get here via a jump, so know we are not in a
                conditional execution block.  */
-            gen_exception_internal(dc, EXCP_KERNEL_TRAP);
+            gen_helper_handle_kernel_trap(dc, dc->__cpu_env);
             dc->is_jmp = DISAS_UPDATE;
             break;
         }

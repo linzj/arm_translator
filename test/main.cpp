@@ -252,3 +252,24 @@ int main(int argc, char** argv)
     }
     return 0;
 }
+
+extern "C" {
+void helper_handle_swi(CPUARMState* env, int32_t ex);
+void helper_handle_kernel_trap(CPUARMState* env);
+void helper_handle_strex(CPUARMState* env);
+}
+
+void helper_handle_swi(CPUARMState* env, int32_t ex)
+{
+    EMUNREACHABLE();
+}
+
+void helper_handle_kernel_trap(CPUARMState* env)
+{
+    EMUNREACHABLE();
+}
+
+void helper_handle_strex(CPUARMState* env)
+{
+    EMUNREACHABLE();
+}
