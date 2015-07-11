@@ -1944,8 +1944,8 @@ float32 float32_sub( float32 a, float32 b STATUS_PARAM )
     "subss %%xmm1, %%xmm0\n"
     "movd %%xmm0, %[ret]\n"
     : [ret] "=g" (ret)
-    : [a] "g" (a)
-    , [b] "g" (b)
+    : [a] "m" (a)
+    , [b] "m" (b)
     : "xmm0", "xmm1");
     END_SSE_FLOAT_SCOPE()
     return ret;
@@ -1995,8 +1995,8 @@ float32 float32_div( float32 a, float32 b STATUS_PARAM )
     "divss %%xmm1, %%xmm0\n"
     "movd %%xmm0, %[ret]\n"
     : [ret] "=g" (ret)
-    : [a] "g" (a)
-    , [b] "g" (b)
+    : [a] "m" (a)
+    , [b] "m" (b)
     : "xmm0", "xmm1");
     END_SSE_FLOAT_SCOPE()
     return ret;
