@@ -471,8 +471,8 @@ void tcg_gen_ori_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 void tcg_gen_qemu_ld_i32(DisasContext* s, TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
 #ifdef ENABLE_ASAN
-    int size = static_cast<int>(memop) & static_cast<int>(MO_SIGN);
-    size = 8 << size;
+    int size = static_cast<int>(memop) & static_cast<int>(~MO_SIGN);
+    size = 1 << size;
     check_mem(s, addr, 0, size, true);
 #endif
     static_cast<DisasContextBase*>(s)->gen_qemu_ld_i32(val, addr, idx, memop);
@@ -481,8 +481,8 @@ void tcg_gen_qemu_ld_i32(DisasContext* s, TCGv_i32 val, TCGv addr, TCGArg idx, T
 void tcg_gen_qemu_ld_i64(DisasContext* s, TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
 #ifdef ENABLE_ASAN
-    int size = static_cast<int>(memop) & static_cast<int>(MO_SIGN);
-    size = 8 << size;
+    int size = static_cast<int>(memop) & static_cast<int>(~MO_SIGN);
+    size = 1 << size;
     check_mem(s, addr, 0, size, true);
 #endif
     static_cast<DisasContextBase*>(s)->gen_qemu_ld_i64(val, addr, idx, memop);
@@ -491,8 +491,8 @@ void tcg_gen_qemu_ld_i64(DisasContext* s, TCGv_i64 val, TCGv addr, TCGArg idx, T
 void tcg_gen_qemu_st_i32(DisasContext* s, TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
 #ifdef ENABLE_ASAN
-    int size = static_cast<int>(memop) & static_cast<int>(MO_SIGN);
-    size = 8 << size;
+    int size = static_cast<int>(memop) & static_cast<int>(~MO_SIGN);
+    size = 1 << size;
     check_mem(s, addr, 0, size, false);
 #endif
     static_cast<DisasContextBase*>(s)->gen_qemu_st_i32(val, addr, idx, memop);
@@ -501,8 +501,8 @@ void tcg_gen_qemu_st_i32(DisasContext* s, TCGv_i32 val, TCGv addr, TCGArg idx, T
 void tcg_gen_qemu_st_i64(DisasContext* s, TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
 #ifdef ENABLE_ASAN
-    int size = static_cast<int>(memop) & static_cast<int>(MO_SIGN);
-    size = 8 << size;
+    int size = static_cast<int>(memop) & static_cast<int>(~MO_SIGN);
+    size = 1 << size;
     check_mem(s, addr, 0, size, false);
 #endif
     static_cast<DisasContextBase*>(s)->gen_qemu_st_i64(val, addr, idx, memop);
