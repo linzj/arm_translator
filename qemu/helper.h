@@ -529,6 +529,12 @@ DEF_HELPER_2(dc_zva, void, env, i64)
 DEF_HELPER_FLAGS_2(neon_pmull_64_lo, TCG_CALL_NO_RWG_SE, i64, i64, i64)
 DEF_HELPER_FLAGS_2(neon_pmull_64_hi, TCG_CALL_NO_RWG_SE, i64, i64, i64)
 
+// external linkage helpers
 DEF_HELPER_2(handle_swi, void, env, i32)
 DEF_HELPER_1(handle_kernel_trap, void, env)
 DEF_HELPER_1(handle_strex, void, env)
+
+#ifdef ENABLE_ASAN
+DEF_HELPER_2(asan_bad_load, void, ptr, i32)
+DEF_HELPER_2(asan_bad_store, void, ptr, i32)
+#endif // ENABLE_ASAN

@@ -30,6 +30,7 @@ typedef uint32_t target_ulong;
 #define TARGET_FMT_ld "%d"
 #define TARGET_FMT_lu "%u"
 #define tcg_temp_new(s) (TCGv) tcg_temp_new_i32(s);
+#define tcg_gen_mov(s, a, b) tcg_gen_movi_i32(s, (TCGv_i32)a, (TCGv_i32)b)
 #define TCGv TCGv_i32
 #define tcg_temp_free tcg_temp_free_i32
 #define TCG_TARGET_REG_BITS 32
@@ -40,6 +41,7 @@ typedef uint64_t target_ulong;
 #define TARGET_FMT_ld "%" PRId64
 #define TARGET_FMT_lu "%" PRIu64
 #define tcg_temp_new(s) (TCGv) tcg_temp_new_i64(s);
+#define tcg_gen_mov(s, a, b) tcg_gen_movi_i64(s, (TCGv_i64)a, (TCGv_i64)b)
 #define TCGv TCGv_i64
 #define tcg_temp_free tcg_temp_free_i64
 #define TCG_TARGET_REG_BITS 64

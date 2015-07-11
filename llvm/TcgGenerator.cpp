@@ -134,6 +134,59 @@ void unpatchDirectJump(uintptr_t from, uintptr_t to)
     assembler.call(JSC::X86Registers::eax);
 }
 }
+#ifdef ENABLE_ASAN
+extern "C" {
+void helper_asan_bad_load(void* addr, int bytes);
+void helper_asan_bad_store(void* addr, int bytes);
+}
+
+static bool check_bad(void* addr, int bytes)
+{
+    uintptr_t addri = reinterpret_cast<uintptr_t>(addr);
+    if (addri >= 0xffff0000) {
+        return false;
+    }
+    uintptr_t addri_1 = addri >> 3;
+    uint32_t sb;
+    asm volatile("movzbl (%[addri_1]), %[sb]\n"
+        : [sb] "=r" (sb)
+        : [addri_1] "r" (addri_1));
+    if (sb == 0) {
+        return false;
+    }
+    addri &= 7;
+    addri += bytes - 1;
+    if (addri >= sb) {
+        return false;
+    }
+    return true;
+}
+void helper_asan_bad_load(void* addr, int bytes)
+{
+    if (check_bad(addr, bytes))
+        LOGE("%s: bad addr: %p, bytes: %d.\n", __FUNCTION__, addr, bytes);
+}
+
+void helper_asan_bad_store(void* addr, int bytes)
+{
+    if (check_bad(addr, bytes))
+        LOGE("%s: bad addr: %p, bytes: %d.\n", __FUNCTION__, addr, bytes);
+}
+
+static void check_mem(DisasContext* s, TCGv addr, tcg_target_long offset, int bytes, bool isload)
+{
+    // call bad helpers
+    void* func = isload ? reinterpret_cast<void*>(helper_asan_bad_load) : reinterpret_cast<void*>(helper_asan_bad_store);
+    TCGv_i32 tcgBytes = tcg_const_i32(s, bytes);
+    TCGv_i32 addr2 = tcg_temp_new_i32(s);
+    tcg_gen_mov_i32(s, addr2, addr);
+    tcg_gen_addi_i32(s, addr2, addr2, offset);
+    TCGArg args[] = { reinterpret_cast<TCGArg>(addr2), reinterpret_cast<TCGArg>(tcgBytes) };
+    static_cast<DisasContextBase*>(s)->gen_callN(func, reinterpret_cast<TCGArg>(-1), 2, args);
+    tcg_temp_free_i32(s, addr2);
+}
+#endif //ENABLE_ASAN
+
 
 int gen_new_label(DisasContext* s)
 {
@@ -312,12 +365,18 @@ void tcg_gen_extu_i32_i64(DisasContext* s, TCGv_i64 ret, TCGv_i32 arg)
 
 void tcg_gen_ld_i32(DisasContext* s, TCGv_i32 ret, TCGv_ptr arg2, tcg_target_long offset)
 {
+#ifdef ENABLE_ASAN
+    check_mem(s, (TCGv)arg2, offset, 4, true);
+#endif
     static_cast<DisasContextBase*>(s)->gen_ld_i32(ret, arg2, offset);
 }
 
 void tcg_gen_ld_i64(DisasContext* s, TCGv_i64 ret, TCGv_ptr arg2,
     tcg_target_long offset)
 {
+#ifdef ENABLE_ASAN
+    check_mem(s, (TCGv)arg2, offset, 8, true);
+#endif
     static_cast<DisasContextBase*>(s)->gen_ld_i64(ret, arg2,
         offset);
 }
@@ -411,21 +470,41 @@ void tcg_gen_ori_i32(DisasContext* s, TCGv_i32 ret, TCGv_i32 arg1, int32_t arg2)
 
 void tcg_gen_qemu_ld_i32(DisasContext* s, TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
+#ifdef ENABLE_ASAN
+    int size = static_cast<int>(memop) & static_cast<int>(MO_SIGN);
+    size = 8 << size;
+    check_mem(s, addr, 0, size, true);
+#endif
     static_cast<DisasContextBase*>(s)->gen_qemu_ld_i32(val, addr, idx, memop);
 }
 
 void tcg_gen_qemu_ld_i64(DisasContext* s, TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
+#ifdef ENABLE_ASAN
+    int size = static_cast<int>(memop) & static_cast<int>(MO_SIGN);
+    size = 8 << size;
+    check_mem(s, addr, 0, size, true);
+#endif
     static_cast<DisasContextBase*>(s)->gen_qemu_ld_i64(val, addr, idx, memop);
 }
 
 void tcg_gen_qemu_st_i32(DisasContext* s, TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
+#ifdef ENABLE_ASAN
+    int size = static_cast<int>(memop) & static_cast<int>(MO_SIGN);
+    size = 8 << size;
+    check_mem(s, addr, 0, size, false);
+#endif
     static_cast<DisasContextBase*>(s)->gen_qemu_st_i32(val, addr, idx, memop);
 }
 
 void tcg_gen_qemu_st_i64(DisasContext* s, TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
+#ifdef ENABLE_ASAN
+    int size = static_cast<int>(memop) & static_cast<int>(MO_SIGN);
+    size = 8 << size;
+    check_mem(s, addr, 0, size, false);
+#endif
     static_cast<DisasContextBase*>(s)->gen_qemu_st_i64(val, addr, idx, memop);
 }
 
@@ -488,12 +567,18 @@ void tcg_gen_shri_i64(DisasContext* s, TCGv_i64 ret, TCGv_i64 arg1, int64_t arg2
 
 void tcg_gen_st_i32(DisasContext* s, TCGv_i32 arg1, TCGv_ptr arg2, tcg_target_long offset)
 {
+#ifdef ENABLE_ASAN
+    check_mem(s, (TCGv)arg2, offset, 4, false);
+#endif
     static_cast<DisasContextBase*>(s)->gen_st_i32(arg1, arg2, offset);
 }
 
 void tcg_gen_st_i64(DisasContext* s, TCGv_i64 arg1, TCGv_ptr arg2,
     tcg_target_long offset)
 {
+#ifdef ENABLE_ASAN
+    check_mem(s, (TCGv)arg2, offset, 8, false);
+#endif
     static_cast<DisasContextBase*>(s)->gen_st_i64(arg1, arg2,
         offset);
 }
