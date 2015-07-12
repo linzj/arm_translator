@@ -148,12 +148,12 @@ static bool check_bad(void* addr, int bytes)
     }
     uintptr_t addri_1 = (addri >> 3);
 #ifndef __ANDROID__
-    addri_1  += (1 << 29);
+    addri_1 += (1 << 29);
 #endif
     uint32_t sb;
     asm volatile("movzbl (%[addri_1]), %[sb]\n"
-        : [sb] "=r" (sb)
-        : [addri_1] "r" (addri_1));
+                 : [sb] "=r"(sb)
+                 : [addri_1] "r"(addri_1));
     if (sb == 0) {
         return false;
     }
@@ -189,7 +189,6 @@ static void check_mem(DisasContext* s, TCGv addr, tcg_target_long offset, int by
     tcg_temp_free_i32(s, addr2);
 }
 #endif //ENABLE_ASAN
-
 
 int gen_new_label(DisasContext* s)
 {
@@ -668,7 +667,7 @@ void tcg_func_start(DisasContext* s)
     static_cast<DisasContextBase*>(s)->func_start();
 }
 
-bool tcg_should_continue(DisasContext*s)
+bool tcg_should_continue(DisasContext* s)
 {
     return static_cast<DisasContextBase*>(s)->should_continue();
 }

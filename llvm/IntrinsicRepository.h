@@ -30,7 +30,8 @@ public:
     IntrinsicRepository(LContext, LModule);
     
 #define INTRINSIC_GETTER(ourName, llvmName, type) \
-    LLVMValueRef ourName##Intrinsic() {                 \
+    LLVMValueRef ourName##Intrinsic()             \
+    {                                             \
         if (!m_##ourName)                         \
             return ourName##IntrinsicSlow();      \
         return m_##ourName;                       \
