@@ -146,7 +146,10 @@ static bool check_bad(void* addr, int bytes)
     if (addri >= 0xffff0000) {
         return false;
     }
-    uintptr_t addri_1 = addri >> 3;
+    uintptr_t addri_1 = (addri >> 3);
+#ifndef __ANDROID__
+    addri_1  += (1 << 29);
+#endif
     uint32_t sb;
     asm volatile("movzbl (%[addri_1]), %[sb]\n"
         : [sb] "=r" (sb)
@@ -156,7 +159,7 @@ static bool check_bad(void* addr, int bytes)
     }
     addri &= 7;
     addri += bytes - 1;
-    if (addri >= sb) {
+    if (sb > addri) {
         return false;
     }
     return true;
