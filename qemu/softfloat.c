@@ -1565,14 +1565,16 @@ int_fast16_t float32_to_int16_round_to_zero(float32 a STATUS_PARAM)
 int64 float32_to_int64( float32 a STATUS_PARAM )
 {
     int8 roundingMode;
-    int32 ret;
+    int64 ret;
 
     roundingMode = STATUS(float_rounding_mode);
-    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
-    asm("cvttss2si %[myfloat], %[myint]\n"
-    : [myint] "=r" (ret)
-    : [myfloat] "m" (a));
-    END_SSE_FLOAT_SCOPE()
+    BEGIN_X87_FLOAT_SCOPE(roundingMode)
+    asm ("flds %[myfloat]\n"
+    "fistpq %[ret]\n"
+    : [ret] "=m" (ret)
+    : [myfloat] "m" (a)
+    : "st");
+    END_X87_FLOAT_SCOPE()
     return ret;
 }
 
@@ -1591,15 +1593,17 @@ int64 float32_to_int64( float32 a STATUS_PARAM )
 uint64 float32_to_uint64(float32 a STATUS_PARAM)
 {
     int8 roundingMode;
-    int32 ret;
+    int64 ret;
 
     roundingMode = STATUS(float_rounding_mode);
-    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
-    asm("cvttss2si %[myfloat], %[myint]\n"
-    : [myint] "=r" (ret)
-    : [myfloat] "m" (a));
-    END_SSE_FLOAT_SCOPE()
-    return (uint64)((uint32)ret);
+    BEGIN_X87_FLOAT_SCOPE(roundingMode)
+    asm ("flds %[myfloat]\n"
+    "fistpq %[ret]\n"
+    : [ret] "=m" (ret)
+    : [myfloat] "m" (a)
+    : "st");
+    END_X87_FLOAT_SCOPE()
+    return ret;
 }
 
 /*----------------------------------------------------------------------------
@@ -1616,15 +1620,17 @@ uint64 float32_to_uint64(float32 a STATUS_PARAM)
 uint64 float32_to_uint64_round_to_zero(float32 a STATUS_PARAM)
 {
     int8 roundingMode;
-    int32 ret;
+    int64 ret;
 
     roundingMode = float_round_to_zero;
-    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
-    asm("cvttss2si %[myfloat], %[myint]\n"
-    : [myint] "=r" (ret)
-    : [myfloat] "m" (a));
-    END_SSE_FLOAT_SCOPE()
-    return (uint64)((uint32)ret);
+    BEGIN_X87_FLOAT_SCOPE(roundingMode)
+    asm ("flds %[myfloat]\n"
+    "fistpq %[ret]\n"
+    : [ret] "=m" (ret)
+    : [myfloat] "m" (a)
+    : "st");
+    END_X87_FLOAT_SCOPE()
+    return ret;
 }
 
 /*----------------------------------------------------------------------------
@@ -1640,16 +1646,17 @@ uint64 float32_to_uint64_round_to_zero(float32 a STATUS_PARAM)
 int64 float32_to_int64_round_to_zero( float32 a STATUS_PARAM )
 {
     int8 roundingMode;
-    int32 ret;
+    int64 ret;
 
     roundingMode = float_round_to_zero;
-    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
-    asm("cvttss2si %[myfloat], %[myint]\n"
-    : [myint] "=r" (ret)
-    : [myfloat] "m" (a));
-    END_SSE_FLOAT_SCOPE()
+    BEGIN_X87_FLOAT_SCOPE(roundingMode)
+    asm ("flds %[myfloat]\n"
+    "fistpq %[ret]\n"
+    : [ret] "=m" (ret)
+    : [myfloat] "m" (a)
+    : "st");
+    END_X87_FLOAT_SCOPE()
     return ret;
-
 }
 
 /*----------------------------------------------------------------------------
