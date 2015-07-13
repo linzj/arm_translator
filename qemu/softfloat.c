@@ -40,6 +40,7 @@ these four paragraphs for those parts of this code that are retained.
  */
 #include "types.h"
 #include "softfloat.h"
+#include "bitops.h"
 
 /* We only need stdlib for abort() */
 #include <stdlib.h>
@@ -94,7 +95,7 @@ static inline flag extractFloat16Sign(float16 a)
     asm ("stmxcsr %0\n"\
             : "=m"(save_mxcsr));\
     mxcrs = save_mxcsr;\
-    mxcrs |= (rounding & 3) << 13;\
+    mxcrs = deposit32(mxcrs, 13, 2,  (rounding & 3));\
     asm ("ldmxcsr %0\n"\
     :\
     : "m" (mxcrs));
@@ -103,6 +104,21 @@ static inline flag extractFloat16Sign(float16 a)
     asm ("ldmxcsr %0\n"\
     :\
     : "m" (save_mxcsr));\
+}
+
+#define BEGIN_X87_FLOAT_SCOPE(rounding)\
+{\
+    uint16_t save_cw, cw;\
+    asm ("fnstcw %0\n"\
+        : "=m" (save_cw));\
+    cw = save_cw;\
+    cw = deposit32(cw, 10, 2, (rounding & 3));\
+    asm ("fldcw %0\n"\
+        :\
+        : "m" (cw));
+
+#define END_X87_FLOAT_SCOPE()\
+    asm ("fldcw %0\n" : : "m" (save_cw));\
 }
 
 
@@ -2735,19 +2751,16 @@ int float32_unordered_quiet( float32 a, float32 b STATUS_PARAM )
 
 int32 float64_to_int32( float64 a STATUS_PARAM )
 {
-    flag aSign;
-    int_fast16_t aExp, shiftCount;
-    uint64_t aSig;
-    a = float64_squash_input_denormal(a STATUS_VAR);
+    int8 roundingMode;
+    int32 ret;
 
-    aSig = extractFloat64Frac( a );
-    aExp = extractFloat64Exp( a );
-    aSign = extractFloat64Sign( a );
-    if ( ( aExp == 0x7FF ) && aSig ) aSign = 0;
-    if ( aExp ) aSig |= LIT64( 0x0010000000000000 );
-    shiftCount = 0x42C - aExp;
-    if ( 0 < shiftCount ) shift64RightJamming( aSig, shiftCount, &aSig );
-    return roundAndPackInt32( aSign, aSig STATUS_VAR );
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("cvttsd2si %[myfloat], %[myint]\n"
+    : [myint] "=r" (ret)
+    : [myfloat] "m" (a));
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 
 }
 
@@ -2763,39 +2776,16 @@ int32 float64_to_int32( float64 a STATUS_PARAM )
 
 int32 float64_to_int32_round_to_zero( float64 a STATUS_PARAM )
 {
-    flag aSign;
-    int_fast16_t aExp, shiftCount;
-    uint64_t aSig, savedASig;
-    int32_t z;
-    a = float64_squash_input_denormal(a STATUS_VAR);
+    int8 roundingMode;
+    int32 ret;
 
-    aSig = extractFloat64Frac( a );
-    aExp = extractFloat64Exp( a );
-    aSign = extractFloat64Sign( a );
-    if ( 0x41E < aExp ) {
-        if ( ( aExp == 0x7FF ) && aSig ) aSign = 0;
-        goto invalid;
-    }
-    else if ( aExp < 0x3FF ) {
-        if ( aExp || aSig ) STATUS(float_exception_flags) |= float_flag_inexact;
-        return 0;
-    }
-    aSig |= LIT64( 0x0010000000000000 );
-    shiftCount = 0x433 - aExp;
-    savedASig = aSig;
-    aSig >>= shiftCount;
-    z = aSig;
-    if ( aSign ) z = - z;
-    if ( ( z < 0 ) ^ aSign ) {
- invalid:
-        float_raise( float_flag_invalid STATUS_VAR);
-        return aSign ? (int32_t) 0x80000000 : 0x7FFFFFFF;
-    }
-    if ( ( aSig<<shiftCount ) != savedASig ) {
-        STATUS(float_exception_flags) |= float_flag_inexact;
-    }
-    return z;
-
+    roundingMode = float_round_to_zero;
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("cvttsd2si %[myfloat], %[myint]\n"
+    : [myint] "=r" (ret)
+    : [myfloat] "m" (a));
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 }
 
 /*----------------------------------------------------------------------------
@@ -2810,43 +2800,16 @@ int32 float64_to_int32_round_to_zero( float64 a STATUS_PARAM )
 
 int_fast16_t float64_to_int16_round_to_zero(float64 a STATUS_PARAM)
 {
-    flag aSign;
-    int_fast16_t aExp, shiftCount;
-    uint64_t aSig, savedASig;
-    int32 z;
+    int8 roundingMode;
+    int32 ret;
 
-    aSig = extractFloat64Frac( a );
-    aExp = extractFloat64Exp( a );
-    aSign = extractFloat64Sign( a );
-    if ( 0x40E < aExp ) {
-        if ( ( aExp == 0x7FF ) && aSig ) {
-            aSign = 0;
-        }
-        goto invalid;
-    }
-    else if ( aExp < 0x3FF ) {
-        if ( aExp || aSig ) {
-            STATUS(float_exception_flags) |= float_flag_inexact;
-        }
-        return 0;
-    }
-    aSig |= LIT64( 0x0010000000000000 );
-    shiftCount = 0x433 - aExp;
-    savedASig = aSig;
-    aSig >>= shiftCount;
-    z = aSig;
-    if ( aSign ) {
-        z = - z;
-    }
-    if ( ( (int16_t)z < 0 ) ^ aSign ) {
- invalid:
-        float_raise( float_flag_invalid STATUS_VAR);
-        return aSign ? (int32_t) 0xffff8000 : 0x7FFF;
-    }
-    if ( ( aSig<<shiftCount ) != savedASig ) {
-        STATUS(float_exception_flags) |= float_flag_inexact;
-    }
-    return z;
+    roundingMode = float_round_to_zero;
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("cvttsd2si %[myfloat], %[myint]\n"
+    : [myint] "=r" (ret)
+    : [myfloat] "m" (a));
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 }
 
 /*----------------------------------------------------------------------------
@@ -2861,34 +2824,18 @@ int_fast16_t float64_to_int16_round_to_zero(float64 a STATUS_PARAM)
 
 int64 float64_to_int64( float64 a STATUS_PARAM )
 {
-    flag aSign;
-    int_fast16_t aExp, shiftCount;
-    uint64_t aSig, aSigExtra;
-    a = float64_squash_input_denormal(a STATUS_VAR);
+    int8 roundingMode;
+    int64 ret;
 
-    aSig = extractFloat64Frac( a );
-    aExp = extractFloat64Exp( a );
-    aSign = extractFloat64Sign( a );
-    if ( aExp ) aSig |= LIT64( 0x0010000000000000 );
-    shiftCount = 0x433 - aExp;
-    if ( shiftCount <= 0 ) {
-        if ( 0x43E < aExp ) {
-            float_raise( float_flag_invalid STATUS_VAR);
-            if (    ! aSign
-                 || (    ( aExp == 0x7FF )
-                      && ( aSig != LIT64( 0x0010000000000000 ) ) )
-               ) {
-                return LIT64( 0x7FFFFFFFFFFFFFFF );
-            }
-            return (int64_t) LIT64( 0x8000000000000000 );
-        }
-        aSigExtra = 0;
-        aSig <<= - shiftCount;
-    }
-    else {
-        shift64ExtraRightJamming( aSig, 0, shiftCount, &aSig, &aSigExtra );
-    }
-    return roundAndPackInt64( aSign, aSig, aSigExtra STATUS_VAR );
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_X87_FLOAT_SCOPE(roundingMode)
+    asm ("fldl %[myfloat]\n"
+    "fistpq %[ret]\n"
+    : [ret] "=m" (ret)
+    : [myfloat] "m" (a)
+    : "st");
+    END_X87_FLOAT_SCOPE()
+    return ret;
 
 }
 
@@ -2904,44 +2851,18 @@ int64 float64_to_int64( float64 a STATUS_PARAM )
 
 int64 float64_to_int64_round_to_zero( float64 a STATUS_PARAM )
 {
-    flag aSign;
-    int_fast16_t aExp, shiftCount;
-    uint64_t aSig;
-    int64 z;
-    a = float64_squash_input_denormal(a STATUS_VAR);
+    int8 roundingMode;
+    int32 ret;
 
-    aSig = extractFloat64Frac( a );
-    aExp = extractFloat64Exp( a );
-    aSign = extractFloat64Sign( a );
-    if ( aExp ) aSig |= LIT64( 0x0010000000000000 );
-    shiftCount = aExp - 0x433;
-    if ( 0 <= shiftCount ) {
-        if ( 0x43E <= aExp ) {
-            if ( float64_val(a) != LIT64( 0xC3E0000000000000 ) ) {
-                float_raise( float_flag_invalid STATUS_VAR);
-                if (    ! aSign
-                     || (    ( aExp == 0x7FF )
-                          && ( aSig != LIT64( 0x0010000000000000 ) ) )
-                   ) {
-                    return LIT64( 0x7FFFFFFFFFFFFFFF );
-                }
-            }
-            return (int64_t) LIT64( 0x8000000000000000 );
-        }
-        z = aSig<<shiftCount;
-    }
-    else {
-        if ( aExp < 0x3FE ) {
-            if ( aExp | aSig ) STATUS(float_exception_flags) |= float_flag_inexact;
-            return 0;
-        }
-        z = aSig>>( - shiftCount );
-        if ( (uint64_t) ( aSig<<( shiftCount & 63 ) ) ) {
-            STATUS(float_exception_flags) |= float_flag_inexact;
-        }
-    }
-    if ( aSign ) z = - z;
-    return z;
+    roundingMode = float_round_to_zero;
+    BEGIN_X87_FLOAT_SCOPE(roundingMode)
+    asm ("fldl %[myfloat]\n"
+    "fistpq %[ret]\n"
+    : [ret] "=m" (ret)
+    : [myfloat] "m" (a)
+    : "st");
+    END_X87_FLOAT_SCOPE()
+    return ret;
 
 }
 
@@ -2954,26 +2875,19 @@ int64 float64_to_int64_round_to_zero( float64 a STATUS_PARAM )
 
 float32 float64_to_float32( float64 a STATUS_PARAM )
 {
-    flag aSign;
-    int_fast16_t aExp;
-    uint64_t aSig;
-    uint32_t zSig;
-    a = float64_squash_input_denormal(a STATUS_VAR);
+    int8 roundingMode;
+    float32 ret;
 
-    aSig = extractFloat64Frac( a );
-    aExp = extractFloat64Exp( a );
-    aSign = extractFloat64Sign( a );
-    if ( aExp == 0x7FF ) {
-        if ( aSig ) return commonNaNToFloat32( float64ToCommonNaN( a STATUS_VAR ) STATUS_VAR );
-        return packFloat32( aSign, 0xFF, 0 );
-    }
-    shift64RightJamming( aSig, 22, &aSig );
-    zSig = aSig;
-    if ( aExp || zSig ) {
-        zSig |= 0x40000000;
-        aExp -= 0x381;
-    }
-    return roundAndPackFloat32( aSign, aExp, zSig STATUS_VAR );
+    roundingMode = STATUS(float_rounding_mode);
+    BEGIN_SSE_FLOAT_SCOPE(roundingMode)
+    asm("movq %[myfloat64], %%xmm0\n"
+    "cvtsd2ss %%xmm0, %%xmm0\n"
+    "movd %%xmm0, %[myfloat32]\n"
+    : [myfloat32] "=r" (ret)
+    : [myfloat64] "m" (a)
+    : "xmm0");
+    END_SSE_FLOAT_SCOPE()
+    return ret;
 
 }
 
