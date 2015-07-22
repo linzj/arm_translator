@@ -533,6 +533,7 @@ DEF_HELPER_FLAGS_2(neon_pmull_64_hi, TCG_CALL_NO_RWG_SE, i64, i64, i64)
 DEF_HELPER_2(handle_swi, void, env, i32)
 DEF_HELPER_1(handle_kernel_trap, void, env)
 DEF_HELPER_1(handle_strex, void, env)
+DEF_HELPER_1(handle_ldrex, void, env)
 
 #ifdef ENABLE_ASAN
 DEF_HELPER_2(asan_bad_load, void, ptr, i32)
