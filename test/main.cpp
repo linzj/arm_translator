@@ -273,8 +273,3 @@ void helper_handle_strex(CPUARMState* env)
 {
     EMUNREACHABLE();
 }
-
-void helper_handle_ldrex(CPUARMState* env)
-{
-    EMUNREACHABLE();
-}

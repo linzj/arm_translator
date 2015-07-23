@@ -7427,7 +7427,6 @@ static void gen_load_exclusive(DisasContext *s, int rt, int rt2,
 
     store_reg(s, rt, tmp);
     tcg_gen_extu_i32_i64(s, cpu_exclusive_addr, addr);
-    gen_helper_handle_ldrex(s, cpu_env);
 }
 
 static void gen_clrex(DisasContext *s)
