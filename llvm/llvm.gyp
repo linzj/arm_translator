@@ -10,7 +10,6 @@
             'include_dirs': [
                 '.',
                 '<(DEPTH)/qemu',
-                '<!(llvm-config --includedir)',
             ],
             'defines': [
                 'LLVMLOG_LEVEL=<(llvmlog_level)',
@@ -19,16 +18,13 @@
                 'include_dirs': [
                     '.',
                     '<(DEPTH)/qemu',
-                    '<!(llvm-config --includedir)',
                 ],
                 'libraries': [
-                    '<!(llvm-config --libs)',
                     '-ldl',
                     '-lpthread',
                     '-lz',
                 ],
                 'ldflags': [
-                    '<!(llvm-config --ldflags)',
                 ],
                 'defines': [
                     'LLVMLOG_LEVEL=<(llvmlog_level)',

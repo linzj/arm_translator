@@ -4,13 +4,8 @@
 #include <pthread.h>
 #include "Registers.h"
 #include "TcgGenerator.h"
-#include "CompilerState.h"
-#include "IntrinsicRepository.h"
-#include "InitializeLLVM.h"
-#include "LLVMDisasContext.h"
 #include "QEMUDisasContext.h"
 #include "X86Assembler.h"
-#include "Output.h"
 #include "cpu.h"
 #include "tb.h"
 #include "translate.h"
@@ -102,7 +97,6 @@ void translate(CPUARMState* env, TranslateDesc& desc)
 {
     std::unique_ptr<DisasContextBase> ctxptr;
     if (desc.m_optimal) {
-        ctxptr.reset(new jit::LLVMDisasContext(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect));
     }
     else {
         ctxptr.reset(new qemu::QEMUDisasContext(desc.m_executableMemAllocator, desc.m_dispDirect, desc.m_dispIndirect, reinterpret_cast<void*>(desc.m_dispHot), desc.m_hotObject));
